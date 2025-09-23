@@ -1,0 +1,27 @@
+# Override файл для разработки
+# Автоматически применяется docker-compose при запуске
+
+version: "3.8"
+
+services:
+  backend:
+    volumes:
+      # Монтируем код для hot reload в режиме разработки (закомментировано для production)
+      # - ./backend/src:/app/src
+      # Монтируем uploads директорию
+      - ./uploads:/app/uploads
+    environment:
+      - NODE_ENV=development
+
+  mysql:
+    ports:
+      # Открываем порт MySQL для внешних подключений
+      - "3306:3306"
+    volumes:
+      # Персистентное хранение данных
+      - mysql_data:/var/lib/mysql
+      # Скрипты инициализации
+      - ./mysql/init:/docker-entrypoint-initdb.d
+
+volumes:
+  mysql_data:
