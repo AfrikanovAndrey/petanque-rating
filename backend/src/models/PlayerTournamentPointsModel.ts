@@ -168,14 +168,14 @@ export class PlayerTournamentPointsModel {
       if (player.player_id) {
         const [resultsRows] = await pool.execute<RowDataPacket[]>(
           `
-          SELECT 
+          SELECT
             ptp.id,
             ptp.tournament_id,
             ptp.player_id as team_id,
-            'PLAYER_RESULT' as points_reason,
+            COALESCE(tr.points_reason, 'CUP_QUARTER_FINAL') as points_reason,
             ptp.points,
-            NULL as cup,
-            0 as qualifying_wins,
+            tr.cup,
+            tr.qualifying_wins,
             ptp.created_at,
             ptp.updated_at,
             t.name as tournament_name,
@@ -184,7 +184,10 @@ export class PlayerTournamentPointsModel {
           FROM player_tournament_points ptp
           JOIN tournaments t ON ptp.tournament_id = t.id
           JOIN players p ON ptp.player_id = p.id
-          WHERE ptp.player_id = ?
+          LEFT JOIN team_players tp ON ptp.player_id = tp.player_id
+          LEFT JOIN tournament_results tr ON tp.team_id = tr.team_id AND ptp.tournament_id = tr.tournament_id
+          WHERE ptp.player_id = ? AND ptp.points > 0
+          GROUP BY ptp.id, ptp.tournament_id, ptp.player_id, ptp.points, tr.points_reason, tr.cup, tr.qualifying_wins
           ORDER BY ptp.points DESC, t.date DESC
           `,
           [player.player_id]
@@ -316,14 +319,14 @@ export class PlayerTournamentPointsModel {
     // Получаем все результаты игрока
     const [resultsRows] = await pool.execute<RowDataPacket[]>(
       `
-      SELECT 
+      SELECT
         ptp.id,
         ptp.tournament_id,
         ptp.player_id as team_id,
-        'PLAYER_RESULT' as points_reason,
+        COALESCE(tr.points_reason, 'CUP_QUARTER_FINAL') as points_reason,
         ptp.points,
-        NULL as cup,
-        0 as qualifying_wins,
+        tr.cup,
+        tr.qualifying_wins,
         ptp.created_at,
         ptp.updated_at,
         t.name as tournament_name,
@@ -332,7 +335,10 @@ export class PlayerTournamentPointsModel {
       FROM player_tournament_points ptp
       JOIN tournaments t ON ptp.tournament_id = t.id
       JOIN players p ON ptp.player_id = p.id
-      WHERE ptp.player_id = ?
+      LEFT JOIN team_players tp ON ptp.player_id = tp.player_id
+      LEFT JOIN tournament_results tr ON tp.team_id = tr.team_id AND ptp.tournament_id = tr.tournament_id
+      WHERE ptp.player_id = ? AND ptp.points > 0
+      GROUP BY ptp.id, ptp.tournament_id, ptp.player_id, ptp.points, tr.points_reason, tr.cup, tr.qualifying_wins
       ORDER BY ptp.points DESC, t.date DESC
       `,
       [playerId]
@@ -359,6 +365,40 @@ export class PlayerTournamentPointsModel {
       best_results: bestResults,
       all_results: allResults,
     };
+  }
+
+  // Диагностика дубликатов в player_tournament_points
+  static async checkDuplicates(playerId?: number): Promise<void> {
+    let whereClause = "";
+    let params: number[] = [];
+
+    if (playerId) {
+      whereClause = "WHERE player_id = ?";
+      params = [playerId];
+    }
+
+    const [duplicates] = await pool.execute(
+      `
+      SELECT player_id, tournament_id, COUNT(*) as count
+      FROM player_tournament_points
+      ${whereClause}
+      GROUP BY player_id, tournament_id
+      HAVING COUNT(*) > 1
+      ORDER BY player_id, tournament_id
+    `,
+      params
+    );
+
+    if ((duplicates as any[]).length > 0) {
+      console.log("Найдены дубликаты в player_tournament_points:");
+      (duplicates as any[]).forEach((dup: any) => {
+        console.log(
+          `Игрок ${dup.player_id}, турнир ${dup.tournament_id}: ${dup.count} записей`
+        );
+      });
+    } else {
+      console.log("Дубликатов не найдено");
+    }
   }
 
   // Метод больше не используется - очки теперь рассчитываются напрямую

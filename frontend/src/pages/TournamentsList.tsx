@@ -9,6 +9,7 @@ import { useQuery } from "react-query";
 import { tournamentsApi } from "../services/api";
 import { TournamentResult, TournamentWithResults } from "../types";
 import { formatDate, handleApiError } from "../utils";
+import { getPointsReasonText, getPointsReasonColor } from "../types";
 
 const TournamentsList: React.FC = () => {
   const [expandedTournament, setExpandedTournament] = useState<number | null>(
@@ -65,18 +66,16 @@ const TournamentsList: React.FC = () => {
     }
   };
 
-  const getPositionBadge = (position: string) => {
-    if (position === "1") return <span className="text-2xl">🥇</span>;
-    if (position === "2") return <span className="text-2xl">🥈</span>;
-    if (position === "3") return <span className="text-2xl">🥉</span>;
-    return position;
+  const getPositionBadge = (
+    position: string,
+    cup?: "A" | "B" | "C" | null,
+    qualifyingWins?: number
+  ) => {
+    return getPointsReasonText(position, cup, qualifyingWins);
   };
 
   const getPositionColor = (position: string) => {
-    if (position === "1") return "text-yellow-600";
-    if (position === "2") return "text-gray-600";
-    if (position === "3") return "text-amber-600";
-    return "text-gray-900";
+    return getPointsReasonColor(position);
   };
 
   if (isLoading) {
@@ -236,12 +235,16 @@ const TournamentsList: React.FC = () => {
                                                   <div
                                                     className={`text-sm font-medium ${getPositionColor(
                                                       result.points_reason ||
-                                                        result.cup_position
+                                                        result.cup_position ||
+                                                        ""
                                                     )}`}
                                                   >
                                                     {getPositionBadge(
                                                       result.points_reason ||
-                                                        result.cup_position
+                                                        result.cup_position ||
+                                                        "",
+                                                      result.cup,
+                                                      result.qualifying_wins
                                                     )}
                                                   </div>
                                                 </div>

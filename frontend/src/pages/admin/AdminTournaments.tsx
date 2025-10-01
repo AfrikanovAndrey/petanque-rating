@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { adminApi } from "../../services/api";
 import { formatDate, formatDateTime, handleApiError } from "../../utils";
+import { getPointsReasonText } from "../../types";
 
 interface TournamentUploadForm {
   tournament_name: string;
@@ -42,11 +43,12 @@ const AdminTournaments: React.FC = () => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getPositionBadge = (position: string) => {
-    if (position === "1") return <span className="text-2xl">🥇</span>;
-    if (position === "2") return <span className="text-2xl">🥈</span>;
-    if (position === "3") return <span className="text-2xl">🥉</span>;
-    return position;
+  const getPositionBadge = (
+    position: string,
+    cup?: "A" | "B" | "C" | null,
+    qualifyingWins?: number
+  ) => {
+    return getPointsReasonText(position, cup, qualifyingWins);
   };
 
   const {
@@ -807,9 +809,10 @@ const AdminTournaments: React.FC = () => {
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   <div className="flex flex-col">
                                     <div className="text-sm font-medium text-gray-900">
-                                      {getPositionBadge(
-                                        result.points_reason ||
-                                          result.cup_position
+                                      {getPointsReasonText(
+                                        result.points_reason,
+                                        result.cup,
+                                        result.qualifyingWins
                                       )}
                                     </div>
                                   </div>

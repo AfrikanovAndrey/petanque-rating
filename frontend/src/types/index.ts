@@ -61,32 +61,70 @@ export enum PointsReason {
   PLAYER_RESULT = "PLAYER_RESULT",
 }
 
-// Функция для преобразования PointsReason в читаемый текст
 export function getPointsReasonText(
   reason: PointsReason | string,
-  cup?: "A" | "B" | null
+  cup?: "A" | "B" | "C" | null,
+  qualifyingWins?: number
 ): string {
+  // Для обратной совместимости со старыми данными
+  if (typeof reason === "string") {
+    // Проверяем, является ли строка валидным значением PointsReason
+    if (Object.values(PointsReason).includes(reason as PointsReason)) {
+      // Преобразуем строку в соответствующий enum
+      reason = reason as PointsReason;
+    } else {
+      return reason; // Возвращаем как есть, если не нашли соответствие
+    }
+  }
+
   switch (reason) {
     case PointsReason.QUALIFYING_HIGH:
+      if (qualifyingWins !== undefined && qualifyingWins >= 3) {
+        return `Победы в квалификационном этапе: >= 3`;
+      }
       return "Квалификация >=3 побед";
+
     case PointsReason.QUALIFYING_LOW:
+      if (
+        qualifyingWins !== undefined &&
+        qualifyingWins > 0 &&
+        qualifyingWins <= 2
+      ) {
+        return `Победы в квалификационном этапе: 1-2`;
+      }
       return "Квалификация 1-2 победы";
+
     case PointsReason.CUP_WINNER:
-      return cup ? `1 место ${cup}` : "1 место";
+      return cup ? `1 ${cup}` : "1 место";
+
     case PointsReason.CUP_RUNNER_UP:
-      return cup ? `2 место ${cup}` : "2 место";
+      return cup ? `2 ${cup}` : "2 место";
+
     case PointsReason.CUP_THIRD_PLACE:
-      return cup ? `3 место ${cup}` : "3 место";
+      return cup ? `3 ${cup}` : "3 место";
+
     case PointsReason.CUP_SEMI_FINAL:
-      return cup ? `Полуфинал ${cup}` : "Полуфинал";
+      return cup ? `1/2 ${cup}` : "Полуфинал";
+
     case PointsReason.CUP_QUARTER_FINAL:
-      return cup ? `Четвертьфинал ${cup}` : "Четвертьфинал";
+      return cup ? `1/4 ${cup}` : "Четвертьфинал";
+
     case PointsReason.PLAYER_RESULT:
-      return "Результат турнира";
+      return "Результат игрока";
+
     default:
-      // Для обратной совместимости со старыми данными
-      return reason;
+      throw new Error(`Неизвестное значение PointsReason: ${reason}`);
   }
+
+  return "Результат турнира";
+}
+
+// Функция для получения цвета позиции (для обратной совместимости)
+export function getPointsReasonColor(reason: PointsReason | string): string {
+  if (reason === "1") return "text-yellow-600";
+  if (reason === "2") return "text-gray-600";
+  if (reason === "3") return "text-amber-600";
+  return "text-gray-900";
 }
 
 // Результат турнира
@@ -94,7 +132,7 @@ export interface TournamentResult {
   id: number;
   tournament_id: number;
   team_id: number;
-  points_reason: PointsReason | string;
+  points_reason: PointsReason;
   cup_position?: string; // Для обратной совместимости
   points: number;
   cup?: "A" | "B" | null; // Кубок А или Б, null если не попал в кубки

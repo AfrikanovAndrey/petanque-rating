@@ -30,11 +30,11 @@ const RatingTable: React.FC = () => {
       const response = await ratingApi.getRatingsByGender();
       switch (ratingView) {
         case "male":
-          return response.data.data.male || [];
+          return response.data?.data?.male || [];
         case "female":
-          return response.data.data.female || [];
+          return response.data?.data?.female || [];
         default:
-          return response.data.data.male || [];
+          return response.data?.data?.male || [];
       }
     },
     {
@@ -341,7 +341,8 @@ const RatingTable: React.FC = () => {
                                                   result.points_reason ||
                                                     result.cup_position ||
                                                     "",
-                                                  result.cup
+                                                  result.cup,
+                                                  result.qualifying_wins
                                                 )}
                                               </span>
                                             </div>

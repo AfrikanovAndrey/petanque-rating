@@ -136,12 +136,14 @@ export interface PlayerRating {
   licensed_name?: string; // Полное имя из лицензионной базы
 }
 
-export interface TournamentResultWithTournament extends TournamentResult {
+export interface TournamentResultWithTournament
+  extends Omit<TournamentResult, "points_reason"> {
   tournament_name: string;
   tournament_date: string;
   is_counted: boolean; // Входит ли результат в топ-8 лучших
   team_players: string; // Строка с именами игроков команды через запятую
   points: number; // Очки за этот результат (добавлено для совместимости с рейтингом)
+  points_reason: string; // Причина получения очков (может быть из разных источников)
 }
 
 export interface RatingTableRow {
