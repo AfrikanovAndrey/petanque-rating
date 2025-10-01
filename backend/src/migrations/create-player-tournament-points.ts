@@ -28,7 +28,9 @@ export async function createPlayerTournamentPoints(): Promise<void> {
         UNIQUE KEY unique_player_tournament (player_id, tournament_id),
         INDEX idx_player_points (player_id, points DESC),
         INDEX idx_tournament (tournament_id),
-        INDEX idx_points (points DESC)
+        INDEX idx_points (points DESC),
+        INDEX idx_player_tournament_points (player_id, tournament_id, points),
+        INDEX idx_tournament_created (tournament_id, created_at)
       )
     `);
     console.log("✓ Создана таблица player_tournament_points");

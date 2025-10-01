@@ -63,12 +63,40 @@ export class PlayerTournamentPointsModel {
     points: number
   ): Promise<number> {
     const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO player_tournament_points 
-       (player_id, tournament_id, points) 
+      `INSERT INTO player_tournament_points
+       (player_id, tournament_id, points)
        VALUES (?, ?, ?)`,
       [playerId, tournamentId, points]
     );
     return result.insertId;
+  }
+
+  // Создать несколько записей очков игроков (batch insert для оптимизации)
+  static async createPlayerTournamentPointsBatch(
+    playerPointsData: Array<{
+      playerId: number;
+      tournamentId: number;
+      points: number;
+    }>
+  ): Promise<number> {
+    if (playerPointsData.length === 0) return 0;
+
+    // Создаем VALUES строки для batch insert
+    const values = playerPointsData.map(() => "(?, ?, ?)").join(", ");
+    const params: number[] = [];
+
+    playerPointsData.forEach((data) => {
+      params.push(data.playerId, data.tournamentId, data.points);
+    });
+
+    const [result] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO player_tournament_points
+       (player_id, tournament_id, points)
+       VALUES ${values}`,
+      params
+    );
+
+    return result.affectedRows;
   }
 
   // Обновить очки игрока за турнир

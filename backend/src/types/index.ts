@@ -79,7 +79,7 @@ export interface TournamentResult {
   tournament_id: number;
   team_id: number;
   points_reason: PointsReason;
-  cup?: "A" | "B" | "C" | null;
+  cup?: "A" | "B" | null;
   qualifying_wins?: number; // Количество побед команды в квалификационной части
   wins?: number; // Общее количество побед (qualifying_wins + бонусы за кубки)
   loses?: number; // Общее количество поражений
@@ -159,7 +159,7 @@ export interface TournamentUploadData {
   results: Array<{
     player_name: string;
     points_reason: string;
-    cup?: "A" | "B" | "C" | null;
+    cup?: "A" | "B" | null;
   }>;
 }
 
@@ -207,6 +207,7 @@ export interface LicensedPlayer {
 export interface LicensedPlayerUploadData {
   license_number: string;
   player_name: string; // Имя игрока, будет создан/найден в таблице players
+  full_name?: string; // Полное имя для совместимости
   city: string;
   license_date: string;
   year: number;
@@ -259,7 +260,7 @@ export interface TournamentTeamUploadData {
     team_name: string;
     team_players: string[]; // массив имен игроков в команде (1-4)
     points_reason: string;
-    cup?: "A" | "B" | "C" | null;
+    cup?: "A" | "B" | null;
   }>;
 }
 

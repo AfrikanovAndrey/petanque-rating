@@ -97,7 +97,7 @@ export interface TournamentResult {
   points_reason: PointsReason | string;
   cup_position?: string; // Для обратной совместимости
   points: number;
-  cup?: "A" | "B" | "C" | null; // Кубок А, Б или С, null если не попал в кубки
+  cup?: "A" | "B" | null; // Кубок А или Б, null если не попал в кубки
   qualifying_wins?: number; // Количество побед команды в квалификационной части
   wins?: number; // Общее количество побед (qualifying_wins + бонусы за кубки)
   loses?: number; // Общее количество поражений

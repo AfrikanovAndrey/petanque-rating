@@ -746,10 +746,6 @@ const AdminTournaments: React.FC = () => {
                 const cupB = selectedTournament.results.filter(
                   (result: any) => result.cup === "B"
                 );
-                const cupC = selectedTournament.results.filter(
-                  (result: any) =>
-                    !result.cup || (result.cup !== "A" && result.cup !== "B")
-                );
 
                 const sortResults = (results: any[]) => {
                   return results.sort((a: any, b: any) => {
@@ -838,7 +834,6 @@ const AdminTournaments: React.FC = () => {
                   <div className="space-y-6">
                     {renderCupTable(cupA, "Кубок A")}
                     {renderCupTable(cupB, "Кубок B")}
-                    {renderCupTable(cupC, "Кубок C")}
                   </div>
                 );
               })()}

@@ -191,11 +191,6 @@ const TournamentsList: React.FC = () => {
                             const cupB = details.results.filter(
                               (result: TournamentResult) => result.cup === "B"
                             );
-                            const cupC = details.results.filter(
-                              (result: TournamentResult) =>
-                                !result.cup ||
-                                (result.cup !== "A" && result.cup !== "B")
-                            );
 
                             const renderCupTable = (
                               results: TournamentResult[],
@@ -274,7 +269,6 @@ const TournamentsList: React.FC = () => {
                               <div className="space-y-6">
                                 {renderCupTable(cupA, "Кубок A")}
                                 {renderCupTable(cupB, "Кубок B")}
-                                {renderCupTable(cupC, "Кубок C")}
                               </div>
                             );
                           })()}
