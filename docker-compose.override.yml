@@ -5,13 +5,57 @@ version: "3.8"
 
 services:
   backend:
+    # Переопределяем образ для dev-режима
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+      target: development
     volumes:
-      # Монтируем код для hot reload в режиме разработки (закомментировано для production)
-      # - ./backend/src:/app/src
+      # Монтируем код для hot reload в режиме разработки
+      - ./backend/src:/app/src:cached
+      - ./backend/package.json:/app/package.json:cached
+      - ./backend/package-lock.json:/app/package-lock.json:cached
+      - ./backend/tsconfig.json:/app/tsconfig.json:cached
       # Монтируем uploads директорию
       - ./uploads:/app/uploads
+      # Исключаем node_modules из монтирования (используем анонимный volume)
+      - /app/node_modules
     environment:
       - NODE_ENV=development
+    # Переопределяем команду запуска для dev-режима
+    command: npm run dev
+    # Добавляем stdin/tty для интерактивности
+    stdin_open: true
+    tty: true
+
+  frontend:
+    # Переопределяем образ для dev-режима
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+      target: development
+    volumes:
+      # Монтируем код для hot reload
+      - ./frontend/src:/app/src:cached
+      - ./frontend/public:/app/public:cached
+      - ./frontend/index.html:/app/index.html:cached
+      - ./frontend/package.json:/app/package.json:cached
+      - ./frontend/package-lock.json:/app/package-lock.json:cached
+      - ./frontend/vite.config.ts:/app/vite.config.ts:cached
+      - ./frontend/tsconfig.json:/app/tsconfig.json:cached
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js:cached
+      - ./frontend/postcss.config.js:/app/postcss.config.js:cached
+      # Исключаем node_modules из монтирования (используем анонимный volume)
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3001/api
+    # Переопределяем порты для Vite dev server
+    ports:
+      - "3002:5173" # Используем порт 3002 для dev-режима чтобы избежать конфликтов
+    # Переопределяем команду запуска
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    stdin_open: true
+    tty: true
 
   mysql:
     ports:

@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
 import {
   TrophyIcon,
@@ -8,11 +8,15 @@ import {
   PlusIcon,
   ArrowUpIcon,
   CogIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
 import { ratingApi, adminApi } from "../../services/api";
-import { formatNumber } from "../../utils";
+import { formatNumber, handleApiError } from "../../utils";
 
 const AdminDashboard: React.FC = () => {
+  const queryClient = useQueryClient();
+
   // Загружаем данные для статистики
   const { data: ratingData } = useQuery("dashboardRating", async () => {
     const response = await ratingApi.getFullRating();
@@ -31,6 +35,37 @@ const AdminDashboard: React.FC = () => {
     const response = await adminApi.getPlayers();
     return response.data.data || [];
   });
+
+  // Мутация для удаления всех команд
+  const deleteAllTeamsMutation = useMutation(
+    async () => {
+      return await adminApi.deleteAllTeams();
+    },
+    {
+      onSuccess: (response) => {
+        const deletedCount = response.data.data?.deleted_count || 0;
+        toast.success(`Удалено команд: ${deletedCount}`);
+        // Обновляем кеш данных
+        queryClient.invalidateQueries("dashboardRating");
+        queryClient.invalidateQueries("dashboardTournaments");
+        queryClient.invalidateQueries("dashboardPlayers");
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
+  // Обработчик удаления всех команд
+  const handleDeleteAllTeams = () => {
+    if (
+      window.confirm(
+        "Вы уверены, что хотите удалить ВСЕ команды? Это действие нельзя отменить!"
+      )
+    ) {
+      deleteAllTeamsMutation.mutate();
+    }
+  };
 
   // Вычисляем статистику
   const stats = {
@@ -78,11 +113,11 @@ const AdminDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Заголовок */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Панель управления</h1>
-        <p className="mt-2 text-gray-600">Обзор системы рейтинга игроков</p>
+        <p className="mt-1 text-gray-600">Обзор системы рейтинга игроков</p>
       </div>
 
       {/* Статистика */}
@@ -118,7 +153,7 @@ const AdminDashboard: React.FC = () => {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Топ игроков */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-6">
@@ -242,6 +277,19 @@ const AdminDashboard: React.FC = () => {
               Управление игроками
             </span>
           </Link>
+
+          <button
+            onClick={handleDeleteAllTeams}
+            disabled={deleteAllTeamsMutation.isLoading}
+            className="flex items-center p-4 border-2 border-dashed border-red-300 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <TrashIcon className="h-5 w-5 text-red-500 mr-3" />
+            <span className="text-red-600 font-medium">
+              {deleteAllTeamsMutation.isLoading
+                ? "Удаление..."
+                : "Удалить все команды"}
+            </span>
+          </button>
         </div>
       </div>
     </div>

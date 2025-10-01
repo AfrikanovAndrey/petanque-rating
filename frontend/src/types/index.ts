@@ -9,6 +9,7 @@ export interface ApiResponse<T = any> {
 export interface Player {
   id: number;
   name: string;
+  gender: string;
   created_at: string;
   updated_at: string;
 }
@@ -22,25 +23,110 @@ export interface Tournament {
   updated_at: string;
 }
 
+// Команда
+export interface Team {
+  id: number;
+  name: string;
+  tournament_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Участник команды
+export interface TeamMember {
+  player_id: number;
+  player_name: string;
+  sort_order: number;
+}
+
+// Команда с участниками
+export interface TeamWithMembers extends Team {
+  members: TeamMember[];
+}
+
+// Enum для причин получения очков
+export enum PointsReason {
+  // Кубки
+  CUP_WINNER = "CUP_WINNER",
+  CUP_RUNNER_UP = "CUP_RUNNER_UP",
+  CUP_THIRD_PLACE = "CUP_THIRD_PLACE",
+  CUP_SEMI_FINAL = "CUP_SEMI_FINAL",
+  CUP_QUARTER_FINAL = "CUP_QUARTER_FINAL",
+
+  // Квалификация (швейцарка)
+  QUALIFYING_HIGH = "QUALIFYING_HIGH", // >=3 побед
+  QUALIFYING_LOW = "QUALIFYING_LOW", // 1-2 побед
+
+  // Результат игрока
+  PLAYER_RESULT = "PLAYER_RESULT",
+}
+
+// Функция для преобразования PointsReason в читаемый текст
+export function getPointsReasonText(
+  reason: PointsReason | string,
+  cup?: "A" | "B" | null
+): string {
+  switch (reason) {
+    case PointsReason.QUALIFYING_HIGH:
+      return "Квалификация >=3 побед";
+    case PointsReason.QUALIFYING_LOW:
+      return "Квалификация 1-2 победы";
+    case PointsReason.CUP_WINNER:
+      return cup ? `1 место ${cup}` : "1 место";
+    case PointsReason.CUP_RUNNER_UP:
+      return cup ? `2 место ${cup}` : "2 место";
+    case PointsReason.CUP_THIRD_PLACE:
+      return cup ? `3 место ${cup}` : "3 место";
+    case PointsReason.CUP_SEMI_FINAL:
+      return cup ? `Полуфинал ${cup}` : "Полуфинал";
+    case PointsReason.CUP_QUARTER_FINAL:
+      return cup ? `Четвертьфинал ${cup}` : "Четвертьфинал";
+    case PointsReason.PLAYER_RESULT:
+      return "Результат турнира";
+    default:
+      // Для обратной совместимости со старыми данными
+      return reason;
+  }
+}
+
 // Результат турнира
 export interface TournamentResult {
   id: number;
   tournament_id: number;
-  player_id: number;
-  position: number;
+  team_id: number;
+  points_reason: PointsReason | string;
+  cup_position?: string; // Для обратной совместимости
   points: number;
+  cup?: "A" | "B" | "C" | null; // Кубок А, Б или С, null если не попал в кубки
+  qualifying_wins?: number; // Количество побед команды в квалификационной части
+  wins?: number; // Общее количество побед (qualifying_wins + бонусы за кубки)
+  loses?: number; // Общее количество поражений
   created_at: string;
   updated_at: string;
   tournament_name?: string;
   tournament_date?: string;
-  player_name?: string;
+  team_name?: string;
+  team_players?: string; // Строка с именами игроков через запятую
   is_counted?: boolean; // Входит ли в топ-N лучших результатов
 }
 
 // Рейтинг игрока
 export interface PlayerRating {
-  player_id: number;
+  player_id: number | null; // Может быть null для лицензированных игроков без записи в players
   player_name: string;
+  gender?: "male" | "female" | null;
+  total_points: number;
+  rank?: number;
+  best_results: TournamentResult[];
+  all_results: TournamentResult[];
+  licensed_name?: string; // Полное имя из лицензионной базы
+}
+
+// Рейтинг команды
+export interface TeamRating {
+  team_id: number;
+  team_name: string;
+  players: string[]; // Массив имен игроков
   total_points: number;
   rank?: number;
   best_results: TournamentResult[];
@@ -50,18 +136,25 @@ export interface PlayerRating {
 // Строка таблицы рейтинга
 export interface RatingTableRow {
   rank: number;
-  player_id: number;
+  player_id: number | null;
   player_name: string;
+  gender?: "male" | "female" | null;
   total_points: number;
 }
 
-// Настройки очков за позицию
-export interface PositionPoints {
-  id: number;
-  position: number;
-  points: number;
-  created_at: string;
-  updated_at: string;
+// Рейтинги разделенные по полу
+export interface RatingsByGender {
+  male: PlayerRating[];
+  female: PlayerRating[];
+  unknown: PlayerRating[];
+}
+
+// Статистика рейтингов по полу
+export interface GenderRatingCounts {
+  male: number;
+  female: number;
+  unknown: number;
+  total: number;
 }
 
 // Настройка рейтинга

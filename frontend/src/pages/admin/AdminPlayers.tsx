@@ -12,8 +12,22 @@ import { adminApi } from "../../services/api";
 import { Player } from "../../types";
 import { formatDateTime, handleApiError } from "../../utils";
 
+// Функция для форматирования отображения пола
+const formatGender = (gender: string | null | undefined): string => {
+  if (!gender) return "—";
+  switch (gender.toLowerCase()) {
+    case "male":
+      return "М";
+    case "female":
+      return "Ж";
+    default:
+      return "—";
+  }
+};
+
 interface EditPlayerForm {
   name: string;
+  gender: string;
 }
 
 const AdminPlayers: React.FC = () => {
@@ -43,8 +57,11 @@ const AdminPlayers: React.FC = () => {
 
   // Мутация для обновления игрока
   const updateMutation = useMutation(
-    async (data: { id: number; name: string }) => {
-      return await adminApi.updatePlayer(data.id, { name: data.name });
+    async (data: { id: number; name: string; gender: string }) => {
+      return await adminApi.updatePlayer(data.id, {
+        name: data.name,
+        gender: data.gender,
+      });
     },
     {
       onSuccess: () => {
@@ -83,6 +100,7 @@ const AdminPlayers: React.FC = () => {
   const openEditModal = (player: Player) => {
     setEditingPlayer(player);
     setValue("name", player.name);
+    setValue("gender", player.gender);
     setIsEditModalOpen(true);
   };
 
@@ -97,6 +115,7 @@ const AdminPlayers: React.FC = () => {
       updateMutation.mutate({
         id: editingPlayer.id,
         name: data.name.trim(),
+        gender: data.gender,
       });
     }
   };
@@ -180,6 +199,9 @@ const AdminPlayers: React.FC = () => {
                     ФИО
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Пол
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата добавления
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -204,6 +226,9 @@ const AdminPlayers: React.FC = () => {
                           {player.name}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatGender(player.gender)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateTime(player.created_at)}
@@ -316,6 +341,30 @@ const AdminPlayers: React.FC = () => {
                 {errors.name && (
                   <p className="mt-1 text-sm text-red-600">
                     {errors.name.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Пол
+                </label>
+                <select
+                  className={`input-field ${
+                    errors.gender ? "border-red-300" : ""
+                  }`}
+                  {...register("gender", {
+                    required: "Пол обязателен",
+                  })}
+                >
+                  <option value="">Выберите пол</option>
+                  <option value="male">Мужской</option>
+                  <option value="female">Женский</option>
+                  <option value="unknown">Неизвестно</option>
+                </select>
+                {errors.gender && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.gender.message}
                   </p>
                 )}
               </div>

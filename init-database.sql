@@ -154,3 +154,33 @@ CREATE TABLE IF NOT EXISTS licensed_players (
 INSERT IGNORE INTO rating_settings (setting_name, setting_value, description) VALUES 
   ('best_results_count', '8', 'Количество лучших результатов для подсчета рейтинга'),
   ('current_season', '2025', 'Текущий сезон');
+
+-- ========================================
+-- 4. ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ
+-- ========================================
+
+-- Данный файл объединяет функциональность следующих миграций:
+-- - migrate.ts (основные таблицы)
+-- - add-gender-column.ts (поле gender в players)
+-- - add-teams.ts (таблицы команд)
+-- - add-wins-column.ts (поле wins)
+-- - add-wins-loses-columns.ts (поля wins и loses)
+-- - create-player-tournament-points.ts (таблица очков игроков)
+-- - fix-cup-position.ts (корректировка структуры)
+-- - populate-gender.ts (заполнение пола - требует выполнения через приложение)
+-- - remove-points-from-tournament-results.ts (удаление поля points)
+-- - remove-position-enum-duplicates.ts (обновление enum)
+-- - remove-tournament-from-teams.ts (глобальные команды)
+-- - rename-cup-position-to-points-reason.ts (переименование поля)
+-- - rename-wins-to-qualifying-wins.ts (переименование поля)
+-- - restructure-teams-final.ts (окончательная структура команд)
+-- - restructure-teams-simple.ts (упрощенная структура команд)
+-- - restructure-teams.ts (изменения в структуре команд)
+-- - update-gender.ts (обновление определения пола - требует выполнения через приложение)
+
+-- ВАЖНО: 
+-- 1. Определение пола игроков (populate-gender.ts, update-gender.ts) должно выполняться через приложение
+-- 2. Данные о командах могут потребовать миграции при переходе со старой структуры
+-- 3. Рейтинговые очки рассчитываются автоматически при загрузке турниров
+
+-- Конец файла инициализации

@@ -37,18 +37,18 @@ check_dependencies() {
     fi
 }
 
-# Функция для запуска приложения
+# Функция для запуска приложения в production режиме
 start() {
-    log "Запуск приложения..."
+    log "Запуск приложения в production режиме..."
     
     # Создаем директории если их нет
     mkdir -p uploads mysql/data
     
-    # Запускаем контейнеры
+    # Запускаем контейнеры без override файла
     if command -v docker-compose &> /dev/null; then
-        docker-compose up -d
+        docker-compose -f docker-compose.yml up -d
     else
-        docker compose up -d
+        docker compose -f docker-compose.yml up -d
     fi
     
     # Ждем пока база данных запустится
@@ -62,6 +62,44 @@ start() {
     info "Frontend: http://localhost:3000"
     info "Backend API: http://localhost:3001/api"
     info "Админ панель: http://localhost:3000/admin (admin/admin123)"
+}
+
+# Функция для запуска приложения в dev режиме с hot reload
+dev() {
+    log "Запуск приложения в dev режиме с hot reload..."
+    
+    # Создаем директории если их нет
+    mkdir -p uploads mysql/data
+    
+    # Запускаем контейнеры с override файлом (автоматически применяется)
+    if command -v docker-compose &> /dev/null; then
+        docker-compose up
+    else
+        docker compose up
+    fi
+    
+    log "Dev режим завершен!"
+}
+
+# Функция для запуска только определенных сервисов в dev режиме
+dev_service() {
+    local service=${1:-}
+    
+    if [ -z "$service" ]; then
+        error "Укажите сервис: $0 dev-service <backend|frontend|mysql>"
+        exit 1
+    fi
+    
+    log "Запуск сервиса '$service' в dev режиме..."
+    
+    # Создаем директории если их нет
+    mkdir -p uploads mysql/data
+    
+    if command -v docker-compose &> /dev/null; then
+        docker-compose up "$service"
+    else
+        docker compose up "$service"
+    fi
 }
 
 # Функция для остановки приложения
@@ -87,12 +125,24 @@ restart() {
 
 # Функция для сборки образов
 build() {
-    log "Сборка образов..."
+    local mode=${1:-production}
     
-    if command -v docker-compose &> /dev/null; then
-        docker-compose build --no-cache
+    if [ "$mode" = "dev" ]; then
+        log "Сборка dev образов..."
+        
+        if command -v docker-compose &> /dev/null; then
+            docker-compose build --no-cache
+        else
+            docker compose build --no-cache
+        fi
     else
-        docker compose build --no-cache
+        log "Сборка production образов..."
+        
+        if command -v docker-compose &> /dev/null; then
+            docker-compose -f docker-compose.yml build --no-cache
+        else
+            docker compose -f docker-compose.yml build --no-cache
+        fi
     fi
     
     log "Образы собраны!"
@@ -203,21 +253,36 @@ restore() {
 help() {
     echo "Использование: $0 <команда> [опции]"
     echo ""
-    echo "Команды:"
-    echo "  start     Запуск приложения"
-    echo "  stop      Остановка приложения"
-    echo "  restart   Перезапуск приложения"
-    echo "  build     Сборка образов"
-    echo "  logs      Просмотр логов (опционально: logs <service>)"
-    echo "  status    Проверка статуса контейнеров"
-    echo "  clean     Полная очистка (контейнеры, образы, данные)"
-    echo "  backup    Создание бэкапа базы данных"
-    echo "  restore   Восстановление из бэкапа (restore <file>)"
-    echo "  help      Показать эту справку"
+    echo "🚀 Основные команды:"
+    echo "  start        Запуск приложения в production режиме"
+    echo "  dev          Запуск приложения в dev режиме с hot reload"
+    echo "  dev-service  Запуск одного сервиса в dev режиме (dev-service <service>)"
+    echo "  stop         Остановка приложения"
+    echo "  restart      Перезапуск приложения"
     echo ""
-    echo "Примеры:"
-    echo "  $0 start"
-    echo "  $0 logs backend"
+    echo "🔧 Утилиты:"
+    echo "  build        Сборка образов (build [dev|production])"
+    echo "  logs         Просмотр логов (logs [service])"
+    echo "  status       Проверка статуса контейнеров"
+    echo "  clean        Полная очистка (контейнеры, образы, данные)"
+    echo ""
+    echo "💾 Резервное копирование:"
+    echo "  backup       Создание бэкапа базы данных"
+    echo "  restore      Восстановление из бэкапа (restore <file>)"
+    echo ""
+    echo "❓ Справка:"
+    echo "  help         Показать эту справку"
+    echo ""
+    echo "📝 Примеры для разработки:"
+    echo "  $0 dev                    # Запуск всех сервисов в dev режиме"
+    echo "  $0 dev-service backend    # Запуск только backend в dev режиме"
+    echo "  $0 dev-service frontend   # Запуск только frontend в dev режиме"
+    echo "  $0 build dev              # Сборка dev образов"
+    echo "  $0 logs backend           # Просмотр логов backend"
+    echo ""
+    echo "📝 Примеры для production:"
+    echo "  $0 start                  # Запуск в production режиме"
+    echo "  $0 build production       # Сборка production образов"
     echo "  $0 restore backups/backup_20231120_143000.sql"
 }
 
@@ -229,6 +294,12 @@ main() {
         start)
             start
             ;;
+        dev)
+            dev
+            ;;
+        dev-service)
+            dev_service "$2"
+            ;;
         stop)
             stop
             ;;
@@ -236,7 +307,7 @@ main() {
             restart
             ;;
         build)
-            build
+            build "$2"
             ;;
         logs)
             logs "$2"

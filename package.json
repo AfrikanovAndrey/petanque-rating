@@ -8,7 +8,8 @@
         "client": "cd frontend && npm run dev",
         "build": "cd frontend && npm run build",
         "start": "cd backend && npm start",
-        "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+        "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+        "rebuild": "npm run build && npm run start"
     },
     "devDependencies": {
         "concurrently": "^8.2.2"

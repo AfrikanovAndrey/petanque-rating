@@ -172,7 +172,12 @@ DB_NAME=petanque_rating
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
+
+# Для работы с Google Таблицами (необязательно)
+GOOGLE_SHEETS_API_KEY=your_google_sheets_api_key_here
 ```
+
+**Для использования Google Таблиц:** Если вы планируете загружать турниры из Google Sheets, обязательно настройте `GOOGLE_SHEETS_API_KEY`. Подробные инструкции см. в файле [GOOGLE_SHEETS_SETUP.md](./GOOGLE_SHEETS_SETUP.md).
 
 #### 4. Запуск миграций
 
