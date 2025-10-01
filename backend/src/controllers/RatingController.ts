@@ -1,12 +1,13 @@
 import { Request, Response } from "express";
-import { PlayerModel } from "../models/PlayerModel";
+import { PlayerTournamentPointsModel } from "../models/PlayerTournamentPointsModel";
 import { RatingTableRow } from "../types";
 
 export class RatingController {
   // Получить таблицу рейтинга (публичный доступ)
   static async getRatingTable(req: Request, res: Response): Promise<void> {
     try {
-      const playerRatings = await PlayerModel.getPlayerRatings();
+      const playerRatings =
+        await PlayerTournamentPointsModel.getPlayerRatings();
 
       // Формируем таблицу рейтинга с позициями
       const ratingTable: RatingTableRow[] = playerRatings.map(
@@ -44,7 +45,9 @@ export class RatingController {
         return;
       }
 
-      const playerRating = await PlayerModel.getPlayerRating(playerId);
+      const playerRating = await PlayerTournamentPointsModel.getPlayerRating(
+        playerId
+      );
 
       if (!playerRating) {
         res.status(404).json({
@@ -70,7 +73,8 @@ export class RatingController {
   // Получить полную таблицу рейтинга с детальными данными (публичный доступ)
   static async getFullRatingTable(req: Request, res: Response): Promise<void> {
     try {
-      const playerRatings = await PlayerModel.getPlayerRatings();
+      const playerRatings =
+        await PlayerTournamentPointsModel.getPlayerRatings();
 
       // Добавляем позиции в рейтинге
       const fullRatingTable = playerRatings.map((player, index) => ({
@@ -87,6 +91,117 @@ export class RatingController {
       res.status(500).json({
         success: false,
         message: "Ошибка получения полного рейтинга",
+      });
+    }
+  }
+
+  // Получить мужской рейтинг (публичный доступ)
+  static async getMaleRatingTable(req: Request, res: Response): Promise<void> {
+    try {
+      const playerRatings =
+        await PlayerTournamentPointsModel.getMalePlayerRatings();
+
+      // Формируем таблицу рейтинга с позициями
+      const ratingTable = playerRatings.map((player, index) => ({
+        rank: index + 1,
+        player_id: player.player_id,
+        player_name: player.player_name,
+        gender: player.gender,
+        total_points: player.total_points,
+      }));
+
+      res.json({
+        success: true,
+        data: ratingTable,
+        gender: "male",
+        count: ratingTable.length,
+      });
+    } catch (error) {
+      console.error("Ошибка получения мужского рейтинга:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка получения мужского рейтинга",
+      });
+    }
+  }
+
+  // Получить женский рейтинг (публичный доступ)
+  static async getFemaleRatingTable(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const playerRatings =
+        await PlayerTournamentPointsModel.getFemalePlayerRatings();
+
+      // Формируем таблицу рейтинга с позициями
+      const ratingTable = playerRatings.map((player, index) => ({
+        rank: index + 1,
+        player_id: player.player_id,
+        player_name: player.player_name,
+        gender: player.gender,
+        total_points: player.total_points,
+      }));
+
+      res.json({
+        success: true,
+        data: ratingTable,
+        gender: "female",
+        count: ratingTable.length,
+      });
+    } catch (error) {
+      console.error("Ошибка получения женского рейтинга:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка получения женского рейтинга",
+      });
+    }
+  }
+
+  // Получить рейтинги разделенные по полу (публичный доступ)
+  static async getRatingsByGender(req: Request, res: Response): Promise<void> {
+    try {
+      const ratingsByGender =
+        await PlayerTournamentPointsModel.getPlayerRatingsByGender();
+
+      // Добавляем позиции для каждого рейтинга
+      const maleWithRanks = ratingsByGender.male.map((player, index) => ({
+        ...player,
+        rank: index + 1,
+      }));
+
+      const femaleWithRanks = ratingsByGender.female.map((player, index) => ({
+        ...player,
+        rank: index + 1,
+      }));
+
+      const unknownWithRanks = ratingsByGender.unknown.map((player, index) => ({
+        ...player,
+        rank: index + 1,
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          male: maleWithRanks,
+          female: femaleWithRanks,
+          unknown: unknownWithRanks,
+        },
+        counts: {
+          male: maleWithRanks.length,
+          female: femaleWithRanks.length,
+          unknown: unknownWithRanks.length,
+          total:
+            maleWithRanks.length +
+            femaleWithRanks.length +
+            unknownWithRanks.length,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка получения рейтингов по полу:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка получения рейтингов по полу",
       });
     }
   }

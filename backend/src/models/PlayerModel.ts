@@ -34,10 +34,14 @@ export class PlayerModel {
     return result.insertId;
   }
 
-  static async updatePlayer(id: number, name: string): Promise<boolean> {
+  static async updatePlayer(
+    id: number,
+    name: string,
+    gender: string
+  ): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
-      "UPDATE players SET name = ? WHERE id = ?",
-      [name, id]
+      "UPDATE players SET name = ?, gender = ? WHERE id = ?",
+      [name, gender, id]
     );
     return result.affectedRows > 0;
   }
@@ -57,35 +61,54 @@ export class PlayerModel {
     );
     const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
 
-    // Получаем всех игроков с их результатами
-    const [playersRows] = await pool.execute<RowDataPacket[]>(`
+    // Получаем текущий год для проверки лицензий
+    const currentYear = new Date().getFullYear();
+
+    // Получаем только лицензированных игроков - только они могут получать очки рейтинга
+    const [playersRows] = await pool.execute<RowDataPacket[]>(
+      `
       SELECT 
         p.id as player_id,
-        p.name as player_name
+        p.name as player_name,
+        p.name as licensed_name
       FROM players p
+      INNER JOIN licensed_players lp ON (
+        lp.year = ? AND lp.is_active = TRUE AND 
+        lp.player_id = p.id
+      )
       ORDER BY p.name
-    `);
+    `,
+      [currentYear]
+    );
 
     const ratings: PlayerRating[] = [];
 
     for (const player of playersRows) {
-      // Получаем все результаты игрока с информацией о турнирах
+      // Получаем все результаты игрока из player_tournament_points
       const [resultsRows] = await pool.execute<RowDataPacket[]>(
         `
         SELECT 
-          tr.id,
-          tr.tournament_id,
-          tr.player_id,
-          tr.position,
-          tr.points,
-          tr.created_at,
-          tr.updated_at,
+          ptp.id,
+          ptp.tournament_id,
+          ptp.team_id,
+          ptp.points_reason,
+          ptp.points,
+          ptp.cup,
+          ptp.qualifying_wins,
+          ptp.created_at,
+          ptp.updated_at,
           t.name as tournament_name,
-          t.date as tournament_date
-        FROM tournament_results tr
-        JOIN tournaments t ON tr.tournament_id = t.id
-        WHERE tr.player_id = ?
-        ORDER BY tr.points DESC, t.date DESC
+          t.date as tournament_date,
+          GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_name,
+          GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_players
+        FROM player_tournament_points ptp
+        JOIN tournaments t ON ptp.tournament_id = t.id
+        JOIN teams tm ON ptp.team_id = tm.id
+        JOIN team_players tp ON tm.id = tp.team_id
+        JOIN players p2 ON tp.player_id = p2.id
+        WHERE ptp.player_id = ?
+        GROUP BY ptp.id, t.name, t.date
+        ORDER BY ptp.points DESC, t.date DESC
       `,
         [player.player_id]
       );
@@ -111,6 +134,7 @@ export class PlayerModel {
         total_points: totalPoints,
         best_results: bestResults,
         all_results: allResults,
+        licensed_name: (player as any).licensed_name, // Полное имя из лицензионной базы
       });
     }
 
@@ -122,29 +146,63 @@ export class PlayerModel {
     const player = await this.getPlayerById(playerId);
     if (!player) return null;
 
+    // Получаем текущий год для проверки лицензий
+    const currentYear = new Date().getFullYear();
+
+    // Проверяем является ли игрок лицензированным в текущем году
+    // Улучшенная логика сопоставления по имени и фамилии
+    const playerNameParts = player.name.trim().split(/\s+/);
+    const playerFirstName = playerNameParts[0]?.toLowerCase() || "";
+    const playerLastName = playerNameParts[1]?.toLowerCase() || "";
+
+    const [licenseCheck] = await pool.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) as count FROM licensed_players 
+       WHERE year = ? AND is_active = TRUE AND player_id = ?`,
+      [currentYear, player.id]
+    );
+
+    if ((licenseCheck[0] as any).count === 0) {
+      // Если игрок не лицензирован, возвращаем пустой рейтинг
+      return {
+        player_id: playerId,
+        player_name: player.name,
+        total_points: 0,
+        best_results: [],
+        all_results: [],
+      };
+    }
+
     // Получаем количество лучших результатов из настроек
     const [settingsRows] = await pool.execute<RowDataPacket[]>(
       'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count"'
     );
     const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
 
-    // Получаем все результаты игрока
+    // Получаем все результаты игрока из player_tournament_points
     const [resultsRows] = await pool.execute<RowDataPacket[]>(
       `
       SELECT 
-        tr.id,
-        tr.tournament_id,
-        tr.player_id,
-        tr.position,
-        tr.points,
-        tr.created_at,
-        tr.updated_at,
+        ptp.id,
+        ptp.tournament_id,
+        ptp.team_id,
+        ptp.points_reason,
+        ptp.points,
+        ptp.cup,
+        ptp.qualifying_wins,
+        ptp.created_at,
+        ptp.updated_at,
         t.name as tournament_name,
-        t.date as tournament_date
-      FROM tournament_results tr
-      JOIN tournaments t ON tr.tournament_id = t.id
-      WHERE tr.player_id = ?
-      ORDER BY tr.points DESC, t.date DESC
+        t.date as tournament_date,
+        GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_name,
+        GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_players
+      FROM player_tournament_points ptp
+      JOIN tournaments t ON ptp.tournament_id = t.id
+      JOIN teams tm ON ptp.team_id = tm.id
+      JOIN team_players tp ON tm.id = tp.team_id
+      JOIN players p2 ON tp.player_id = p2.id
+      WHERE ptp.player_id = ?
+      GROUP BY ptp.id, t.name, t.date
+      ORDER BY ptp.points DESC, t.date DESC
     `,
       [playerId]
     );

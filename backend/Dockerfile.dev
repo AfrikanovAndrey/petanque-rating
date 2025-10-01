@@ -1,0 +1,32 @@
+# Development Dockerfile для backend с hot reload
+
+FROM node:18-alpine AS development
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем package.json и package-lock.json
+COPY package*.json ./
+
+# Устанавливаем все зависимости (включая dev)
+RUN npm ci && npm cache clean --force
+
+# Копируем исходный код (но в dev-режиме он будет монтироваться как volume)
+COPY . .
+
+# Создаем пользователя для безопасности
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Создаем директорию для загрузок и назначаем права
+RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app/uploads
+RUN chown -R nodejs:nodejs /app
+
+# Переключаемся на пользователя nodejs
+USER nodejs
+
+# Открываем порт
+EXPOSE 3001
+
+# В dev-режиме используем ts-node-dev для hot reload
+CMD ["npm", "run", "dev"]
