@@ -161,41 +161,53 @@ export class RatingController {
   // Получить рейтинги разделенные по полу (публичный доступ)
   static async getRatingsByGender(req: Request, res: Response): Promise<void> {
     try {
-      const ratingsByGender =
-        await PlayerTournamentPointsModel.getPlayerRatingsByGender();
+      const gender = req.query.gender as string;
 
-      // Добавляем позиции для каждого рейтинга
-      const maleWithRanks = ratingsByGender.male.map((player, index) => ({
-        ...player,
-        rank: index + 1,
-      }));
+      // Валидация параметра пола
+      const validGenders = ["male", "female"];
+      if (gender && !validGenders.includes(gender)) {
+        res.status(400).json({
+          success: false,
+          message: `Неверный параметр пола. Допустимые значения: ${validGenders}`,
+        });
+        return;
+      }
 
-      const femaleWithRanks = ratingsByGender.female.map((player, index) => ({
-        ...player,
-        rank: index + 1,
-      }));
+      // Если параметр пола не указан, возвращаем все рейтинги
+      if (!gender) {
+        const ratingsByGender =
+          await PlayerTournamentPointsModel.getPlayerRatingsByGender();
 
-      const unknownWithRanks = ratingsByGender.unknown.map((player, index) => ({
+        // Добавляем позиции для каждого рейтинга
+        const maleWithRanks = ratingsByGender.map((player, index) => ({
+          ...player,
+          rank: index + 1,
+        }));
+
+        res.json({
+          success: true,
+          data: maleWithRanks,
+          gender: "male",
+          count: maleWithRanks.length,
+        });
+        return;
+      }
+
+      // Получаем рейтинги для конкретного пола
+      const ratingsForGender =
+        await PlayerTournamentPointsModel.getPlayerRatingsByGender(gender);
+
+      // Добавляем позиции в рейтинге
+      const ratingsWithRanks = ratingsForGender.map((player, index) => ({
         ...player,
         rank: index + 1,
       }));
 
       res.json({
         success: true,
-        data: {
-          male: maleWithRanks,
-          female: femaleWithRanks,
-          unknown: unknownWithRanks,
-        },
-        counts: {
-          male: maleWithRanks.length,
-          female: femaleWithRanks.length,
-          unknown: unknownWithRanks.length,
-          total:
-            maleWithRanks.length +
-            femaleWithRanks.length +
-            unknownWithRanks.length,
-        },
+        data: ratingsWithRanks,
+        gender: gender,
+        count: ratingsWithRanks.length,
       });
     } catch (error) {
       console.error("Ошибка получения рейтингов по полу:", error);

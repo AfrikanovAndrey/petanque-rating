@@ -28,27 +28,6 @@ export enum PointsReason {
   QUALIFYING_LOW = "QUALIFYING_LOW", // 1-2 побед
 }
 
-// Функция для преобразования старых значений cup_position в PointsReason
-export function convertCupPositionToPointsReason(
-  cupPosition: string
-): PointsReason {
-  // Квалификация
-  if (cupPosition === "Квалификация >=3 побед")
-    return PointsReason.QUALIFYING_HIGH;
-  if (cupPosition === "Квалификация 1-2 победы")
-    return PointsReason.QUALIFYING_LOW;
-
-  // Позиции кубков
-  if (cupPosition === "1") return PointsReason.CUP_WINNER;
-  if (cupPosition === "2") return PointsReason.CUP_RUNNER_UP;
-  if (cupPosition === "3") return PointsReason.CUP_THIRD_PLACE;
-  if (cupPosition === "1/2") return PointsReason.CUP_SEMI_FINAL;
-  if (cupPosition === "1/4") return PointsReason.CUP_QUARTER_FINAL;
-
-  // По умолчанию
-  return PointsReason.CUP_QUARTER_FINAL;
-}
-
 // Функция для преобразования PointsReason в читаемый текст
 export function getPointsReasonText(
   reason: PointsReason,
@@ -176,11 +155,11 @@ export interface AuthResponse {
   message?: string;
 }
 export enum CupPosition {
-  WINNER = "1",
-  RUNNER_UP = "2",
-  THIRD_PLACE = "3",
-  SEMI_FINAL = "1/2",
-  QUARTER_FINAL = "1/4",
+  WINNER = "CUP_WINNER",
+  RUNNER_UP = "CUP_RUNNER_UP",
+  THIRD_PLACE = "CUP_THIRD_PLACE",
+  SEMI_FINAL = "CUP_SEMI_FINAL",
+  QUARTER_FINAL = "CUP_QUARTER_FINAL",
 }
 
 export interface Team {
@@ -191,7 +170,7 @@ export interface Team {
 export interface CupTeamResult {
   team: Team;
   cup: "A" | "B";
-  points_reason: string;
+  points_reason: CupPosition;
 }
 
 export interface LicensedPlayer {

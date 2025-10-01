@@ -24,18 +24,11 @@ const RatingTable: React.FC = () => {
     isLoading,
     error,
     refetch,
-  } = useQuery(
+  } = useQuery<PlayerRating[]>(
     ["rating", ratingView],
     async () => {
-      const response = await ratingApi.getRatingsByGender();
-      switch (ratingView) {
-        case "male":
-          return response.data?.data?.male || [];
-        case "female":
-          return response.data?.data?.female || [];
-        default:
-          return response.data?.data?.male || [];
-      }
+      const response = await ratingApi.getRatingsByGender(ratingView);
+      return response.data?.data || [];
     },
     {
       refetchInterval: 5 * 60 * 1000, // Обновляем каждые 5 минут
@@ -156,7 +149,7 @@ const RatingTable: React.FC = () => {
 
         <p className="text-gray-600">
           Рейтинг основан на {ratingData?.[0]?.best_results?.length || 8} лучших
-          результатах
+          результатах ({ratingData?.length || 0} игроков)
         </p>
         <p className="text-sm text-gray-500 mt-1">
           Последнее обновление: {new Date().toLocaleString("ru-RU")}
@@ -338,9 +331,7 @@ const RatingTable: React.FC = () => {
                                               </span>
                                               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
                                                 {getPointsReasonText(
-                                                  result.points_reason ||
-                                                    result.cup_position ||
-                                                    "",
+                                                  result.points_reason || "",
                                                   result.cup,
                                                   result.qualifying_wins
                                                 )}

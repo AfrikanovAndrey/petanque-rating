@@ -18,7 +18,6 @@ import {
   Team,
   TournamentUploadData,
   PointsReason,
-  convertCupPositionToPointsReason,
 } from "../types";
 import { PlayerTournamentPointsModel } from "../models/PlayerTournamentPointsModel";
 
@@ -44,6 +43,27 @@ export class TournamentController {
       .replace(/\s+/g, " ") // заменяем множественные пробелы на одинарные
       .replace(/[-.]/g, " ") // заменяем дефисы и точки на пробелы
       .trim();
+  }
+
+  // Сопоставление строковых позиций из Excel с enum CupPosition
+  static mapExcelPositionToCupPosition(excelPosition: string): CupPosition {
+    switch (excelPosition.trim()) {
+      case "1":
+        return CupPosition.WINNER;
+      case "2":
+        return CupPosition.RUNNER_UP;
+      case "3":
+        return CupPosition.THIRD_PLACE;
+      case "1/2":
+        return CupPosition.SEMI_FINAL;
+      case "1/4":
+        return CupPosition.QUARTER_FINAL;
+      default:
+        console.warn(
+          `Неизвестная позиция из Excel: "${excelPosition}", используем QUARTER_FINAL по умолчанию`
+        );
+        return CupPosition.QUARTER_FINAL;
+    }
   }
 
   // Проверка совпадения имен игроков с учетом различий в написании
@@ -998,7 +1018,7 @@ export class TournamentController {
         thirdPlace: [{ range: "F38", position: CupPosition.THIRD_PLACE }],
       };
 
-      const cupTeamResults: Array<{ team: Team; position: string }> = [];
+      const cupTeamResults: Array<{ team: Team; position: CupPosition }> = [];
 
       // Парсим все стадии
       // Определяем приоритет позиций (чем выше число, тем лучше позиция)
@@ -1137,11 +1157,11 @@ export class TournamentController {
   static async parseCupResultsFromDB(
     workbook: XLSX.WorkBook,
     tournamentId: number
-  ): Promise<Array<{ teamId: number; cup: "A" | "B"; position: string }>> {
+  ): Promise<Array<{ teamId: number; cup: "A" | "B"; position: CupPosition }>> {
     const cupResults: Array<{
       teamId: number;
       cup: "A" | "B";
-      position: string;
+      position: CupPosition;
     }> = [];
     const cupNames = ["A", "B"] as const; // Обрабатываем только кубки A и B
 
@@ -1205,7 +1225,8 @@ export class TournamentController {
         ],
       };
 
-      const cupTeamResults: Array<{ teamId: number; position: string }> = [];
+      const cupTeamResults: Array<{ teamId: number; position: CupPosition }> =
+        [];
 
       // Парсим все стадии
       // Определяем приоритет позиций (чем выше число, тем лучше позиция)
@@ -1647,7 +1668,7 @@ export class TournamentController {
       let cupResults: Array<{
         teamId: number;
         cup: "A" | "B";
-        position: string;
+        position: CupPosition;
       }>;
       try {
         cupResults = await this.parseCupResultsFromDB(workbook, tournamentId);
@@ -1751,7 +1772,7 @@ export class TournamentController {
 
   // Сохранение результата команды кубка
   static async saveCupTeamResult(
-    result: { teamId: number; cup: "A" | "B"; position: string },
+    result: { teamId: number; cup: "A" | "B"; position: CupPosition },
     tournamentId: number,
     teamWins: Map<string, number>,
     category: "1" | "2",
@@ -1854,8 +1875,28 @@ export class TournamentController {
       `📊 Команда ${result.teamId}: кубок ${result.cup}, позиция ${result.position}, побед: ${qualifying_wins}, лицензирована: ${isLicensed}, очков: ${points}`
     );
 
-    // Конвертируем позицию в правильное enum значение
-    const pointsReason = convertCupPositionToPointsReason(result.position);
+    // Позиция уже является правильным enum значением
+    let pointsReason: PointsReason;
+
+    switch (result.position) {
+      case CupPosition.WINNER:
+        pointsReason = PointsReason.CUP_WINNER;
+        break;
+      case CupPosition.RUNNER_UP:
+        pointsReason = PointsReason.CUP_RUNNER_UP;
+        break;
+      case CupPosition.THIRD_PLACE:
+        pointsReason = PointsReason.CUP_THIRD_PLACE;
+        break;
+      case CupPosition.SEMI_FINAL:
+        pointsReason = PointsReason.CUP_SEMI_FINAL;
+        break;
+      case CupPosition.QUARTER_FINAL:
+        pointsReason = PointsReason.CUP_QUARTER_FINAL;
+        break;
+      default:
+        pointsReason = PointsReason.CUP_QUARTER_FINAL; // значение по умолчанию
+    }
 
     await pool.execute(
       "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins) VALUES (?, ?, ?, ?, ?)",
@@ -2079,11 +2120,11 @@ export class TournamentController {
     workbook: XLSX.WorkBook,
     tournamentId: number,
     connection: any
-  ): Promise<Array<{ teamId: number; cup: "A" | "B"; position: string }>> {
+  ): Promise<Array<{ teamId: number; cup: "A" | "B"; position: CupPosition }>> {
     const cupResults: Array<{
       teamId: number;
       cup: "A" | "B";
-      position: string;
+      position: CupPosition;
     }> = [];
     const cupNames = ["A", "B"] as const; // Обрабатываем только кубки A и B
 
@@ -2130,7 +2171,8 @@ export class TournamentController {
         thirdPlace: [{ range: "F38", position: CupPosition.THIRD_PLACE }],
       };
 
-      const cupTeamResults: Array<{ teamId: number; position: string }> = [];
+      const cupTeamResults: Array<{ teamId: number; position: CupPosition }> =
+        [];
       const positionPriority: { [key: string]: number } = {
         [CupPosition.WINNER]: 5,
         [CupPosition.RUNNER_UP]: 4,

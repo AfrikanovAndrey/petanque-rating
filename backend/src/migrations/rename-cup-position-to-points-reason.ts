@@ -1,6 +1,6 @@
 import { pool } from "../config/database";
 import { RowDataPacket } from "mysql2";
-import { convertCupPositionToPointsReason, PointsReason } from "../types";
+import { PointsReason } from "../types";
 
 interface TableColumn extends RowDataPacket {
   Field: string;
@@ -63,7 +63,23 @@ export const renameCupPositionToPointsReason = async () => {
 
     let convertedCount = 0;
     for (const row of results) {
-      const pointsReason = convertCupPositionToPointsReason(row.cup_position);
+      // Простая конвертация старых значений cup_position в points_reason
+      let pointsReason = PointsReason.CUP_QUARTER_FINAL; // значение по умолчанию
+
+      if (row.cup_position === "1") pointsReason = PointsReason.CUP_WINNER;
+      else if (row.cup_position === "2")
+        pointsReason = PointsReason.CUP_RUNNER_UP;
+      else if (row.cup_position === "3")
+        pointsReason = PointsReason.CUP_THIRD_PLACE;
+      else if (row.cup_position === "1/2")
+        pointsReason = PointsReason.CUP_SEMI_FINAL;
+      else if (row.cup_position === "1/4")
+        pointsReason = PointsReason.CUP_QUARTER_FINAL;
+      else if (row.cup_position === "Квалификация >=3 побед")
+        pointsReason = PointsReason.QUALIFYING_HIGH;
+      else if (row.cup_position === "Квалификация 1-2 победы")
+        pointsReason = PointsReason.QUALIFYING_LOW;
+
       await pool.execute(
         "UPDATE tournament_results SET points_reason = ? WHERE id = ?",
         [pointsReason, row.id]

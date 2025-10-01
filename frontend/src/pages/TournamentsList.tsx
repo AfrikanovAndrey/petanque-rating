@@ -234,14 +234,11 @@ const TournamentsList: React.FC = () => {
                                                 <div className="flex flex-col">
                                                   <div
                                                     className={`text-sm font-medium ${getPositionColor(
-                                                      result.points_reason ||
-                                                        result.cup_position ||
-                                                        ""
+                                                      result.points_reason || ""
                                                     )}`}
                                                   >
                                                     {getPositionBadge(
                                                       result.points_reason ||
-                                                        result.cup_position ||
                                                         "",
                                                       result.cup,
                                                       result.qualifying_wins

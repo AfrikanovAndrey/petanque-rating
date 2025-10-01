@@ -360,7 +360,6 @@ const AdminPlayers: React.FC = () => {
                   <option value="">Выберите пол</option>
                   <option value="male">Мужской</option>
                   <option value="female">Женский</option>
-                  <option value="unknown">Неизвестно</option>
                 </select>
                 {errors.gender && (
                   <p className="mt-1 text-sm text-red-600">

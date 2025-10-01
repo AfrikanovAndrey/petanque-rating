@@ -14,7 +14,7 @@ const checkAndFixCupPositionColumn = async () => {
   try {
     console.log("🔍 Проверка структуры таблицы tournament_results...");
 
-    // Проверяем существование столбца cup_position
+    // Проверяем существование столбца points_reason
     const [columns] = await pool.execute<TableColumn[]>(
       "DESCRIBE tournament_results"
     );
@@ -28,28 +28,28 @@ const checkAndFixCupPositionColumn = async () => {
       );
     });
 
-    const hasCupPositionColumn = columns.some(
-      (col) => col.Field === "cup_position"
+    const hasPointsReasonColumn = columns.some(
+      (col) => col.Field === "points_reason"
     );
 
-    if (!hasCupPositionColumn) {
-      console.log("❌ Столбец cup_position отсутствует. Добавляем...");
+    if (!hasPointsReasonColumn) {
+      console.log("❌ Столбец points_reason отсутствует. Добавляем...");
 
-      // Добавляем столбец cup_position
+      // Добавляем столбец points_reason
       await pool.execute(`
-        ALTER TABLE tournament_results 
-        ADD COLUMN cup_position VARCHAR(10) NOT NULL DEFAULT '0' AFTER player_id
+        ALTER TABLE tournament_results
+        ADD COLUMN points_reason ENUM('CUP_WINNER', 'CUP_RUNNER_UP', 'CUP_THIRD_PLACE', 'CUP_SEMI_FINAL', 'CUP_QUARTER_FINAL', 'QUALIFYING_HIGH', 'QUALIFYING_LOW') NOT NULL DEFAULT 'CUP_QUARTER_FINAL' AFTER player_id
       `);
 
-      // Добавляем индекс для cup_position
+      // Добавляем индекс для points_reason
       await pool.execute(`
-        ALTER TABLE tournament_results 
-        ADD INDEX idx_cup_position (cup_position)
+        ALTER TABLE tournament_results
+        ADD INDEX idx_points_reason (points_reason)
       `);
 
-      console.log("✅ Столбец cup_position успешно добавлен");
+      console.log("✅ Столбец points_reason успешно добавлен");
     } else {
-      console.log("✅ Столбец cup_position уже существует");
+      console.log("✅ Столбец points_reason уже существует");
     }
 
     // Проверяем наличие столбца cup
@@ -59,8 +59,8 @@ const checkAndFixCupPositionColumn = async () => {
 
       // Добавляем столбец cup
       await pool.execute(`
-        ALTER TABLE tournament_results 
-        ADD COLUMN cup ENUM('A', 'B') NULL AFTER cup_position
+        ALTER TABLE tournament_results
+        ADD COLUMN cup ENUM('A', 'B') NULL AFTER points_reason
       `);
 
       console.log("✅ Столбец cup успешно добавлен");

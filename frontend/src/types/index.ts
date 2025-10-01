@@ -121,9 +121,12 @@ export function getPointsReasonText(
 
 // Функция для получения цвета позиции (для обратной совместимости)
 export function getPointsReasonColor(reason: PointsReason | string): string {
-  if (reason === "1") return "text-yellow-600";
-  if (reason === "2") return "text-gray-600";
-  if (reason === "3") return "text-amber-600";
+  if (reason === PointsReason.CUP_WINNER || reason === "CUP_WINNER")
+    return "text-yellow-600";
+  if (reason === PointsReason.CUP_RUNNER_UP || reason === "CUP_RUNNER_UP")
+    return "text-gray-600";
+  if (reason === PointsReason.CUP_THIRD_PLACE || reason === "CUP_THIRD_PLACE")
+    return "text-amber-600";
   return "text-gray-900";
 }
 
@@ -133,7 +136,6 @@ export interface TournamentResult {
   tournament_id: number;
   team_id: number;
   points_reason: PointsReason;
-  cup_position?: string; // Для обратной совместимости
   points: number;
   cup?: "A" | "B" | null; // Кубок А или Б, null если не попал в кубки
   qualifying_wins?: number; // Количество побед команды в квалификационной части
@@ -185,6 +187,13 @@ export interface RatingsByGender {
   male: PlayerRating[];
   female: PlayerRating[];
   unknown: PlayerRating[];
+}
+
+// Рейтинги для конкретного пола
+export interface GenderRatingResponse {
+  data: PlayerRating[];
+  gender: string;
+  count: number;
 }
 
 // Статистика рейтингов по полу

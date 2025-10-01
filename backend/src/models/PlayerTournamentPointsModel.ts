@@ -255,11 +255,9 @@ export class PlayerTournamentPointsModel {
   }
 
   // Получить рейтинги разделенные по полу
-  static async getPlayerRatingsByGender(): Promise<{
-    male: PlayerRating[];
-    female: PlayerRating[];
-    unknown: PlayerRating[];
-  }> {
+  static async getPlayerRatingsByGender(
+    gender?: string
+  ): Promise<PlayerRating[]> {
     const allRatings = await this.getPlayerRatings();
 
     const male = allRatings
@@ -274,7 +272,22 @@ export class PlayerTournamentPointsModel {
       .filter((rating) => !rating.gender || rating.gender === null)
       .sort((a, b) => b.total_points - a.total_points);
 
-    return { male, female, unknown };
+    // Если указан конкретный пол, возвращаем только его
+    if (gender) {
+      switch (gender) {
+        case "male":
+          return male;
+        case "female":
+          return female;
+        case "unknown":
+          return unknown;
+        default:
+          return [];
+      }
+    }
+
+    // Если пол не указан, возвращаем все рейтинги мужского пола (для обратной совместимости)
+    return male;
   }
 
   // Получить рейтинг конкретного игрока на основе новой таблицы

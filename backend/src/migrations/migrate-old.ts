@@ -37,7 +37,7 @@ const migrations = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     tournament_id INT NOT NULL,
     player_id INT NOT NULL,
-    cup_position VARCHAR(10) NOT NULL,
+    points_reason ENUM('CUP_WINNER', 'CUP_RUNNER_UP', 'CUP_THIRD_PLACE', 'CUP_SEMI_FINAL', 'CUP_QUARTER_FINAL', 'QUALIFYING_HIGH', 'QUALIFYING_LOW') NOT NULL DEFAULT 'CUP_QUARTER_FINAL',
     points INT NOT NULL DEFAULT 0,
     cup ENUM('A', 'B') NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -47,7 +47,7 @@ const migrations = [
     INDEX idx_tournament_player (tournament_id, player_id),
     INDEX idx_tournament_cup (tournament_id, cup),
     INDEX idx_points (points DESC),
-    INDEX idx_cup_position (cup_position)
+    INDEX idx_points_reason (points_reason)
   )`,
 
   // 4. Создание таблицы настроек рейтинга

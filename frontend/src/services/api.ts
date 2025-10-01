@@ -3,8 +3,6 @@ import {
   ApiResponse,
   PlayerRating,
   RatingTableRow,
-  RatingsByGender,
-  GenderRatingCounts,
   LoginCredentials,
   AuthResponse,
   Tournament,
@@ -71,9 +69,10 @@ export const ratingApi = {
   > => api.get("/rating/female"),
 
   // Получить рейтинги разделенные по полу
-  getRatingsByGender: (): Promise<
-    AxiosResponse<ApiResponse<RatingsByGender> & { counts: GenderRatingCounts }>
-  > => api.get("/rating/by-gender"),
+  getRatingsByGender: (
+    gender?: string
+  ): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get("/rating/by-gender" + (gender ? `?gender=${gender}` : "")),
 
   // Получить детали игрока
   getPlayerDetails: (

@@ -43,14 +43,6 @@ const AdminTournaments: React.FC = () => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getPositionBadge = (
-    position: string,
-    cup?: "A" | "B" | "C" | null,
-    qualifyingWins?: number
-  ) => {
-    return getPointsReasonText(position, cup, qualifyingWins);
-  };
-
   const {
     register,
     handleSubmit,
@@ -765,12 +757,8 @@ const AdminTournaments: React.FC = () => {
                       "1/4": 5, // четвертьфинал
                     };
 
-                    const aPriority =
-                      positionPriority[a.points_reason || a.cup_position] ||
-                      999;
-                    const bPriority =
-                      positionPriority[b.points_reason || b.cup_position] ||
-                      999;
+                    const aPriority = positionPriority[a.points_reason] || 999;
+                    const bPriority = positionPriority[b.points_reason] || 999;
 
                     return aPriority - bPriority;
                   });
