@@ -704,12 +704,14 @@ export class TournamentController {
           if (!isNaN(teamNumber)) {
             const players: string[] = [];
 
-            // Добавляем всех игроков команды (от 1 до 4)
-            for (let j = 1; j <= 4 && j < row.length; j++) {
-              const player = String(row[j]).trim();
-              if (player && player !== "undefined") {
-                players.push(player);
-              }
+            // Парсим игроков из строки с разделителями-запятыми
+            const playersString = String(row[1] || "").trim();
+            if (playersString) {
+              const parsedPlayers = playersString
+                .split(",")
+                .map((player) => this.cleanPlayerName(player.trim()))
+                .filter((player) => player && player !== "undefined");
+              players.push(...parsedPlayers);
             }
 
             if (players.length > 0) {
@@ -733,7 +735,21 @@ export class TournamentController {
     }
   }
 
-  // Валидация игроков из листа регистрации против базы данных
+  // Очистка имени игрока от частей в скобках и лишних пробелов
+  static cleanPlayerName(name: string): string {
+    return name
+      .replace(/\([^)]*\)/g, "") // Удаляем всё в скобках
+      .replace(/\s+/g, " ") // Заменяем множественные пробелы на одинарные
+      .trim();
+  }
+
+  // Проверка, является ли строка инициалами (одна или несколько букв с точками)
+  static isInitials(str: string): boolean {
+    // Проверяем формат: одна заглавная буква с точкой, например "И.", "И.О.", "A."
+    return /^[А-ЯA-Z]\.?(\s*[А-ЯA-Z]\.?)*$/.test(str.trim());
+  }
+
+  // Улучшенная валидация игроков из листа регистрации с автосозданием
   static async validatePlayerNamesFromRegistration(
     playerNames: string[]
   ): Promise<string[]> {
@@ -742,23 +758,128 @@ export class TournamentController {
     // Получаем всех игроков из базы данных
     const allPlayers = await PlayerModel.getAllPlayers();
     const registeredPlayersArray = allPlayers.map((p) => p.name);
-    const registeredPlayersNormalizedSet = new Set(
-      registeredPlayersArray.map((name) => this.normalizePlayerName(name))
-    );
 
     for (const playerName of playerNames) {
-      // Используем уже существующий метод для проверки неоднозначности
-      const matchResult = this.findPlayerMatch(
-        playerName,
-        registeredPlayersNormalizedSet,
-        registeredPlayersArray
-      );
+      // Очищаем имя от скобок
+      const cleanedName = this.cleanPlayerName(playerName);
+      const parts = cleanedName.trim().split(/\s+/);
 
-      // Если имя неоднозначно - добавляем ошибку
-      if (matchResult.ambiguous) {
-        errors.push(
-          `Неоднозначное имя игрока "${playerName}" в листе регистрации. ${matchResult.suggestion}`
-        );
+      // Случай 1: Только одно слово (например, "Мишин")
+      if (parts.length === 1) {
+        const surname = parts[0];
+
+        // Ищем всех игроков с такой фамилией (по первому слову)
+        const matchesBySurname = registeredPlayersArray.filter((dbPlayer) => {
+          const dbParts = dbPlayer.trim().split(/\s+/);
+          return (
+            dbParts.length > 0 &&
+            this.normalizePlayerName(dbParts[0]) ===
+              this.normalizePlayerName(surname)
+          );
+        });
+
+        if (matchesBySurname.length === 0) {
+          // Ищем по второму слову (возможно, это имя)
+          const matchesByFirstName = registeredPlayersArray.filter(
+            (dbPlayer) => {
+              const dbParts = dbPlayer.trim().split(/\s+/);
+              return (
+                dbParts.length > 1 &&
+                this.normalizePlayerName(dbParts[1]) ===
+                  this.normalizePlayerName(surname)
+              );
+            }
+          );
+
+          if (matchesByFirstName.length === 0) {
+            errors.push(
+              `❌ Игрок "${cleanedName}" не найден в базе данных. Укажите полное имя (Фамилия Имя) для автоматического создания.`
+            );
+          } else if (matchesByFirstName.length === 1) {
+            // Найден один игрок по имени - это ОК
+            console.log(
+              `✓ Игрок "${playerName}" найден по имени: ${matchesByFirstName[0]}`
+            );
+          } else {
+            errors.push(
+              `❌ Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByFirstName.join(
+                ", "
+              )}. Уточните имя.`
+            );
+          }
+        } else if (matchesBySurname.length === 1) {
+          // Найден ровно один игрок с такой фамилией - это ОК
+          console.log(
+            `✓ Игрок "${playerName}" однозначно идентифицирован: ${matchesBySurname[0]}`
+          );
+        } else {
+          // Найдено несколько игроков с такой фамилией
+          errors.push(
+            `❌ Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько игроков: ${matchesBySurname.join(
+              ", "
+            )}. Укажите полное имя.`
+          );
+        }
+      }
+      // Случай 2: Два и более слов (например, "Большаков В." или "Мишин Дмитрий")
+      else if (parts.length >= 2) {
+        const surname = parts[0];
+        const secondPart = parts[1];
+
+        // Проверяем, являются ли вторая часть инициалами
+        if (this.isInitials(secondPart)) {
+          // Ищем игроков по фамилии и инициалам в БД
+          const initial = secondPart.charAt(0).toUpperCase();
+          const matchesByInitial = registeredPlayersArray.filter((dbPlayer) => {
+            const dbParts = dbPlayer.trim().split(/\s+/);
+            if (dbParts.length < 2) return false;
+            const dbSurname = dbParts[0];
+            const dbFirstName = dbParts[1];
+            return (
+              this.normalizePlayerName(dbSurname) ===
+                this.normalizePlayerName(surname) &&
+              dbFirstName.charAt(0).toUpperCase() === initial
+            );
+          });
+
+          if (matchesByInitial.length === 0) {
+            // НЕ найдено игроков с такими инициалами в БД
+            // Это критическая ошибка - нельзя создать игрока с инициалами
+            errors.push(
+              `❌ Игрок "${cleanedName}" не найден в базе данных. Нельзя создать игрока с инициалами. Укажите полное имя (Фамилия Имя) в листе регистрации.`
+            );
+          } else if (matchesByInitial.length === 1) {
+            // Найден один игрок с такими инициалами - это ОК
+            console.log(
+              `✓ Игрок "${playerName}" найден по инициалам: ${matchesByInitial[0]}`
+            );
+          } else {
+            // Найдено несколько игроков с такими инициалами
+            errors.push(
+              `❌ Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByInitial.join(
+                ", "
+              )}. Укажите полное имя.`
+            );
+          }
+        } else {
+          // Полное имя - проверяем точное совпадение
+          const normalizedInput = this.normalizePlayerName(cleanedName);
+          const exactMatch = registeredPlayersArray.find(
+            (dbPlayer) => this.normalizePlayerName(dbPlayer) === normalizedInput
+          );
+
+          if (!exactMatch) {
+            // Если у игрока указаны и фамилия, и имя - он будет создан автоматически при сохранении
+            console.log(
+              `⚠️ Игрок "${cleanedName}" не найден в БД. Будет создан автоматически при сохранении турнира.`
+            );
+            // НЕ создаём игрока здесь! Создание происходит в parseAndSaveTeamsFromRegistrationSheet
+            // Просто добавляем в массив для последующих проверок уникальности в этой же сессии
+            registeredPlayersArray.push(cleanedName);
+          } else {
+            console.log(`✓ Игрок "${playerName}" найден: ${exactMatch}`);
+          }
+        }
       }
     }
 
@@ -842,12 +963,14 @@ export class TournamentController {
         if (row && row.length >= 2) {
           const teamNumber = parseInt(String(row[0]));
           if (!isNaN(teamNumber)) {
-            // Добавляем всех игроков команды (от 1 до 4)
-            for (let j = 1; j <= 4 && j < row.length; j++) {
-              const player = String(row[j]).trim();
-              if (player && player !== "undefined") {
-                allPlayerNames.push(player);
-              }
+            // Парсим игроков из строки с разделителями-запятыми
+            const playersString = String(row[1] || "").trim();
+            if (playersString) {
+              const players = playersString
+                .split(",")
+                .map((player) => this.cleanPlayerName(player.trim()))
+                .filter((player) => player && player !== "undefined");
+              allPlayerNames.push(...players);
             }
           }
         }
@@ -861,7 +984,7 @@ export class TournamentController {
         await this.validatePlayerNamesFromRegistration(allPlayerNames);
       if (nameValidationErrors.length > 0) {
         throw new Error(
-          `Ошибки валидации имен игроков в листе регистрации:\n${nameValidationErrors.join(
+          `Критические ошибки в именах игроков (Лист регистрации):\n${nameValidationErrors.join(
             "\n"
           )}`
         );
@@ -875,12 +998,14 @@ export class TournamentController {
           if (!isNaN(teamNumber)) {
             const players: string[] = [];
 
-            // Добавляем всех игроков команды (от 1 до 4)
-            for (let j = 1; j <= 4 && j < row.length; j++) {
-              const player = String(row[j]).trim();
-              if (player && player !== "undefined") {
-                players.push(player);
-              }
+            // Парсим игроков из строки с разделителями-запятыми
+            const playersString = String(row[1] || "").trim();
+            if (playersString) {
+              const parsedPlayers = playersString
+                .split(",")
+                .map((player) => this.cleanPlayerName(player.trim()))
+                .filter((player) => player && player !== "undefined");
+              players.push(...parsedPlayers);
             }
 
             if (players.length > 0) {
@@ -891,8 +1016,131 @@ export class TournamentController {
               const playerIds: number[] = [];
               for (const playerName of sortedPlayers) {
                 let playerId: number;
+                // Ищем игрока по очищенному имени или оригинальному
                 let player = await PlayerModel.getPlayerByName(playerName);
+
+                // Если не найден, пытаемся найти по нормализованному совпадению
                 if (!player) {
+                  const allPlayers = await PlayerModel.getAllPlayers();
+                  const normalizedSearchName =
+                    this.normalizePlayerName(playerName);
+                  const matchedPlayer = allPlayers.find(
+                    (p) =>
+                      this.normalizePlayerName(p.name) === normalizedSearchName
+                  );
+
+                  if (matchedPlayer) {
+                    player = matchedPlayer;
+                  }
+                }
+
+                // Если не найден - пытаемся найти по частям имени
+                if (!player) {
+                  const allPlayers = await PlayerModel.getAllPlayers();
+                  const nameParts = playerName.split(/\s+/);
+
+                  // Случай 1: Одно слово (только фамилия или только имя)
+                  if (nameParts.length === 1) {
+                    const searchTerm = nameParts[0];
+                    // Ищем по первому слову (фамилия)
+                    const matchesByFirstWord = allPlayers.filter((p) => {
+                      const dbParts = p.name.trim().split(/\s+/);
+                      return (
+                        dbParts.length >= 1 &&
+                        this.normalizePlayerName(dbParts[0]) ===
+                          this.normalizePlayerName(searchTerm)
+                      );
+                    });
+
+                    if (matchesByFirstWord.length === 1) {
+                      player = matchesByFirstWord[0];
+                      console.log(
+                        `✓ Игрок "${playerName}" найден по фамилии: ${player.name} (ID: ${player.id})`
+                      );
+                    } else if (matchesByFirstWord.length > 1) {
+                      throw new Error(
+                        `Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByFirstWord
+                          .map((p) => p.name)
+                          .join(", ")}. Укажите полное имя или инициалы.`
+                      );
+                    } else {
+                      // Не найдено по фамилии, ищем по имени
+                      const matchesBySecondWord = allPlayers.filter((p) => {
+                        const dbParts = p.name.trim().split(/\s+/);
+                        return (
+                          dbParts.length >= 2 &&
+                          this.normalizePlayerName(dbParts[1]) ===
+                            this.normalizePlayerName(searchTerm)
+                        );
+                      });
+
+                      if (matchesBySecondWord.length === 1) {
+                        player = matchesBySecondWord[0];
+                        console.log(
+                          `✓ Игрок "${playerName}" найден по имени: ${player.name} (ID: ${player.id})`
+                        );
+                      } else if (matchesBySecondWord.length > 1) {
+                        throw new Error(
+                          `Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesBySecondWord
+                            .map((p) => p.name)
+                            .join(", ")}. Укажите полное имя.`
+                        );
+                      }
+                      // Если не найдено по имени тоже, player остается null
+                    }
+                  }
+                  // Случай 2: Два слова - проверяем инициалы
+                  else if (
+                    nameParts.length >= 2 &&
+                    this.isInitials(nameParts[1])
+                  ) {
+                    // Это формат "Фамилия И." - ищем по инициалам
+                    const surname = nameParts[0];
+                    const initial = nameParts[1].charAt(0).toUpperCase();
+
+                    const matchesByInitial = allPlayers.filter((p) => {
+                      const dbParts = p.name.trim().split(/\s+/);
+                      if (dbParts.length < 2) return false;
+                      const dbSurname = dbParts[0];
+                      const dbFirstName = dbParts[1];
+                      return (
+                        this.normalizePlayerName(dbSurname) ===
+                          this.normalizePlayerName(surname) &&
+                        dbFirstName.charAt(0).toUpperCase() === initial
+                      );
+                    });
+
+                    if (matchesByInitial.length === 1) {
+                      player = matchesByInitial[0];
+                      console.log(
+                        `✓ Игрок "${playerName}" найден по инициалам: ${player.name} (ID: ${player.id})`
+                      );
+                    } else if (matchesByInitial.length > 1) {
+                      throw new Error(
+                        `Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByInitial
+                          .map((p) => p.name)
+                          .join(", ")}. Укажите полное имя.`
+                      );
+                    }
+                    // Если matchesByInitial.length === 0, player остается null и сработает следующая проверка
+                  }
+                }
+
+                if (!player) {
+                  // Проверяем, что игрок имеет полное имя (не инициалы)
+                  const nameParts = playerName.split(/\s+/);
+                  const hasInitials =
+                    nameParts.length >= 2 && /^[А-ЯA-Z]\.?$/.test(nameParts[1]);
+
+                  if (nameParts.length < 2 || hasInitials) {
+                    console.warn(
+                      `⚠️ Игрок "${playerName}" не создан: имя должно содержать полную фамилию и имя (без инициалов)`
+                    );
+                    throw new Error(
+                      `Игрок "${playerName}" имеет неполное имя. Укажите полное имя (Фамилия Имя) в листе регистрации.`
+                    );
+                  }
+
                   playerId = await PlayerModel.createPlayer(playerName);
                   console.log(
                     `✓ Создан игрок: "${playerName}" (ID: ${playerId})`
@@ -1635,6 +1883,9 @@ export class TournamentController {
         );
       }
 
+      // ВАЖНО: После валидации начинается сохранение данных
+      // При любой ошибке после этой точки нужно откатывать изменения
+
       // 1. Создаем турнир (используем отдельное соединение)
       let tournamentId: number;
       try {
@@ -1652,6 +1903,7 @@ export class TournamentController {
 
       // 2. Парсим и сохраняем команды из листа регистрации в БД (используем отдельное соединение)
       let savedTeams: Array<{ teamId: number; players: string[] }>;
+
       try {
         savedTeams = await this.parseAndSaveTeamsFromRegistrationSheet(
           workbook,
@@ -1659,6 +1911,33 @@ export class TournamentController {
         );
         console.log(`✓ Сохранено команд: ${savedTeams.length}`);
       } catch (error) {
+        // Откатываем турнир и связанные данные при ошибке парсинга команд
+        console.error(
+          `❌ Ошибка при парсинге команд, откатываем турнир ${tournamentId}...`
+        );
+
+        try {
+          // Удаляем турнир (каскадно удалятся связанные результаты через ON DELETE CASCADE)
+          await pool.execute("DELETE FROM tournaments WHERE id = ?", [
+            tournamentId,
+          ]);
+          console.log(
+            `✓ Турнир ${tournamentId} и связанные результаты удалены`
+          );
+
+          // ВАЖНО: Игроки НЕ удаляются, так как:
+          // 1. Они не связаны с турниром напрямую (через команды)
+          // 2. Могут быть полезны для будущих турниров
+          // 3. Их удаление может нарушить целостность, если они используются в других командах
+
+          // Команды и связи игрок-команда НЕ удаляются автоматически,
+          // но это не критично - они останутся сиротами и не будут влиять на систему
+        } catch (deleteError) {
+          console.error(
+            `❌ Не удалось удалить турнир: ${(deleteError as Error).message}`
+          );
+        }
+
         throw new Error(
           `Ошибка при парсинге и сохранении команд: ${(error as Error).message}`
         );
@@ -1762,6 +2041,11 @@ export class TournamentController {
         `❌ Критическая ошибка при парсинге файла турнира "${fileName}":`,
         error
       );
+
+      // ВАЖНО: При любой ошибке НЕ сохраняем турнир
+      // Просто пробрасываем ошибку дальше - турнир либо не был создан,
+      // либо уже удалён в блоке try-catch выше
+
       throw new Error(
         `Не удалось обработать файл турнира "${fileName}": ${
           (error as Error).message

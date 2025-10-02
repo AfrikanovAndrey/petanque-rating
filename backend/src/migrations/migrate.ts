@@ -2,6 +2,7 @@ import { pool } from "../config/database";
 import { populateGender } from "./populate-gender";
 import { updateGender } from "./update-gender";
 import { linkLicensedPlayersWithPlayers } from "./link-licensed-players";
+import { removePlayersWithInitials } from "./remove-players-with-initials";
 
 /**
  * Миграции для системы с уже инициализированной БД
@@ -38,6 +39,9 @@ export const runMigrations = async () => {
       "🔗 Связывание лицензионных игроков с основной таблицей players..."
     );
     await linkLicensedPlayersWithPlayers();
+
+    console.log("🧹 Удаление игроков с инициалами вместо имени...");
+    await removePlayersWithInitials();
 
     // Проверяем наличие базовых настроек
     const [settings] = await pool.execute(

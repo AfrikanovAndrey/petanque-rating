@@ -66,6 +66,9 @@ router.delete(
 // GET /api/admin/players - получить всех игроков
 router.get("/players", AdminController.getPlayers);
 
+// POST /api/admin/players - создать игрока
+router.post("/players", AdminController.createPlayer);
+
 // PUT /api/admin/players/:playerId - обновить игрока
 router.put("/players/:playerId", AdminController.updatePlayer);
 

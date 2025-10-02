@@ -88,6 +88,10 @@ export class AdminController {
         statusCode = 400;
         // Сохраняем оригинальное сообщение для критических ошибок
         // Оно уже содержит детальную информацию в нужном формате
+      } else if (errorMessage.includes("имеет неполное имя")) {
+        // Ошибка валидации имени игрока - форматируем как критическую
+        statusCode = 400;
+        errorMessage = `Критические ошибки в именах игроков (Лист регистрации):\n${errorMessage}`;
       } else if (
         errorMessage.includes("недоступна") ||
         errorMessage.includes("доступ")
@@ -178,6 +182,10 @@ export class AdminController {
         statusCode = 400;
         // Сохраняем оригинальное сообщение для критических ошибок
         // Оно уже содержит детальную информацию в нужном формате
+      } else if (errorMessage.includes("имеет неполное имя")) {
+        // Ошибка валидации имени игрока - форматируем как критическую
+        statusCode = 400;
+        errorMessage = `Критические ошибки в именах игроков (Лист регистрации):\n${errorMessage}`;
       } else if (errorMessage.includes("Не найден лист регистрации")) {
         statusCode = 400;
         errorMessage = `Ошибка структуры файла: ${errorMessage}. 
@@ -306,6 +314,75 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Ошибка получения игроков",
+      });
+    }
+  }
+
+  // Создать игрока (админ)
+  static async createPlayer(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, gender } = req.body;
+
+      if (!name || !gender) {
+        res.status(400).json({
+          success: false,
+          message: "Имя и пол игрока обязательны",
+        });
+        return;
+      }
+
+      // Очищаем имя от лишних пробелов
+      const cleanedName = name.trim();
+
+      // Проверяем, что имя состоит минимум из двух слов (Фамилия Имя)
+      const nameParts = cleanedName.split(/\s+/);
+      if (nameParts.length < 2) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Имя должно содержать минимум Фамилию и Имя (например: Иванов Иван)",
+        });
+        return;
+      }
+
+      // Проверяем, что вторая часть не является инициалами
+      const secondPart = nameParts[1];
+      const isInitial = /^[А-ЯA-Z]\.?$/.test(secondPart);
+      if (isInitial) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Нельзя создать игрока с инициалами. Укажите полное имя (например: Иванов Иван, а не Иванов И.)",
+        });
+        return;
+      }
+
+      // Проверяем, существует ли игрок с таким именем
+      const existingPlayer = await PlayerModel.getPlayerByName(cleanedName);
+      if (existingPlayer) {
+        res.status(400).json({
+          success: false,
+          message: "Игрок с таким именем уже существует",
+        });
+        return;
+      }
+
+      // Создаем игрока
+      const playerId = await PlayerModel.createPlayer(cleanedName);
+
+      // Обновляем пол
+      await PlayerModel.updatePlayer(playerId, cleanedName, gender);
+
+      res.json({
+        success: true,
+        message: "Игрок успешно создан",
+        player_id: playerId,
+      });
+    } catch (error) {
+      console.error("Ошибка создания игрока:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка при создании игрока",
       });
     }
   }

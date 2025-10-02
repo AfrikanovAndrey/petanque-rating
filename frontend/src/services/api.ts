@@ -181,6 +181,13 @@ export const adminApi = {
   getPlayers: (): Promise<AxiosResponse<ApiResponse<Player[]>>> =>
     api.get("/admin/players"),
 
+  // Создать игрока
+  createPlayer: (data: {
+    name: string;
+    gender: string;
+  }): Promise<AxiosResponse<ApiResponse<{ player_id: number }>>> =>
+    api.post("/admin/players", data),
+
   // Обновить игрока
   updatePlayer: (
     playerId: number,
