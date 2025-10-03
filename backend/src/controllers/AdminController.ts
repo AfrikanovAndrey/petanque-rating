@@ -63,7 +63,6 @@ export class AdminController {
 
       console.log(`🔗 Загружаем турнир из Google Sheets: ${google_sheets_url}`);
 
-      // Используем новый метод для парсинга из Google Sheets
       const result = await TournamentController.parseTournamentFromGoogleSheets(
         google_sheets_url,
         tournament_name,
@@ -157,7 +156,7 @@ export class AdminController {
       console.log(`Запрошенная категория турнира: ${requestedCategory}`);
 
       // Используем новый алгоритм парсинга с сохранением в БД
-      const result = await TournamentController.parseTournamentDataWithDB(
+      const result = await TournamentController.parseTournamentData(
         req.file.buffer,
         req.file.originalname,
         tournament_name,

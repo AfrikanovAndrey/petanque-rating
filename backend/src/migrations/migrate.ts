@@ -1,4 +1,5 @@
 import { pool } from "../config/database";
+import { addPointsToTournamentResultsAndDropPTP } from "./add-points-to-tournament-results-and-drop-ptp";
 import { populateGender } from "./populate-gender";
 import { updateGender } from "./update-gender";
 import { linkLicensedPlayersWithPlayers } from "./link-licensed-players";
@@ -17,10 +18,10 @@ export const runMigrations = async () => {
       SELECT TABLE_NAME 
       FROM information_schema.TABLES 
       WHERE TABLE_SCHEMA = DATABASE() 
-      AND TABLE_NAME IN ('players', 'tournaments', 'teams', 'tournament_results', 'player_tournament_points')
+      AND TABLE_NAME IN ('players', 'tournaments', 'teams', 'tournament_results')
     `);
 
-    if ((tables as any[]).length < 5) {
+    if ((tables as any[]).length < 4) {
       throw new Error(
         "Основные таблицы не найдены. Убедитесь, что база данных инициализирована через init-database.sql"
       );
@@ -28,12 +29,19 @@ export const runMigrations = async () => {
 
     console.log("✅ Основные таблицы найдены");
 
+    // Выполняем критическую миграцию структуры/данных рейтинга очков
+    console.log(
+      "🧱 Миграция: перенос points в tournament_results и удаление player_tournament_points..."
+    );
+    await addPointsToTournamentResultsAndDropPTP();
+    console.log("✅ Миграция очков выполнена");
+
     // Выполняем только операции, требующие логики приложения
     console.log("🚻 Заполнение пола для существующих игроков...");
     await populateGender();
 
-    console.log("🔄 Обновление пола игроков с улучшенным алгоритмом...");
-    await updateGender();
+    // console.log("🔄 Обновление пола игроков с улучшенным алгоритмом...");
+    // await updateGender();
 
     console.log(
       "🔗 Связывание лицензионных игроков с основной таблицей players..."

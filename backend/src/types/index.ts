@@ -167,6 +167,11 @@ export interface Team {
   players: string[];
 }
 
+export interface PlayersTeam {
+  teamId: number;
+  players: number[];
+}
+
 export interface CupTeamResult {
   team: Team;
   cup: "A" | "B";

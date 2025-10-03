@@ -20,7 +20,7 @@ export class PlayerModel {
 
   static async getPlayerByName(name: string): Promise<Player | null> {
     const [rows] = await pool.execute<Player[] & RowDataPacket[]>(
-      "SELECT * FROM players WHERE name = ?",
+      "SELECT * FROM players WHERE name LIKE '%?%'",
       [name]
     );
     return rows[0] || null;
@@ -84,31 +84,34 @@ export class PlayerModel {
     const ratings: PlayerRating[] = [];
 
     for (const player of playersRows) {
-      // Получаем все результаты игрока из player_tournament_points
+      // Получаем все результаты игрока по tournament_results через его команды
       const [resultsRows] = await pool.execute<RowDataPacket[]>(
         `
         SELECT 
-          ptp.id,
-          ptp.tournament_id,
-          ptp.team_id,
-          ptp.points_reason,
-          ptp.points,
-          ptp.cup,
-          ptp.qualifying_wins,
-          ptp.created_at,
-          ptp.updated_at,
+          tr.id,
+          tr.tournament_id,
+          tr.team_id,
+          tr.points_reason,
+          tr.points,
+          tr.cup,
+          tr.qualifying_wins,
+          tr.created_at,
+          tr.updated_at,
           t.name as tournament_name,
           t.date as tournament_date,
           GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_name,
           GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_players
-        FROM player_tournament_points ptp
-        JOIN tournaments t ON ptp.tournament_id = t.id
-        JOIN teams tm ON ptp.team_id = tm.id
+        FROM tournament_results tr
+        JOIN tournaments t ON tr.tournament_id = t.id
+        JOIN teams tm ON tr.team_id = tm.id
         JOIN team_players tp ON tm.id = tp.team_id
         JOIN players p2 ON tp.player_id = p2.id
-        WHERE ptp.player_id = ?
-        GROUP BY ptp.id, t.name, t.date
-        ORDER BY ptp.points DESC, t.date DESC
+        WHERE EXISTS (
+          SELECT 1 FROM team_players tp2 
+          WHERE tp2.team_id = tr.team_id AND tp2.player_id = ?
+        )
+        GROUP BY tr.id, t.name, t.date
+        ORDER BY tr.points DESC, t.date DESC
       `,
         [player.player_id]
       );

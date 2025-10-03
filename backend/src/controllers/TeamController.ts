@@ -274,26 +274,26 @@ export class TeamController {
         const members = await TeamModel.getTeamMembers(team.team_id);
         const players = members.map((m) => m.player_name);
 
-        // Получаем все результаты команды из player_tournament_points
+        // Получаем все результаты команды из tournament_results
         const [resultsRows] = await (
           await import("../config/database")
         ).pool.execute<any>(
           `
           SELECT 
-            ptp.id,
-            ptp.tournament_id,
-            ptp.team_id,
-            ptp.points_reason,
-            ptp.points,
-            ptp.cup,
-            ptp.created_at,
-            ptp.updated_at,
+            tr.id,
+            tr.tournament_id,
+            tr.team_id,
+            tr.points_reason,
+            tr.points,
+            tr.cup,
+            tr.created_at,
+            tr.updated_at,
             t.name as tournament_name,
             t.date as tournament_date
-          FROM player_tournament_points ptp
-          JOIN tournaments t ON ptp.tournament_id = t.id
-          WHERE ptp.team_id = ?
-          ORDER BY ptp.points DESC, t.date DESC
+          FROM tournament_results tr
+          JOIN tournaments t ON tr.tournament_id = t.id
+          WHERE tr.team_id = ?
+          ORDER BY tr.points DESC, t.date DESC
         `,
           [team.team_id]
         );

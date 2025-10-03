@@ -1,25 +1,31 @@
 import { Request, Response } from "express";
+import { RowDataPacket } from "mysql2";
 import * as XLSX from "xlsx";
 import {
   getAllCupPointsConfig,
-  getPointsExample,
   getCupPoints,
+  getPointsExample,
   getWinsPoints,
 } from "../config/cupPoints";
 import { pool } from "../config/database";
 import { PlayerModel } from "../models/PlayerModel";
+// import removed: PlayerTournamentPointsModel больше не используется
+import {
+  normalizeName,
+  swissResultsSheetName,
+  TournamentParser,
+} from "../controllers/TournamentParser";
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
 import {
   CupPosition,
   CupTeamResult,
+  PointsReason,
   StageInfo,
   Team,
-  TournamentUploadData,
-  PointsReason,
 } from "../types";
-import { PlayerTournamentPointsModel } from "../models/PlayerTournamentPointsModel";
+import { selectBestTeamCupResults } from "../utils/cupResults";
 
 export class TournamentController {
   private static readonly quarterFinalsPlayersCells = [
@@ -35,15 +41,6 @@ export class TournamentController {
   private static readonly semiFinalsPlayersCells = ["F6", "F14", "F22", "F30"];
   private static readonly finalsPlayersCells = ["J10", "J26"];
   private static readonly thirdPlacePlayersCells = ["F38"];
-
-  // Нормализация имени игрока для сравнения
-  static normalizePlayerName(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/\s+/g, " ") // заменяем множественные пробелы на одинарные
-      .replace(/[-.]/g, " ") // заменяем дефисы и точки на пробелы
-      .trim();
-  }
 
   // Сопоставление строковых позиций из Excel с enum CupPosition
   static mapExcelPositionToCupPosition(excelPosition: string): CupPosition {
@@ -77,13 +74,13 @@ export class TournamentController {
     suggestion?: string;
     ambiguous?: boolean;
   } {
-    const normalizedPlayerName = this.normalizePlayerName(playerName);
+    const normalizedPlayerName = normalizeName(playerName);
 
     // 1. Быстрая проверка точного совпадения через Set (O(1))
     if (registeredPlayersNormalizedSet.has(normalizedPlayerName)) {
       // Находим оригинальное написание в массиве
       const exactMatch = registeredPlayersArray.find(
-        (player) => this.normalizePlayerName(player) === normalizedPlayerName
+        (player) => normalizeName(player) === normalizedPlayerName
       );
       return { found: true, exactMatch: exactMatch || playerName };
     }
@@ -101,7 +98,7 @@ export class TournamentController {
     }> = [];
 
     for (const registeredPlayer of registeredPlayersArray) {
-      const registeredWords = this.normalizePlayerName(registeredPlayer)
+      const registeredWords = normalizeName(registeredPlayer)
         .split(" ")
         .filter((word) => word.length > 0);
 
@@ -117,7 +114,7 @@ export class TournamentController {
             // Собираем все игроков с такой же фамилией
             const sameLastNamePlayers = registeredPlayersArray.filter(
               (regPlayer) => {
-                const regWords = this.normalizePlayerName(regPlayer)
+                const regWords = normalizeName(regPlayer)
                   .split(" ")
                   .filter((word) => word.length > 0);
                 return regWords.length > 0 && regWords[0] === playerSurname;
@@ -700,6 +697,12 @@ export class TournamentController {
       for (let i = 0; i < registrationData.length; i++) {
         const row = registrationData[i] as any[];
         if (row && row.length >= 2) {
+          // Пропускаем строку с заголовками
+          const colA = String(row[0] || "").toLowerCase();
+          const colB = String(row[1] || "").toLowerCase();
+          if (colA.includes("№") && colB.includes("команда")) {
+            continue;
+          }
           const teamNumber = parseInt(String(row[0]));
           if (!isNaN(teamNumber)) {
             const players: string[] = [];
@@ -709,7 +712,9 @@ export class TournamentController {
             if (playersString) {
               const parsedPlayers = playersString
                 .split(",")
-                .map((player) => this.cleanPlayerName(player.trim()))
+                .map((player) =>
+                  TournamentController.cleanPlayerName(player.trim())
+                )
                 .filter((player) => player && player !== "undefined");
               players.push(...parsedPlayers);
             }
@@ -773,8 +778,7 @@ export class TournamentController {
           const dbParts = dbPlayer.trim().split(/\s+/);
           return (
             dbParts.length > 0 &&
-            this.normalizePlayerName(dbParts[0]) ===
-              this.normalizePlayerName(surname)
+            normalizeName(dbParts[0]) === normalizeName(surname)
           );
         });
 
@@ -785,8 +789,7 @@ export class TournamentController {
               const dbParts = dbPlayer.trim().split(/\s+/);
               return (
                 dbParts.length > 1 &&
-                this.normalizePlayerName(dbParts[1]) ===
-                  this.normalizePlayerName(surname)
+                normalizeName(dbParts[1]) === normalizeName(surname)
               );
             }
           );
@@ -836,8 +839,7 @@ export class TournamentController {
             const dbSurname = dbParts[0];
             const dbFirstName = dbParts[1];
             return (
-              this.normalizePlayerName(dbSurname) ===
-                this.normalizePlayerName(surname) &&
+              normalizeName(dbSurname) === normalizeName(surname) &&
               dbFirstName.charAt(0).toUpperCase() === initial
             );
           });
@@ -863,9 +865,9 @@ export class TournamentController {
           }
         } else {
           // Полное имя - проверяем точное совпадение
-          const normalizedInput = this.normalizePlayerName(cleanedName);
+          const normalizedInput = normalizeName(cleanedName);
           const exactMatch = registeredPlayersArray.find(
-            (dbPlayer) => this.normalizePlayerName(dbPlayer) === normalizedInput
+            (dbPlayer) => normalizeName(dbPlayer) === normalizedInput
           );
 
           if (!exactMatch) {
@@ -1022,11 +1024,9 @@ export class TournamentController {
                 // Если не найден, пытаемся найти по нормализованному совпадению
                 if (!player) {
                   const allPlayers = await PlayerModel.getAllPlayers();
-                  const normalizedSearchName =
-                    this.normalizePlayerName(playerName);
+                  const normalizedSearchName = normalizeName(playerName);
                   const matchedPlayer = allPlayers.find(
-                    (p) =>
-                      this.normalizePlayerName(p.name) === normalizedSearchName
+                    (p) => normalizeName(p.name) === normalizedSearchName
                   );
 
                   if (matchedPlayer) {
@@ -1047,8 +1047,7 @@ export class TournamentController {
                       const dbParts = p.name.trim().split(/\s+/);
                       return (
                         dbParts.length >= 1 &&
-                        this.normalizePlayerName(dbParts[0]) ===
-                          this.normalizePlayerName(searchTerm)
+                        normalizeName(dbParts[0]) === normalizeName(searchTerm)
                       );
                     });
 
@@ -1069,8 +1068,8 @@ export class TournamentController {
                         const dbParts = p.name.trim().split(/\s+/);
                         return (
                           dbParts.length >= 2 &&
-                          this.normalizePlayerName(dbParts[1]) ===
-                            this.normalizePlayerName(searchTerm)
+                          normalizeName(dbParts[1]) ===
+                            normalizeName(searchTerm)
                         );
                       });
 
@@ -1104,8 +1103,7 @@ export class TournamentController {
                       const dbSurname = dbParts[0];
                       const dbFirstName = dbParts[1];
                       return (
-                        this.normalizePlayerName(dbSurname) ===
-                          this.normalizePlayerName(surname) &&
+                        normalizeName(dbSurname) === normalizeName(surname) &&
                         dbFirstName.charAt(0).toUpperCase() === initial
                       );
                     });
@@ -1209,7 +1207,7 @@ export class TournamentController {
     });
 
     const cupResults: CupTeamResult[] = [];
-    const cupNames = ["A", "B"]; // Обрабатываем только кубки A и B
+    const cupNames = ["A", "B", "C", "А", "Б", "С"]; // Обрабатываем только кубки A и B
 
     for (const cupName of cupNames) {
       // Пробуем различные варианты названий листов
@@ -1247,20 +1245,23 @@ export class TournamentController {
         // 1/4 финала
         quarterFinals: [
           {
-            cells: ["B4", "B8", "B12", "B16", "B20", "B24", "B28", "B32"],
+            cells: TournamentController.quarterFinalsPlayersCells,
             position: CupPosition.QUARTER_FINAL,
           },
         ],
         // 1/2 финала
         semiFinals: [
           {
-            cells: ["F6", "F14", "F22", "F30"],
+            cells: TournamentController.semiFinalsPlayersCells,
             position: CupPosition.SEMI_FINAL,
           },
         ],
         // Финал
         finals: [
-          { cells: ["J10", "J26"], position: CupPosition.RUNNER_UP }, // Участники финала (2 место)
+          {
+            cells: TournamentController.finalsPlayersCells,
+            position: CupPosition.RUNNER_UP,
+          }, // Участники финала (2 место)
         ],
         // Игра за 3 место
         thirdPlace: [{ range: "F38", position: CupPosition.THIRD_PLACE }],
@@ -1624,134 +1625,12 @@ export class TournamentController {
       });
     }
 
-    return cupResults;
-  }
-
-  // Полный парсинг турнира с командами
-  static parseTournamentData(
-    fileBuffer: Buffer,
-    fileName: string,
-    tournamentName: string,
-    tournamentDate: string
-  ): TournamentUploadData {
-    try {
-      console.log(`Начинается парсинг файла турнира: "${fileName}"`);
-
-      // Парсим XLSX файл
-      let workbook: XLSX.WorkBook;
-      try {
-        workbook = XLSX.read(fileBuffer, { type: "buffer" });
-        console.log(
-          `Доступные листы в файле: ${workbook.SheetNames.join(", ")}`
-        );
-      } catch (error) {
-        throw new Error(
-          `Ошибка при чтении Excel файла "${fileName}": ${
-            (error as Error).message
-          }`
-        );
-      }
-
-      // Парсим команды
-      let teams: Team[];
-      try {
-        teams = this.parseTeamsFromRegistrationSheet(workbook);
-        if (teams.length === 0) {
-          console.warn("Не найдено ни одной команды в листе регистрации");
-        }
-      } catch (error) {
-        throw new Error(
-          `Ошибка при парсинге листа регистрации: ${(error as Error).message}`
-        );
-      }
-
-      // Парсим результаты кубков
-      let cupResults: CupTeamResult[];
-      try {
-        cupResults = this.parseCupResults(workbook, teams);
-        console.log(`Найдено результатов кубков: ${cupResults.length}`);
-      } catch (error) {
-        console.warn(
-          `Ошибка при парсинге результатов кубков: ${(error as Error).message}`
-        );
-        // Не бросаем ошибку, продолжаем с пустыми результатами
-        cupResults = [];
-      }
-
-      // Преобразуем результаты команд в результаты игроков
-      const playerResults: Array<{
-        player_name: string;
-        points_reason: string;
-        cup: "A" | "B";
-      }> = [];
-
-      cupResults.forEach((teamResult) => {
-        teamResult.team.players.forEach((player) => {
-          playerResults.push({
-            player_name: player,
-            points_reason: teamResult.points_reason,
-            cup: teamResult.cup,
-          });
-        });
-      });
-
-      console.log(`Создано результатов игроков: ${playerResults.length}`);
-
-      // Определяем категорию турнира из названия файла
-      const fileNameLower = fileName.toLowerCase();
-      let category: "1" | "2" = "1"; // по умолчанию первая категория
-
-      if (
-        fileNameLower.includes("2 категория") ||
-        fileNameLower.includes("2категория") ||
-        fileNameLower.includes("вторая категория") ||
-        fileNameLower.includes("ii категория") ||
-        fileNameLower.includes("категория 2")
-      ) {
-        category = "2";
-        console.log("Определена 2-я категория турнира из названия файла");
-      } else if (
-        fileNameLower.includes("1 категория") ||
-        fileNameLower.includes("1категория") ||
-        fileNameLower.includes("первая категория") ||
-        fileNameLower.includes("i категория") ||
-        fileNameLower.includes("категория 1")
-      ) {
-        category = "1";
-        console.log("Определена 1-я категория турнира из названия файла");
-      } else {
-        console.log(
-          "Категория турнира не определена из названия файла, используется 1-я категория по умолчанию"
-        );
-      }
-
-      const result = {
-        tournament_name: tournamentName,
-        tournament_date: tournamentDate,
-        total_teams: teams.length,
-        tournament_category: category,
-        results: playerResults,
-      };
-
-      console.log(
-        `Парсинг завершен успешно: команд - ${teams.length}, результатов игроков - ${playerResults.length}, категория - ${category}`
-      );
-      return result;
-    } catch (error) {
-      console.error(
-        `Критическая ошибка при парсинге файла турнира "${fileName}":`,
-        error
-      );
-      throw new Error(
-        `Не удалось обработать файл турнира "${fileName}": ${
-          (error as Error).message
-        }`
-      );
-    }
+    // Оставляем только лучший результат для каждой команды
+    return selectBestTeamCupResults(cupResults);
   }
 
   // Новый метод: парсинг турнира с сохранением команд в БД и валидацией критических ошибок
-  static async parseTournamentDataWithDB(
+  static async parseTournamentData(
     fileBuffer: Buffer,
     fileName: string,
     tournamentName: string,
@@ -1814,15 +1693,15 @@ export class TournamentController {
       let registeredPlayersNormalizedSet: Set<string>;
       let registeredPlayersArray: string[];
       try {
-        const teams = this.parseTeamsFromRegistrationSheet(workbook);
+        const teams = await TournamentParser.parseTeamsFromRegistrationSheet(
+          workbook
+        );
         registeredPlayersNormalizedSet = new Set();
         registeredPlayersArray = [];
 
-        teams.forEach((team) => {
-          team.players.forEach((player) => {
-            registeredPlayersNormalizedSet.add(
-              this.normalizePlayerName(player)
-            ); // Нормализованные имена для быстрого поиска
+        teams.forEach((team: Team) => {
+          team.players.forEach((player: string) => {
+            registeredPlayersNormalizedSet.add(normalizeName(player)); // Нормализованные имена для быстрого поиска
             registeredPlayersArray.push(player); // Сохраняем оригинальный регистр
           });
         });
@@ -1962,15 +1841,34 @@ export class TournamentController {
         cupResults = [];
       }
 
-      // 4. Парсим данные швейцарской системы для получения побед команд
+      // 4. Парсим данные квалификационного этапа для получения побед команд
       let teamWins = new Map<string, number>();
+
+      const swissSheet = TournamentParser.findXlsSheet(
+        workbook,
+        normalizeName(swissResultsSheetName)
+      );
+      const groupSheet = TournamentParser.findXlsSheet(workbook, /Группа \w+/);
+
+      if (!swissSheet || !groupSheet) {
+        console.error(
+          `Не найдены данные квалификационного этапа. Ожидалось наличие листов: "Результаты швейцарки" или "Группа А"`
+        );
+      }
+
       try {
-        console.log("🎯 Парсим лист 'Итоги Швейцарки'...");
-        teamWins = this.parseSwissSystemResults(workbook);
-        console.log(`✓ Найдено ${teamWins.size} команд с данными о победах`);
+        if (swissSheet) {
+          console.log("🎯 Парсим результаты Швейарки");
+          teamWins = TournamentParser.parseSwissSystemResults(swissSheet);
+        }
+
+        if (groupSheet) {
+          console.log("🎯 Парсим результаты группового этапа");
+          teamWins = TournamentParser.parseGroupResults(workbook);
+        }
       } catch (error) {
         console.warn(
-          `Ошибка при парсинге листа 'Итоги Швейцарки': ${
+          `Ошибка при парсинге данных квалификационного этапа': ${
             (error as Error).message
           }`
         );
@@ -2062,6 +1960,23 @@ export class TournamentController {
     category: "1" | "2",
     totalTeams: number
   ): Promise<void> {
+    // Гарантируем наличие колонки points в tournament_results (если миграция не применена)
+    try {
+      const [colCheck] = await pool.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) as count
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'tournament_results'
+           AND COLUMN_NAME = 'points'`
+      );
+      if ((colCheck[0] as any)?.count === 0) {
+        await pool.execute(
+          "ALTER TABLE tournament_results ADD COLUMN points INT NOT NULL DEFAULT 0 AFTER qualifying_wins"
+        );
+      }
+    } catch (e) {
+      // no-op: если нет прав на ALTER, последующие INSERT без points продолжат работать в старой схеме
+    }
     // Ищем количество побед для этой команды
     let qualifying_wins = 0;
 
@@ -2182,17 +2097,8 @@ export class TournamentController {
         pointsReason = PointsReason.CUP_QUARTER_FINAL; // значение по умолчанию
     }
 
-    await pool.execute(
-      "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins) VALUES (?, ?, ?, ?, ?)",
-      [tournamentId, result.teamId, pointsReason, result.cup, qualifying_wins]
-    );
-
-    // Собираем данные для batch вставки очков игроков
-    const playerPointsBatch: Array<{
-      playerId: number;
-      tournamentId: number;
-      points: number;
-    }> = [];
+    // Собираем очки команды для записи сразу в tournament_results.points
+    let teamPoints = 0;
 
     // Получаем всех игроков команды
     const [teamPlayers] = await pool.execute(
@@ -2229,23 +2135,26 @@ export class TournamentController {
           playerPoints = getWinsPoints(category, qualifying_wins);
         }
       }
-
-      // Добавляем в batch, если очки больше 0
-      if (playerPoints > 0) {
-        playerPointsBatch.push({
-          playerId,
-          tournamentId,
-          points: playerPoints,
-        });
-      }
+      teamPoints = Math.max(teamPoints, playerPoints);
     }
+    await pool.execute(
+      "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins, points) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        tournamentId,
+        result.teamId,
+        pointsReason,
+        result.cup,
+        qualifying_wins,
+        teamPoints,
+      ]
+    );
 
-    // Выполняем batch вставку если есть данные
-    if (playerPointsBatch.length > 0) {
-      await PlayerTournamentPointsModel.createPlayerTournamentPointsBatch(
-        playerPointsBatch
-      );
-    }
+    // На некоторых данных запись могла быть создана ранее без поля points
+    // По аналогии со швейцаркой, гарантируем, что очки обновятся для записи кубка
+    await pool.execute(
+      "UPDATE tournament_results SET points = ? WHERE tournament_id = ? AND team_id = ? AND cup = ?",
+      [teamPoints, tournamentId, result.teamId, result.cup]
+    );
   }
 
   // Сохранение результата команды швейцарки
@@ -2255,6 +2164,23 @@ export class TournamentController {
     teamWins: Map<string, number>,
     category: "1" | "2"
   ): Promise<boolean> {
+    // Гарантируем наличие колонки points (на случай неподнятой миграции)
+    try {
+      const [colCheck] = await pool.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) as count
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'tournament_results'
+           AND COLUMN_NAME = 'points'`
+      );
+      if ((colCheck[0] as any)?.count === 0) {
+        await pool.execute(
+          "ALTER TABLE tournament_results ADD COLUMN points INT NOT NULL DEFAULT 0 AFTER qualifying_wins"
+        );
+      }
+    } catch (e) {
+      // no-op
+    }
     // Эта команда не в кубках, значит она в швейцарке
     let qualifying_wins = 0;
     const playerNames = savedTeam.players.join(", ");
@@ -2343,12 +2269,8 @@ export class TournamentController {
         ]
       );
 
-      // Собираем данные для batch вставки очков игроков швейцарки
-      const swissPlayerPointsBatch: Array<{
-        playerId: number;
-        tournamentId: number;
-        points: number;
-      }> = [];
+      // Рассчитываем очки команды для сохранения в tournament_results.points
+      let teamPoints = 0;
 
       // Получаем всех игроков команды
       const [teamPlayers] = await pool.execute(
@@ -2375,23 +2297,14 @@ export class TournamentController {
         if (playerIsLicensed && qualifying_wins > 0) {
           playerPoints = getWinsPoints(category, qualifying_wins);
         }
-
-        // Добавляем в batch, если очки больше 0
-        if (playerPoints > 0) {
-          swissPlayerPointsBatch.push({
-            playerId,
-            tournamentId,
-            points: playerPoints,
-          });
-        }
+        teamPoints = Math.max(teamPoints, playerPoints);
       }
 
-      // Выполняем batch вставку если есть данные
-      if (swissPlayerPointsBatch.length > 0) {
-        await PlayerTournamentPointsModel.createPlayerTournamentPointsBatch(
-          swissPlayerPointsBatch
-        );
-      }
+      // Обновляем ранее вставленную строку tournament_results очками
+      await pool.execute(
+        "UPDATE tournament_results SET points = ? WHERE tournament_id = ? AND team_id = ? AND cup IS NULL AND qualifying_wins = ?",
+        [teamPoints, tournamentId, savedTeam.teamId, qualifying_wins]
+      );
 
       return true;
     }
@@ -2441,17 +2354,22 @@ export class TournamentController {
       const stages = {
         quarterFinals: [
           {
-            cells: ["B4", "B8", "B12", "B16", "B20", "B24", "B28", "B32"],
+            cells: TournamentController.quarterFinalsPlayersCells,
             position: CupPosition.QUARTER_FINAL,
           },
         ],
         semiFinals: [
           {
-            cells: ["F6", "F14", "F22", "F30"],
+            cells: TournamentController.semiFinalsPlayersCells,
             position: CupPosition.SEMI_FINAL,
           },
         ],
-        finals: [{ cells: ["J10", "J26"], position: CupPosition.RUNNER_UP }],
+        finals: [
+          {
+            cells: TournamentController.finalsPlayersCells,
+            position: CupPosition.RUNNER_UP,
+          },
+        ],
         thirdPlace: [{ range: "F38", position: CupPosition.THIRD_PLACE }],
       };
 
@@ -2604,7 +2522,8 @@ export class TournamentController {
       });
     }
 
-    return cupResults;
+    // Оставляем только лучший результат для каждой команды
+    return selectBestTeamCupResults(cupResults);
   }
 
   // Диагностика структуры Excel файла
@@ -2728,59 +2647,6 @@ export class TournamentController {
     }
   }
 
-  // Парсинг XLSX файла с командными турнирами (включает кубки A и B) - Express endpoint
-  static async parseTournamentWithTeams(req: Request, res: Response) {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "Файл не загружен",
-      });
-    }
-
-    try {
-      // Получаем имя турнира и дату из URL параметров или используем дефолтные
-      const tournamentName = "Турнир кубков";
-      const originalName = req.file.originalname.replace(/\.xlsx?$/i, "");
-      const dateMatch = originalName.match(/(\d{4})/);
-      const tournamentDate = dateMatch
-        ? `${dateMatch[1]}-01-01`
-        : new Date().toISOString().split("T")[0];
-
-      // Парсим данные турнира
-      const parseData = this.parseTournamentData(
-        req.file.buffer,
-        req.file.originalname,
-        tournamentName,
-        tournamentDate
-      );
-
-      // Сохраняем в базу данных
-      const tournamentId = await TournamentModel.uploadTournamentData(
-        parseData
-      );
-
-      res.json({
-        success: true,
-        message: `Данные турнира с командами успешно загружены. Обработано команд: ${parseData.total_teams}, результатов игроков: ${parseData.results.length}. Категория турнира: ${parseData.tournament_category}.`,
-        data: {
-          tournament_id: tournamentId,
-          teams_count: parseData.total_teams,
-          total_teams: parseData.total_teams,
-          tournament_category: parseData.tournament_category,
-          player_results_count: parseData.results.length,
-          tournament_name: parseData.tournament_name,
-          tournament_date: parseData.tournament_date,
-        },
-      });
-    } catch (error) {
-      console.error("Ошибка при парсинге файла турнира с командами:", error);
-      res.status(500).json({
-        success: false,
-        message: "Ошибка при обработке файла: " + (error as Error).message,
-      });
-    }
-  }
-
   // Удалить результат турнира/кубка (только админ)
   static async deleteTournamentResult(req: Request, res: Response) {
     const resultId = parseInt(req.params.resultId);
@@ -2851,103 +2717,6 @@ export class TournamentController {
     }
   }
 
-  // Парсинг листа "Итоги Швейцарки" для извлечения количества побед команд
-  static parseSwissSystemResults(workbook: XLSX.WorkBook): Map<string, number> {
-    // Пробуем различные варианты названий листа "Итоги Швейцарки"
-    const possibleSwissSheetNames = [
-      "Итоги Швейцарки",
-      "Итоги швейцарки",
-      "ИТОГИ ШВЕЙЦАРКИ",
-      "Итоги Швейцарской системы",
-      "Швейцарская система",
-      "Швейцарка",
-      "Swiss",
-      "Swiss System",
-    ];
-
-    let swissSheet = null;
-    let foundSheetName = null;
-
-    // Проверяем все возможные варианты названий
-    for (const possibleName of possibleSwissSheetNames) {
-      if (workbook.Sheets[possibleName]) {
-        swissSheet = workbook.Sheets[possibleName];
-        foundSheetName = possibleName;
-        break;
-      }
-    }
-
-    if (!swissSheet) {
-      console.log(
-        `Лист "Итоги Швейцарки" не найден. Проверенные варианты: ${possibleSwissSheetNames.join(
-          ", "
-        )}. Доступные листы: ${workbook.SheetNames.join(", ")}`
-      );
-      return new Map(); // Возвращаем пустую карту, если лист не найден
-    }
-
-    console.log(`Найден лист швейцарской системы: "${foundSheetName}"`);
-
-    try {
-      // Парсим данные из листа
-      const swissData = XLSX.utils.sheet_to_json(swissSheet, {
-        header: 1,
-      });
-
-      const teamWins = new Map<string, number>();
-
-      // Начинаем обработку со строки 2 (индекс 1), так как в B2 начинаются команды
-      // В таблице: A=Место, B=Имя, C=Результат(победы), D=Бхгц, E=Прогресс, F=Детал
-      for (let rowIndex = 1; rowIndex < swissData.length; rowIndex++) {
-        const row = swissData[rowIndex] as any[];
-
-        if (!row || row.length < 3) continue;
-
-        // Столбец B (индекс 1) - название команды
-        // Столбец C (индекс 2) - количество побед (результат)
-        const teamName =
-          typeof row[1] === "string"
-            ? row[1].replace(/,?$/, "").trim()
-            : row[1];
-        const winsValue = row[2];
-
-        if (!teamName || teamName === "" || typeof teamName !== "string") {
-          continue; // Пропускаем пустые строки
-        }
-
-        // Парсим количество побед
-        let qualifying_wins = 0;
-
-        if (typeof winsValue === "number") {
-          qualifying_wins = Math.floor(winsValue); // Округляем до целого числа
-        } else if (typeof winsValue === "string") {
-          const parsed = parseInt(winsValue, 10);
-          qualifying_wins = isNaN(parsed) ? 0 : parsed;
-        } else if (winsValue === undefined || winsValue === null) {
-          qualifying_wins = 0;
-        }
-
-        // Нормализуем название команды для поиска
-        const normalizedTeamName = teamName.toString().trim();
-
-        if (normalizedTeamName) {
-          teamWins.set(normalizedTeamName, qualifying_wins);
-          console.log(
-            `Найдена команда "${normalizedTeamName}" с ${qualifying_wins} побед(ами)`
-          );
-        }
-      }
-
-      console.log(
-        `Обработано ${teamWins.size} команд из листа "${foundSheetName}"`
-      );
-      return teamWins;
-    } catch (error) {
-      console.error(`Ошибка при парсинге листа "${foundSheetName}":`, error);
-      return new Map(); // Возвращаем пустую карту при ошибке
-    }
-  }
-
   // ========== МЕТОДЫ ДЛЯ РАБОТЫ С GOOGLE SHEETS ==========
 
   /**
@@ -2987,7 +2756,7 @@ export class TournamentController {
         await GoogleSheetsService.getTournamentDataAsBuffer(googleSheetsUrl);
 
       // Используем существующую логику парсинга
-      return await this.parseTournamentDataWithDB(
+      return await this.parseTournamentData(
         Buffer.alloc(0), // Пустой buffer, так как мы используем workbook напрямую
         fileName,
         tournamentName,
