@@ -136,6 +136,7 @@ export const adminApi = {
   uploadTournamentFromGoogleSheets: (data: {
     tournament_name: string;
     tournament_date: string;
+    tournament_category: string;
     google_sheets_url: string;
   }): Promise<AxiosResponse<ApiResponse>> => {
     return api.post("/admin/tournaments/upload-from-google-sheets", data, {

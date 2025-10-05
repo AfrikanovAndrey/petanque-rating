@@ -28,31 +28,6 @@ export enum PointsReason {
   QUALIFYING_LOW = "QUALIFYING_LOW", // 1-2 побед
 }
 
-// Функция для преобразования PointsReason в читаемый текст
-export function getPointsReasonText(
-  reason: PointsReason,
-  cup?: "A" | "B" | null
-): string {
-  switch (reason) {
-    case PointsReason.QUALIFYING_HIGH:
-      return "Квалификация >=3 побед";
-    case PointsReason.QUALIFYING_LOW:
-      return "Квалификация 1-2 победы";
-    case PointsReason.CUP_WINNER:
-      return cup ? `1 место ${cup}` : "1 место";
-    case PointsReason.CUP_RUNNER_UP:
-      return cup ? `2 место ${cup}` : "2 место";
-    case PointsReason.CUP_THIRD_PLACE:
-      return cup ? `3 место ${cup}` : "3 место";
-    case PointsReason.CUP_SEMI_FINAL:
-      return cup ? `Полуфинал ${cup}` : "Полуфинал";
-    case PointsReason.CUP_QUARTER_FINAL:
-      return cup ? `Четвертьфинал ${cup}` : "Четвертьфинал";
-    default:
-      return reason;
-  }
-}
-
 export interface TournamentResult {
   id: number;
   tournament_id: number;
@@ -155,11 +130,11 @@ export interface AuthResponse {
   message?: string;
 }
 export enum CupPosition {
-  WINNER = "CUP_WINNER",
-  RUNNER_UP = "CUP_RUNNER_UP",
-  THIRD_PLACE = "CUP_THIRD_PLACE",
-  SEMI_FINAL = "CUP_SEMI_FINAL",
-  QUARTER_FINAL = "CUP_QUARTER_FINAL",
+  WINNER = "1",
+  RUNNER_UP = "2",
+  THIRD_PLACE = "3",
+  SEMI_FINAL = "1/2",
+  QUARTER_FINAL = "1/4",
 }
 
 export interface Team {
@@ -172,9 +147,11 @@ export interface PlayersTeam {
   players: number[];
 }
 
+export type Cup = "A" | "B" | "C";
+
 export interface CupTeamResult {
-  team: Team;
-  cup: "A" | "B";
+  team: string;
+  cup: Cup;
   points_reason: CupPosition;
 }
 
@@ -251,14 +228,16 @@ export interface TournamentTeamUploadData {
 }
 
 // Типы для стадий турнира
-export interface StageWithCells {
+export type StageWithCells = {
   cells: string[];
   position: CupPosition;
-}
+};
 
-export interface StageWithRange {
-  range: string;
-  position: CupPosition;
-}
-
-export type StageInfo = StageWithCells | StageWithRange;
+export type TeamResults = {
+  cup?: Cup;
+  cupPosition?: CupPosition;
+  qualifyingWins?: number;
+  wins?: number;
+  loses?: number;
+  points?: number;
+};

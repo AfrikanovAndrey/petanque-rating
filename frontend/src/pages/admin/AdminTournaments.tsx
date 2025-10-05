@@ -142,6 +142,7 @@ const AdminTournaments: React.FC = () => {
         return await adminApi.uploadTournamentFromGoogleSheets({
           tournament_name: data.tournament_name,
           tournament_date: data.tournament_date,
+          tournament_category: data.tournament_category,
           google_sheets_url: data.google_sheets_url,
         });
       }

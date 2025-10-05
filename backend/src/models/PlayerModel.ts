@@ -18,12 +18,24 @@ export class PlayerModel {
     return rows[0] || null;
   }
 
-  static async getPlayerByName(name: string): Promise<Player | null> {
-    const [rows] = await pool.execute<Player[] & RowDataPacket[]>(
-      "SELECT * FROM players WHERE name LIKE '%?%'",
-      [name]
-    );
-    return rows[0] || null;
+  static async getPlayerByName(name: string): Promise<Player[] | null> {
+    let rows: Player[] & RowDataPacket[];
+
+    // Если игрок указан с фамилией и именем (абривеатурой). Например: "Елсвков С"
+    if (name.includes(" ")) {
+      [rows] = await pool.execute<Player[] & RowDataPacket[]>(
+        "SELECT * FROM players WHERE name LIKE ?",
+        [`%${name}%`]
+      );
+    } else {
+      // Если указано только одна часть (имя или фамилия). Например: "Федотов" или "Хафидо"
+      [rows] = await pool.execute<Player[] & RowDataPacket[]>(
+        "SELECT * FROM players WHERE name LIKE ? OR name LIKE ?",
+        [`%${name} %`, `% ${name}%`]
+      );
+    }
+
+    return rows.length ? rows : null;
   }
 
   static async createPlayer(name: string): Promise<number> {

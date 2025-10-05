@@ -12,20 +12,26 @@ import { PlayerModel } from "../models/PlayerModel";
 // import removed: PlayerTournamentPointsModel больше не используется
 import {
   normalizeName,
-  swissResultsSheetName,
+  REGISTRATION_LIST,
+  SWISS_RESULTS_LIST,
+  TeamPlayers,
+  TeamQualifyingResults,
   TournamentParser,
 } from "../controllers/TournamentParser";
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
 import {
+  Cup,
   CupPosition,
   CupTeamResult,
+  Player,
   PointsReason,
-  StageInfo,
   Team,
+  TeamResults,
 } from "../types";
 import { selectBestTeamCupResults } from "../utils/cupResults";
+import { exit } from "process";
 
 export class TournamentController {
   private static readonly quarterFinalsPlayersCells = [
@@ -63,382 +69,85 @@ export class TournamentController {
     }
   }
 
-  // Проверка совпадения имен игроков с учетом различий в написании
-  static findPlayerMatch(
-    playerName: string,
-    registeredPlayersNormalizedSet: Set<string>,
-    registeredPlayersArray: string[]
-  ): {
-    found: boolean;
-    exactMatch?: string;
-    suggestion?: string;
-    ambiguous?: boolean;
-  } {
-    const normalizedPlayerName = normalizeName(playerName);
+  /**
+   * Обновить результаты команд данными с кубков
+   * @param cup
+   * @param cupTeamResults
+   * @param teams
+   * @param teamResults
+   */
+  static async modifyTeamResultsWithCupResults(
+    cup: Cup,
+    cupTeamResults: Map<number, CupPosition>,
+    teams: TeamPlayers[],
+    teamResults: Map<number, TeamResults>
+  ) {
+    for (const [teamOrderNum, cupPosition] of cupTeamResults) {
+      const curTeamResults = teamResults.get(teams[teamOrderNum].teamId!);
+      if (curTeamResults) {
+        let winsModifier = 0;
+        let losesModifier = 0;
 
-    // 1. Быстрая проверка точного совпадения через Set (O(1))
-    if (registeredPlayersNormalizedSet.has(normalizedPlayerName)) {
-      // Находим оригинальное написание в массиве
-      const exactMatch = registeredPlayersArray.find(
-        (player) => normalizeName(player) === normalizedPlayerName
-      );
-      return { found: true, exactMatch: exactMatch || playerName };
-    }
-
-    // 2. Если точного совпадения нет, ищем частичные совпадения
-    const playerWords = normalizedPlayerName
-      .split(" ")
-      .filter((word) => word.length > 0);
-
-    // Список найденных частичных совпадений для ранжирования
-    const partialMatches: Array<{
-      player: string;
-      score: number;
-      type: string;
-    }> = [];
-
-    for (const registeredPlayer of registeredPlayersArray) {
-      const registeredWords = normalizeName(registeredPlayer)
-        .split(" ")
-        .filter((word) => word.length > 0);
-
-      // Проверяем совпадение по фамилии (первое слово)
-      if (playerWords.length > 0 && registeredWords.length > 0) {
-        const playerSurname = playerWords[0];
-        const registeredSurname = registeredWords[0];
-
-        // Точное совпадение фамилии
-        if (playerSurname === registeredSurname) {
-          // Если у игрока в кубке только фамилия (нет дополнительных слов)
-          if (playerWords.length === 1) {
-            // Собираем все игроков с такой же фамилией
-            const sameLastNamePlayers = registeredPlayersArray.filter(
-              (regPlayer) => {
-                const regWords = normalizeName(regPlayer)
-                  .split(" ")
-                  .filter((word) => word.length > 0);
-                return regWords.length > 0 && regWords[0] === playerSurname;
-              }
-            );
-
-            // Если найдено несколько игроков с такой фамилией - это неоднозначность
-            if (sameLastNamePlayers.length > 1) {
-              console.log(
-                `❌ Неоднозначная фамилия "${playerName}". Найдено игроков: ${sameLastNamePlayers.join(
-                  ", "
-                )}`
-              );
-              return {
-                found: false,
-                ambiguous: true,
-                suggestion: `Неоднозначная фамилия "${playerName}". Найдено несколько игроков: ${sameLastNamePlayers.join(
-                  ", "
-                )}. Укажите полное имя.`,
-              };
-            }
-
-            // Если найден только один игрок с такой фамилией - возвращаем его
-            console.log(
-              `✓ Найдено единственное совпадение по фамилии: "${playerName}" -> "${registeredPlayer}"`
-            );
-            return { found: true, exactMatch: registeredPlayer };
-          }
-
-          // Если есть дополнительные слова, проверяем инициалы или полные имена
-          const playerInitials = this.extractInitials(playerWords.slice(1));
-          const registeredInitials = this.extractInitials(
-            registeredWords.slice(1)
-          );
-
-          // Совпадение инициалов или частичное совпадение имени
-          if (
-            playerInitials === registeredInitials ||
-            this.hasPartialNameMatch(
-              playerWords.slice(1),
-              registeredWords.slice(1)
-            )
-          ) {
-            console.log(
-              `✓ Найдено точное совпадение по фамилии и именам/инициалам: "${playerName}" -> "${registeredPlayer}"`
-            );
-            return { found: true, exactMatch: registeredPlayer };
-          }
+        switch (cupPosition) {
+          case CupPosition.WINNER:
+            winsModifier = 3;
+            losesModifier = 0;
+            break;
+          case CupPosition.RUNNER_UP:
+            winsModifier = 2;
+            losesModifier = 1;
+            break;
+          case CupPosition.THIRD_PLACE:
+            winsModifier = 2;
+            losesModifier = 1;
+            break;
+          case CupPosition.SEMI_FINAL:
+            winsModifier = 1;
+            losesModifier = 1;
+            break;
+          case CupPosition.QUARTER_FINAL:
+            winsModifier = 0;
+            losesModifier = 1;
+            break;
         }
 
-        // Похожие фамилии (для возможных опечаток)
-        if (this.isSimilarString(playerSurname, registeredSurname)) {
-          partialMatches.push({
-            player: registeredPlayer,
-            score: 0.7, // средний приоритет для похожих фамилий
-            type: "similar_surname",
-          });
-        }
-      }
-
-      // Дополнительная проверка: ищем совпадения в любом порядке слов
-      for (const playerWord of playerWords) {
-        for (const registeredWord of registeredWords) {
-          if (playerWord === registeredWord && playerWord.length >= 3) {
-            const existingMatch = partialMatches.find(
-              (m) => m.player === registeredPlayer
-            );
-            if (existingMatch) {
-              existingMatch.score += 0.3; // увеличиваем score для существующего совпадения
-            } else {
-              partialMatches.push({
-                player: registeredPlayer,
-                score: 0.5, // средний приоритет для частичных совпадений
-                type: "partial_word_match",
-              });
-            }
-          }
-        }
+        teamResults.set(teams[teamOrderNum].teamId!, {
+          cup,
+          cupPosition,
+          wins: curTeamResults.wins! + winsModifier,
+          loses: curTeamResults.loses! + losesModifier,
+        });
       }
     }
-
-    // Если есть частичные совпадения, возвращаем лучший вариант
-    if (partialMatches.length > 0) {
-      // Сортируем по score (лучшие первые)
-      partialMatches.sort((a, b) => b.score - a.score);
-      const bestMatch = partialMatches[0];
-
-      console.log(
-        `⚠️ Точное совпадение не найдено для "${playerName}". Лучший вариант: "${bestMatch.player}" (score: ${bestMatch.score}, type: ${bestMatch.type})`
-      );
-
-      return {
-        found: false,
-        suggestion: `Возможно, имелся в виду: "${bestMatch.player}"`,
-      };
-    }
-
-    return { found: false };
-  }
-
-  // Извлечение инициалов из массива слов имени
-  static extractInitials(nameWords: string[]): string {
-    return nameWords
-      .map((word) => word.charAt(0))
-      .join("")
-      .toLowerCase();
-  }
-
-  // Проверка частичного совпадения имен
-  static hasPartialNameMatch(
-    playerNameWords: string[],
-    registeredNameWords: string[]
-  ): boolean {
-    // Проверяем, есть ли хотя бы одно полное совпадение слов имени
-    return playerNameWords.some((playerWord) =>
-      registeredNameWords.some(
-        (registeredWord) =>
-          playerWord.length > 1 &&
-          registeredWord.length > 1 &&
-          playerWord === registeredWord
-      )
-    );
-  }
-
-  // Проверка схожести строк (улучшенный алгоритм для опечаток)
-  static isSimilarString(str1: string, str2: string): boolean {
-    if (Math.abs(str1.length - str2.length) > 2) return false;
-    if (str1.length < 3 || str2.length < 3) return false;
-
-    // Вычисляем расстояние Левенштейна (упрощенная версия)
-    const distance = this.calculateLevenshteinDistance(str1, str2);
-    const maxLength = Math.max(str1.length, str2.length);
-
-    // Если различие составляет менее 30% от длины строки, считаем их похожими
-    return distance / maxLength < 0.3;
-  }
-
-  // Простая реализация расстояния Левенштейна
-  static calculateLevenshteinDistance(str1: string, str2: string): number {
-    const matrix = [];
-
-    for (let i = 0; i <= str2.length; i++) {
-      matrix[i] = [i];
-    }
-
-    for (let j = 0; j <= str1.length; j++) {
-      matrix[0][j] = j;
-    }
-
-    for (let i = 1; i <= str2.length; i++) {
-      for (let j = 1; j <= str1.length; j++) {
-        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-          matrix[i][j] = matrix[i - 1][j - 1];
-        } else {
-          matrix[i][j] = Math.min(
-            matrix[i - 1][j - 1] + 1, // замена
-            matrix[i][j - 1] + 1, // вставка
-            matrix[i - 1][j] + 1 // удаление
-          );
-        }
-      }
-    }
-
-    return matrix[str2.length][str1.length];
   }
 
   // Валидация критических ошибок перед парсингом
   static validateCriticalErrors(workbook: XLSX.WorkBook): string[] {
+    console.log("🔍 Выполняется валидация обязательных листов документа");
     const errors: string[] = [];
 
-    // Проверка наличия листа регистрации
-    const registrationSheetNames = [
-      "Лист регистрации",
-      "Лист Регистрации",
-      "ЛИСТ РЕГИСТРАЦИИ",
-      "Регистрация",
-      "РЕГИСТРАЦИЯ",
-      "Registration",
-      "Sheet1",
-      "Команды",
-      "КОМАНДЫ",
-      "Teams",
-    ];
+    if (!TournamentParser.findXlsSheet(workbook, REGISTRATION_LIST)) {
+      errors.push(`Отсутствует обязательный лист регистрации.`);
+    }
 
-    const hasRegistrationSheet = registrationSheetNames.some(
-      (name) => workbook.Sheets[name]
+    if (!TournamentParser.findXlsSheet(workbook, /^Кубок [AА]$/)) {
+      errors.push(`Отсутствует обязательный лист 'Кубок А'`);
+    }
+
+    if (!TournamentParser.findXlsSheet(workbook, /^Кубок [BБ]$/)) {
+      errors.push(`Отсутствует обязательный лист 'Кубок Б'`);
+    }
+
+    const swissSheet = TournamentParser.findXlsSheet(
+      workbook,
+      normalizeName(SWISS_RESULTS_LIST)
     );
+    const groupSheet = TournamentParser.findXlsSheet(workbook, /Группа \w+/);
 
-    if (!hasRegistrationSheet) {
-      errors.push(
-        `Отсутствует обязательный лист регистрации. Ожидаемые названия: ${registrationSheetNames.join(
-          ", "
-        )}`
+    if (!swissSheet && !groupSheet) {
+      throw new Error(
+        `Отсутствуют листы квалификационного этапа: "Результаты швейцарки" или "Группа А"`
       );
-    }
-
-    // Проверка наличия листов кубков A и B
-    const cupANames = [
-      "Кубок A",
-      "КубокA",
-      "КУБОК A",
-      "Кубок А",
-      "КУБОК А",
-      "КубокА",
-    ];
-    const cupBNames = [
-      "Кубок B",
-      "КубокB",
-      "КУБОК B",
-      "Кубок Б",
-      "КУБОК Б",
-      "КубокБ",
-    ];
-
-    const hasCupA = cupANames.some((name) => workbook.Sheets[name]);
-    const hasCupB = cupBNames.some((name) => workbook.Sheets[name]);
-
-    if (!hasCupA) {
-      errors.push(
-        `Отсутствует обязательный лист Кубок A. Ожидаемые названия: ${cupANames.join(
-          ", "
-        )}`
-      );
-    }
-
-    if (!hasCupB) {
-      errors.push(
-        `Отсутствует обязательный лист Кубок B. Ожидаемые названия: ${cupBNames.join(
-          ", "
-        )}`
-      );
-    }
-
-    return errors;
-  }
-
-  // Валидация игроков на листах кубков
-  static validatePlayersInCups(
-    workbook: XLSX.WorkBook,
-    registeredPlayersNormalizedSet: Set<string>,
-    registeredPlayersArray: string[]
-  ): string[] {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const cupNames = ["A", "B"]; // Обрабатываем только кубки A и B
-
-    // Объединяем все ячейки игроков в один массив
-    const allPlayerCells = [
-      ...this.quarterFinalsPlayersCells,
-      ...this.semiFinalsPlayersCells,
-      ...this.finalsPlayersCells,
-      ...this.thirdPlacePlayersCells,
-    ];
-
-    for (const cupName of cupNames) {
-      const possibleSheetNames = [
-        `Кубок ${cupName}`,
-        `Кубок${cupName}`,
-        `КУБОК ${cupName}`,
-        cupName === "A" ? "Кубок А" : "Кубок Б",
-      ];
-
-      let worksheet = null;
-      let foundSheetName = null;
-
-      for (const possibleName of possibleSheetNames) {
-        if (workbook.Sheets[possibleName]) {
-          worksheet = workbook.Sheets[possibleName];
-          foundSheetName = possibleName;
-          break;
-        }
-      }
-
-      if (!worksheet) continue;
-
-      // Проверяем всех игроков в ячейках кубка
-      for (const cellAddress of allPlayerCells) {
-        const cell = worksheet[cellAddress];
-        if (cell && cell.v && typeof cell.v === "string" && cell.v.trim()) {
-          const playerName = cell.v.trim();
-
-          // Используем улучшенную функцию поиска игроков
-          const matchResult = this.findPlayerMatch(
-            playerName,
-            registeredPlayersNormalizedSet,
-            registeredPlayersArray
-          );
-
-          if (!matchResult.found) {
-            let errorMessage = `Игрок "${playerName}" в листе "${foundSheetName}" (ячейка ${cellAddress})`;
-
-            // Обрабатываем неоднозначные фамилии как критические ошибки
-            if (matchResult.ambiguous) {
-              errorMessage += ` - ${matchResult.suggestion}`;
-              errors.push(errorMessage);
-            } else {
-              errorMessage += ` не найден в листе регистрации`;
-
-              // Добавляем предложение если есть похожие имена
-              if (matchResult.suggestion) {
-                errorMessage += `. ${matchResult.suggestion}`;
-                warnings.push(errorMessage);
-              } else {
-                errors.push(errorMessage);
-              }
-            }
-          } else if (
-            matchResult.exactMatch &&
-            matchResult.exactMatch !== playerName
-          ) {
-            // Логируем информацию о найденном совпадении
-            console.log(
-              `✓ Игрок "${playerName}" в ячейке ${cellAddress} сопоставлен с зарегистрированным игроком "${matchResult.exactMatch}"`
-            );
-          }
-        }
-      }
-    }
-
-    // Добавляем предупреждения в конец списка ошибок
-    if (warnings.length > 0) {
-      console.warn("Обнаружены возможные несоответствия в именах игроков:");
-      warnings.forEach((warning) => console.warn(`  - ${warning}`));
-      errors.push(...warnings);
     }
 
     return errors;
@@ -627,1014 +336,15 @@ export class TournamentController {
     }
   }
 
-  // Парсинг команд из листа регистрации
-  static parseTeamsFromRegistrationSheet(workbook: XLSX.WorkBook): Team[] {
-    // Пробуем различные варианты названий листа регистрации
-    const possibleRegistrationSheetNames = [
-      "Лист регистрации",
-      "Лист Регистрации",
-      "ЛИСТ РЕГИСТРАЦИИ",
-      "Регистрация",
-      "РЕГИСТРАЦИЯ",
-      "Registration",
-      "Sheet1", // На случай если это первый лист
-      "Команды",
-      "КОМАНДЫ",
-      "Teams",
-    ];
-
-    let registrationSheet = null;
-    let foundSheetName = null;
-
-    // Проверяем все возможные варианты названий
-    for (const possibleName of possibleRegistrationSheetNames) {
-      if (workbook.Sheets[possibleName]) {
-        registrationSheet = workbook.Sheets[possibleName];
-        foundSheetName = possibleName;
-        break;
-      }
-    }
-
-    // Если не найден ни один из ожидаемых листов, пробуем первый лист в файле
-    if (!registrationSheet && workbook.SheetNames.length > 0) {
-      const firstSheetName = workbook.SheetNames[0];
-      registrationSheet = workbook.Sheets[firstSheetName];
-      foundSheetName = firstSheetName;
-      console.log(
-        `Не найден лист регистрации с ожидаемым названием. Используется первый лист: "${firstSheetName}"`
-      );
-    }
-
-    if (!registrationSheet) {
-      const availableSheets = workbook.SheetNames.join(", ");
-      throw new Error(
-        `Не найден лист регистрации команд. Проверенные варианты: ${possibleRegistrationSheetNames.join(
-          ", "
-        )}. Доступные листы в файле: ${availableSheets}`
-      );
-    }
-
-    console.log(`Найден лист регистрации: "${foundSheetName}"`);
-
-    const teams: Team[] = [];
-
-    try {
-      // Парсим команды из листа регистрации
-      const registrationData = XLSX.utils.sheet_to_json(registrationSheet, {
-        header: 1,
-      });
-
-      if (registrationData.length === 0) {
-        throw new Error(
-          `Лист "${foundSheetName}" пуст или не содержит данных для парсинга`
-        );
-      }
-
-      console.log(
-        `Найдено строк в листе регистрации: ${registrationData.length}`
-      );
-
-      for (let i = 0; i < registrationData.length; i++) {
-        const row = registrationData[i] as any[];
-        if (row && row.length >= 2) {
-          // Пропускаем строку с заголовками
-          const colA = String(row[0] || "").toLowerCase();
-          const colB = String(row[1] || "").toLowerCase();
-          if (colA.includes("№") && colB.includes("команда")) {
-            continue;
-          }
-          const teamNumber = parseInt(String(row[0]));
-          if (!isNaN(teamNumber)) {
-            const players: string[] = [];
-
-            // Парсим игроков из строки с разделителями-запятыми
-            const playersString = String(row[1] || "").trim();
-            if (playersString) {
-              const parsedPlayers = playersString
-                .split(",")
-                .map((player) =>
-                  TournamentController.cleanPlayerName(player.trim())
-                )
-                .filter((player) => player && player !== "undefined");
-              players.push(...parsedPlayers);
-            }
-
-            if (players.length > 0) {
-              teams.push({
-                number: teamNumber,
-                players: players,
-              });
-            }
-          }
-        }
-      }
-
-      console.log(`Найдено команд: ${teams.length}`);
-      return teams;
-    } catch (error) {
-      throw new Error(
-        `Ошибка при парсинге листа регистрации "${foundSheetName}": ${
-          (error as Error).message
-        }`
-      );
-    }
-  }
-
-  // Очистка имени игрока от частей в скобках и лишних пробелов
-  static cleanPlayerName(name: string): string {
-    return name
-      .replace(/\([^)]*\)/g, "") // Удаляем всё в скобках
-      .replace(/\s+/g, " ") // Заменяем множественные пробелы на одинарные
-      .trim();
-  }
-
-  // Проверка, является ли строка инициалами (одна или несколько букв с точками)
-  static isInitials(str: string): boolean {
-    // Проверяем формат: одна заглавная буква с точкой, например "И.", "И.О.", "A."
-    return /^[А-ЯA-Z]\.?(\s*[А-ЯA-Z]\.?)*$/.test(str.trim());
-  }
-
-  // Улучшенная валидация игроков из листа регистрации с автосозданием
-  static async validatePlayerNamesFromRegistration(
-    playerNames: string[]
-  ): Promise<string[]> {
-    const errors: string[] = [];
-
-    // Получаем всех игроков из базы данных
-    const allPlayers = await PlayerModel.getAllPlayers();
-    const registeredPlayersArray = allPlayers.map((p) => p.name);
-
-    for (const playerName of playerNames) {
-      // Очищаем имя от скобок
-      const cleanedName = this.cleanPlayerName(playerName);
-      const parts = cleanedName.trim().split(/\s+/);
-
-      // Случай 1: Только одно слово (например, "Мишин")
-      if (parts.length === 1) {
-        const surname = parts[0];
-
-        // Ищем всех игроков с такой фамилией (по первому слову)
-        const matchesBySurname = registeredPlayersArray.filter((dbPlayer) => {
-          const dbParts = dbPlayer.trim().split(/\s+/);
-          return (
-            dbParts.length > 0 &&
-            normalizeName(dbParts[0]) === normalizeName(surname)
-          );
-        });
-
-        if (matchesBySurname.length === 0) {
-          // Ищем по второму слову (возможно, это имя)
-          const matchesByFirstName = registeredPlayersArray.filter(
-            (dbPlayer) => {
-              const dbParts = dbPlayer.trim().split(/\s+/);
-              return (
-                dbParts.length > 1 &&
-                normalizeName(dbParts[1]) === normalizeName(surname)
-              );
-            }
-          );
-
-          if (matchesByFirstName.length === 0) {
-            errors.push(
-              `❌ Игрок "${cleanedName}" не найден в базе данных. Укажите полное имя (Фамилия Имя) для автоматического создания.`
-            );
-          } else if (matchesByFirstName.length === 1) {
-            // Найден один игрок по имени - это ОК
-            console.log(
-              `✓ Игрок "${playerName}" найден по имени: ${matchesByFirstName[0]}`
-            );
-          } else {
-            errors.push(
-              `❌ Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByFirstName.join(
-                ", "
-              )}. Уточните имя.`
-            );
-          }
-        } else if (matchesBySurname.length === 1) {
-          // Найден ровно один игрок с такой фамилией - это ОК
-          console.log(
-            `✓ Игрок "${playerName}" однозначно идентифицирован: ${matchesBySurname[0]}`
-          );
-        } else {
-          // Найдено несколько игроков с такой фамилией
-          errors.push(
-            `❌ Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько игроков: ${matchesBySurname.join(
-              ", "
-            )}. Укажите полное имя.`
-          );
-        }
-      }
-      // Случай 2: Два и более слов (например, "Большаков В." или "Мишин Дмитрий")
-      else if (parts.length >= 2) {
-        const surname = parts[0];
-        const secondPart = parts[1];
-
-        // Проверяем, являются ли вторая часть инициалами
-        if (this.isInitials(secondPart)) {
-          // Ищем игроков по фамилии и инициалам в БД
-          const initial = secondPart.charAt(0).toUpperCase();
-          const matchesByInitial = registeredPlayersArray.filter((dbPlayer) => {
-            const dbParts = dbPlayer.trim().split(/\s+/);
-            if (dbParts.length < 2) return false;
-            const dbSurname = dbParts[0];
-            const dbFirstName = dbParts[1];
-            return (
-              normalizeName(dbSurname) === normalizeName(surname) &&
-              dbFirstName.charAt(0).toUpperCase() === initial
-            );
-          });
-
-          if (matchesByInitial.length === 0) {
-            // НЕ найдено игроков с такими инициалами в БД
-            // Это критическая ошибка - нельзя создать игрока с инициалами
-            errors.push(
-              `❌ Игрок "${cleanedName}" не найден в базе данных. Нельзя создать игрока с инициалами. Укажите полное имя (Фамилия Имя) в листе регистрации.`
-            );
-          } else if (matchesByInitial.length === 1) {
-            // Найден один игрок с такими инициалами - это ОК
-            console.log(
-              `✓ Игрок "${playerName}" найден по инициалам: ${matchesByInitial[0]}`
-            );
-          } else {
-            // Найдено несколько игроков с такими инициалами
-            errors.push(
-              `❌ Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByInitial.join(
-                ", "
-              )}. Укажите полное имя.`
-            );
-          }
-        } else {
-          // Полное имя - проверяем точное совпадение
-          const normalizedInput = normalizeName(cleanedName);
-          const exactMatch = registeredPlayersArray.find(
-            (dbPlayer) => normalizeName(dbPlayer) === normalizedInput
-          );
-
-          if (!exactMatch) {
-            // Если у игрока указаны и фамилия, и имя - он будет создан автоматически при сохранении
-            console.log(
-              `⚠️ Игрок "${cleanedName}" не найден в БД. Будет создан автоматически при сохранении турнира.`
-            );
-            // НЕ создаём игрока здесь! Создание происходит в parseAndSaveTeamsFromRegistrationSheet
-            // Просто добавляем в массив для последующих проверок уникальности в этой же сессии
-            registeredPlayersArray.push(cleanedName);
-          } else {
-            console.log(`✓ Игрок "${playerName}" найден: ${exactMatch}`);
-          }
-        }
-      }
-    }
-
-    return errors;
-  }
-
-  // Новый метод: парсинг и сохранение команд из листа регистрации в БД
-  static async parseAndSaveTeamsFromRegistrationSheet(
-    workbook: XLSX.WorkBook,
-    tournamentId: number
-  ): Promise<Array<{ teamId: number; players: string[] }>> {
-    // Используем ту же логику поиска листа регистрации
-    const possibleRegistrationSheetNames = [
-      "Лист регистрации",
-      "Лист Регистрации",
-      "ЛИСТ РЕГИСТРАЦИИ",
-      "Регистрация",
-      "РЕГИСТРАЦИЯ",
-      "Registration",
-      "Sheet1", // На случай если это первый лист
-      "Команды",
-      "КОМАНДЫ",
-      "Teams",
-    ];
-
-    let registrationSheet = null;
-    let foundSheetName = null;
-
-    // Проверяем все возможные варианты названий
-    for (const possibleName of possibleRegistrationSheetNames) {
-      if (workbook.Sheets[possibleName]) {
-        registrationSheet = workbook.Sheets[possibleName];
-        foundSheetName = possibleName;
-        break;
-      }
-    }
-
-    // Если не найден ни один из ожидаемых листов, пробуем первый лист в файле
-    if (!registrationSheet && workbook.SheetNames.length > 0) {
-      const firstSheetName = workbook.SheetNames[0];
-      registrationSheet = workbook.Sheets[firstSheetName];
-      foundSheetName = firstSheetName;
-      console.log(
-        `Не найден лист регистрации с ожидаемым названием. Используется первый лист: "${firstSheetName}"`
-      );
-    }
-
-    if (!registrationSheet) {
-      const availableSheets = workbook.SheetNames.join(", ");
-      throw new Error(
-        `Не найден лист регистрации команд. Проверенные варианты: ${possibleRegistrationSheetNames.join(
-          ", "
-        )}. Доступные листы в файле: ${availableSheets}`
-      );
-    }
-
-    console.log(`Найден лист регистрации: "${foundSheetName}"`);
-
-    const savedTeams: Array<{ teamId: number; players: string[] }> = [];
-
-    try {
-      // Парсим команды из листа регистрации
-      const registrationData = XLSX.utils.sheet_to_json(registrationSheet, {
-        header: 1,
-      });
-
-      if (registrationData.length === 0) {
-        throw new Error(
-          `Лист "${foundSheetName}" пуст или не содержит данных для парсинга`
-        );
-      }
-
-      console.log(
-        `Найдено строк в листе регистрации: ${registrationData.length}`
-      );
-
-      // Сначала собираем всех игроков для валидации
-      const allPlayerNames: string[] = [];
-      for (let i = 0; i < registrationData.length; i++) {
-        const row = registrationData[i] as any[];
-        if (row && row.length >= 2) {
-          const teamNumber = parseInt(String(row[0]));
-          if (!isNaN(teamNumber)) {
-            // Парсим игроков из строки с разделителями-запятыми
-            const playersString = String(row[1] || "").trim();
-            if (playersString) {
-              const players = playersString
-                .split(",")
-                .map((player) => this.cleanPlayerName(player.trim()))
-                .filter((player) => player && player !== "undefined");
-              allPlayerNames.push(...players);
-            }
-          }
-        }
-      }
-
-      // Валидируем все имена игроков на неоднозначность
-      console.log(
-        `🔍 Валидация ${allPlayerNames.length} имен игроков на неоднозначность...`
-      );
-      const nameValidationErrors =
-        await this.validatePlayerNamesFromRegistration(allPlayerNames);
-      if (nameValidationErrors.length > 0) {
-        throw new Error(
-          `Критические ошибки в именах игроков (Лист регистрации):\n${nameValidationErrors.join(
-            "\n"
-          )}`
-        );
-      }
-      console.log(`✅ Валидация имен игроков прошла успешно`);
-
-      for (let i = 0; i < registrationData.length; i++) {
-        const row = registrationData[i] as any[];
-        if (row && row.length >= 2) {
-          const teamNumber = parseInt(String(row[0]));
-          if (!isNaN(teamNumber)) {
-            const players: string[] = [];
-
-            // Парсим игроков из строки с разделителями-запятыми
-            const playersString = String(row[1] || "").trim();
-            if (playersString) {
-              const parsedPlayers = playersString
-                .split(",")
-                .map((player) => this.cleanPlayerName(player.trim()))
-                .filter((player) => player && player !== "undefined");
-              players.push(...parsedPlayers);
-            }
-
-            if (players.length > 0) {
-              // Сортируем игроков по фамилиям
-              const sortedPlayers = players.sort();
-
-              // Создаем или находим игроков в БД
-              const playerIds: number[] = [];
-              for (const playerName of sortedPlayers) {
-                let playerId: number;
-                // Ищем игрока по очищенному имени или оригинальному
-                let player = await PlayerModel.getPlayerByName(playerName);
-
-                // Если не найден, пытаемся найти по нормализованному совпадению
-                if (!player) {
-                  const allPlayers = await PlayerModel.getAllPlayers();
-                  const normalizedSearchName = normalizeName(playerName);
-                  const matchedPlayer = allPlayers.find(
-                    (p) => normalizeName(p.name) === normalizedSearchName
-                  );
-
-                  if (matchedPlayer) {
-                    player = matchedPlayer;
-                  }
-                }
-
-                // Если не найден - пытаемся найти по частям имени
-                if (!player) {
-                  const allPlayers = await PlayerModel.getAllPlayers();
-                  const nameParts = playerName.split(/\s+/);
-
-                  // Случай 1: Одно слово (только фамилия или только имя)
-                  if (nameParts.length === 1) {
-                    const searchTerm = nameParts[0];
-                    // Ищем по первому слову (фамилия)
-                    const matchesByFirstWord = allPlayers.filter((p) => {
-                      const dbParts = p.name.trim().split(/\s+/);
-                      return (
-                        dbParts.length >= 1 &&
-                        normalizeName(dbParts[0]) === normalizeName(searchTerm)
-                      );
-                    });
-
-                    if (matchesByFirstWord.length === 1) {
-                      player = matchesByFirstWord[0];
-                      console.log(
-                        `✓ Игрок "${playerName}" найден по фамилии: ${player.name} (ID: ${player.id})`
-                      );
-                    } else if (matchesByFirstWord.length > 1) {
-                      throw new Error(
-                        `Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByFirstWord
-                          .map((p) => p.name)
-                          .join(", ")}. Укажите полное имя или инициалы.`
-                      );
-                    } else {
-                      // Не найдено по фамилии, ищем по имени
-                      const matchesBySecondWord = allPlayers.filter((p) => {
-                        const dbParts = p.name.trim().split(/\s+/);
-                        return (
-                          dbParts.length >= 2 &&
-                          normalizeName(dbParts[1]) ===
-                            normalizeName(searchTerm)
-                        );
-                      });
-
-                      if (matchesBySecondWord.length === 1) {
-                        player = matchesBySecondWord[0];
-                        console.log(
-                          `✓ Игрок "${playerName}" найден по имени: ${player.name} (ID: ${player.id})`
-                        );
-                      } else if (matchesBySecondWord.length > 1) {
-                        throw new Error(
-                          `Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesBySecondWord
-                            .map((p) => p.name)
-                            .join(", ")}. Укажите полное имя.`
-                        );
-                      }
-                      // Если не найдено по имени тоже, player остается null
-                    }
-                  }
-                  // Случай 2: Два слова - проверяем инициалы
-                  else if (
-                    nameParts.length >= 2 &&
-                    this.isInitials(nameParts[1])
-                  ) {
-                    // Это формат "Фамилия И." - ищем по инициалам
-                    const surname = nameParts[0];
-                    const initial = nameParts[1].charAt(0).toUpperCase();
-
-                    const matchesByInitial = allPlayers.filter((p) => {
-                      const dbParts = p.name.trim().split(/\s+/);
-                      if (dbParts.length < 2) return false;
-                      const dbSurname = dbParts[0];
-                      const dbFirstName = dbParts[1];
-                      return (
-                        normalizeName(dbSurname) === normalizeName(surname) &&
-                        dbFirstName.charAt(0).toUpperCase() === initial
-                      );
-                    });
-
-                    if (matchesByInitial.length === 1) {
-                      player = matchesByInitial[0];
-                      console.log(
-                        `✓ Игрок "${playerName}" найден по инициалам: ${player.name} (ID: ${player.id})`
-                      );
-                    } else if (matchesByInitial.length > 1) {
-                      throw new Error(
-                        `Не можем однозначно идентифицировать игрока "${playerName}". Найдено несколько совпадений: ${matchesByInitial
-                          .map((p) => p.name)
-                          .join(", ")}. Укажите полное имя.`
-                      );
-                    }
-                    // Если matchesByInitial.length === 0, player остается null и сработает следующая проверка
-                  }
-                }
-
-                if (!player) {
-                  // Проверяем, что игрок имеет полное имя (не инициалы)
-                  const nameParts = playerName.split(/\s+/);
-                  const hasInitials =
-                    nameParts.length >= 2 && /^[А-ЯA-Z]\.?$/.test(nameParts[1]);
-
-                  if (nameParts.length < 2 || hasInitials) {
-                    console.warn(
-                      `⚠️ Игрок "${playerName}" не создан: имя должно содержать полную фамилию и имя (без инициалов)`
-                    );
-                    throw new Error(
-                      `Игрок "${playerName}" имеет неполное имя. Укажите полное имя (Фамилия Имя) в листе регистрации.`
-                    );
-                  }
-
-                  playerId = await PlayerModel.createPlayer(playerName);
-                  console.log(
-                    `✓ Создан игрок: "${playerName}" (ID: ${playerId})`
-                  );
-                } else {
-                  playerId = player.id;
-                  console.log(
-                    `✓ Найден игрок: "${playerName}" (ID: ${playerId})`
-                  );
-                }
-                playerIds.push(playerId);
-              }
-
-              // Ищем существующую команду
-              let existingTeam = await TeamModel.findExistingTeam(playerIds);
-
-              let teamId: number;
-              if (existingTeam) {
-                teamId = existingTeam.id;
-                console.log(
-                  `✓ Найдена существующая команда: ID ${teamId}, игроки: ${sortedPlayers.join(
-                    ", "
-                  )}`
-                );
-              } else {
-                // Создаем новую команду
-                teamId = await TeamModel.createTeam(playerIds);
-                console.log(
-                  `✓ Создана новая команда: ID ${teamId}, игроки: ${sortedPlayers.join(
-                    ", "
-                  )}`
-                );
-              }
-
-              savedTeams.push({
-                teamId,
-                players: sortedPlayers,
-              });
-            }
-          }
-        }
-      }
-
-      console.log(`Обработано команд: ${savedTeams.length}`);
-      return savedTeams;
-    } catch (error) {
-      throw new Error(
-        `Ошибка при парсинге и сохранении команд из листа регистрации "${foundSheetName}": ${
-          (error as Error).message
-        }`
-      );
-    }
-  }
-
-  // Парсинг результатов кубков A и B
-  static parseCupResults(
-    workbook: XLSX.WorkBook,
-    teams: Team[]
-  ): CupTeamResult[] {
-    // Создаем маппинг игроков на команды
-    const playerToTeam = new Map<string, Team>();
-    teams.forEach((team) => {
-      team.players.forEach((player) => {
-        playerToTeam.set(player.toLowerCase(), team);
-      });
-    });
-
-    const cupResults: CupTeamResult[] = [];
-    const cupNames = ["A", "B", "C", "А", "Б", "С"]; // Обрабатываем только кубки A и B
-
-    for (const cupName of cupNames) {
-      // Пробуем различные варианты названий листов
-      const possibleSheetNames = [
-        `Кубок ${cupName}`,
-        `Кубок${cupName}`,
-        `КУБОК ${cupName}`,
-        cupName === "A" ? "Кубок А" : "Кубок Б",
-      ];
-
-      let worksheet = null;
-      let foundSheetName = null;
-
-      for (const possibleName of possibleSheetNames) {
-        if (workbook.Sheets[possibleName]) {
-          worksheet = workbook.Sheets[possibleName];
-          foundSheetName = possibleName;
-          break;
-        }
-      }
-
-      if (!worksheet) {
-        console.log(
-          `Лист для кубка ${cupName} не найден, пропускаем. Проверены варианты: ${possibleSheetNames.join(
-            ", "
-          )}`
-        );
-        continue;
-      }
-
-      console.log(`Найден лист кубка ${cupName}: "${foundSheetName}"`);
-
-      // Определяем ячейки для каждой стадии кубка
-      const stages = {
-        // 1/4 финала
-        quarterFinals: [
-          {
-            cells: TournamentController.quarterFinalsPlayersCells,
-            position: CupPosition.QUARTER_FINAL,
-          },
-        ],
-        // 1/2 финала
-        semiFinals: [
-          {
-            cells: TournamentController.semiFinalsPlayersCells,
-            position: CupPosition.SEMI_FINAL,
-          },
-        ],
-        // Финал
-        finals: [
-          {
-            cells: TournamentController.finalsPlayersCells,
-            position: CupPosition.RUNNER_UP,
-          }, // Участники финала (2 место)
-        ],
-        // Игра за 3 место
-        thirdPlace: [{ range: "F38", position: CupPosition.THIRD_PLACE }],
-      };
-
-      const cupTeamResults: Array<{ team: Team; position: CupPosition }> = [];
-
-      // Парсим все стадии
-      // Определяем приоритет позиций (чем выше число, тем лучше позиция)
-      const positionPriority: { [key: string]: number } = {
-        [CupPosition.WINNER]: 5,
-        [CupPosition.RUNNER_UP]: 4,
-        [CupPosition.THIRD_PLACE]: 3,
-        [CupPosition.SEMI_FINAL]: 2,
-        [CupPosition.QUARTER_FINAL]: 1,
-      };
-
-      Object.entries(stages).forEach(([stageName, stageRanges]) => {
-        stageRanges.forEach((stageInfo: StageInfo) => {
-          // Обрабатываем либо конкретные ячейки, либо range (для обратной совместимости)
-          const cellsToProcess: string[] = [];
-
-          // Type guard для StageWithCells
-          if ("cells" in stageInfo) {
-            cellsToProcess.push(...stageInfo.cells);
-          }
-          // Type guard для StageWithRange
-          else if ("range" in stageInfo) {
-            const range = XLSX.utils.decode_range(stageInfo.range);
-            for (let row = range.s.r; row <= range.e.r; row++) {
-              for (let col = range.s.c; col <= range.e.c; col++) {
-                const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-                cellsToProcess.push(cellAddress);
-              }
-            }
-          }
-
-          cellsToProcess.forEach((cellAddress: string) => {
-            const cell = worksheet[cellAddress];
-
-            if (cell && cell.v && typeof cell.v === "string" && cell.v.trim()) {
-              const playerName = cell.v.trim();
-              const team = playerToTeam.get(playerName.toLowerCase());
-
-              if (team) {
-                // Ищем существующий результат команды
-                const existingResultIndex = cupTeamResults.findIndex(
-                  (r) => r.team.number === team.number
-                );
-
-                if (existingResultIndex !== -1) {
-                  // Команда уже есть, проверяем приоритет позиций
-                  const existingPriority =
-                    positionPriority[
-                      cupTeamResults[existingResultIndex].position
-                    ] || 0;
-                  const newPriority = positionPriority[stageInfo.position] || 0;
-
-                  // Обновляем позицию, если новая позиция лучше
-                  if (newPriority > existingPriority) {
-                    cupTeamResults[existingResultIndex].position =
-                      stageInfo.position;
-                  }
-                } else {
-                  // Команды еще нет, добавляем
-                  cupTeamResults.push({
-                    team: team,
-                    position: stageInfo.position,
-                  });
-                }
-              } else {
-                console.log(`Игрок "${playerName}" не найден в командах`);
-              }
-            }
-          });
-        });
-      });
-
-      // Определяем победителя финала (1 место) из ячейки N18
-      try {
-        const winnerCell = worksheet["N18"];
-        if (
-          winnerCell &&
-          winnerCell.v &&
-          typeof winnerCell.v === "string" &&
-          winnerCell.v.trim()
-        ) {
-          const winnerPlayerName = winnerCell.v.trim();
-          const winnerTeam = playerToTeam.get(winnerPlayerName.toLowerCase());
-
-          if (winnerTeam) {
-            // Ищем команду победителя в результатах и устанавливаем позицию WINNER
-            const winnerTeamIndex = cupTeamResults.findIndex(
-              (r) => r.team.number === winnerTeam.number
-            );
-            if (winnerTeamIndex !== -1) {
-              cupTeamResults[winnerTeamIndex].position = CupPosition.WINNER;
-              console.log(
-                `Победитель кубка ${cupName}: команда ${winnerTeam.number} (${winnerPlayerName})`
-              );
-            } else {
-              // Если команда победителя не найдена в результатах, добавляем её
-              cupTeamResults.push({
-                team: winnerTeam,
-                position: CupPosition.WINNER,
-              });
-              console.log(
-                `Добавлен победитель кубка ${cupName}: команда ${winnerTeam.number} (${winnerPlayerName})`
-              );
-            }
-          } else {
-            console.warn(
-              `Команда игрока-победителя "${winnerPlayerName}" не найдена в ячейке N18 кубка ${cupName}`
-            );
-          }
-        } else {
-          console.warn(
-            `Ячейка N18 пуста или не содержит данных о победителе в кубке ${cupName}`
-          );
-        }
-      } catch (error) {
-        console.error(
-          `Ошибка при чтении победителя из ячейки N18 в кубке ${cupName}:`,
-          error
-        );
-      }
-
-      // Добавляем результаты этого кубка
-      cupTeamResults.forEach((result) => {
-        cupResults.push({
-          team: result.team,
-          cup: cupName as "A" | "B",
-          points_reason: result.position,
-        });
-      });
-    }
-
-    return cupResults;
-  }
-
-  // Новый метод: парсинг результатов кубков с поиском команд в БД
-  static async parseCupResultsFromDB(
-    workbook: XLSX.WorkBook,
-    tournamentId: number
-  ): Promise<Array<{ teamId: number; cup: "A" | "B"; position: CupPosition }>> {
-    const cupResults: Array<{
-      teamId: number;
-      cup: "A" | "B";
-      position: CupPosition;
-    }> = [];
-    const cupNames = ["A", "B"] as const; // Обрабатываем только кубки A и B
-
-    for (const cupName of cupNames) {
-      // Пробуем различные варианты названий листов
-      const possibleSheetNames = [
-        `Кубок ${cupName}`,
-        `Кубок${cupName}`,
-        `КУБОК ${cupName}`,
-        cupName === "A" ? "Кубок А" : "Кубок Б",
-      ];
-
-      let worksheet = null;
-      let foundSheetName = null;
-
-      for (const possibleName of possibleSheetNames) {
-        if (workbook.Sheets[possibleName]) {
-          worksheet = workbook.Sheets[possibleName];
-          foundSheetName = possibleName;
-          break;
-        }
-      }
-
-      if (!worksheet) {
-        console.log(
-          `Лист для кубка ${cupName} не найден, пропускаем. Проверены варианты: ${possibleSheetNames.join(
-            ", "
-          )}`
-        );
-        continue;
-      }
-
-      console.log(`Найден лист кубка ${cupName}: "${foundSheetName}"`);
-
-      // Определяем ячейки для каждой стадии кубка
-      const stages = {
-        // 1/4 финала
-        quarterFinals: [
-          {
-            cells: this.quarterFinalsPlayersCells,
-            position: CupPosition.QUARTER_FINAL,
-          },
-        ],
-        // 1/2 финала
-        semiFinals: [
-          {
-            cells: this.semiFinalsPlayersCells,
-            position: CupPosition.SEMI_FINAL,
-          },
-        ],
-        // Финал
-        finals: [
-          { cells: this.finalsPlayersCells, position: CupPosition.RUNNER_UP }, // Участники финала (2 место)
-        ],
-        // Игра за 3 место
-        thirdPlace: [
-          {
-            cells: this.thirdPlacePlayersCells,
-            position: CupPosition.THIRD_PLACE,
-          },
-        ],
-      };
-
-      const cupTeamResults: Array<{ teamId: number; position: CupPosition }> =
-        [];
-
-      // Парсим все стадии
-      // Определяем приоритет позиций (чем выше число, тем лучше позиция)
-      const positionPriority: { [key: string]: number } = {
-        [CupPosition.WINNER]: 5,
-        [CupPosition.RUNNER_UP]: 4,
-        [CupPosition.THIRD_PLACE]: 3,
-        [CupPosition.SEMI_FINAL]: 2,
-        [CupPosition.QUARTER_FINAL]: 1,
-      };
-
-      // Собираем все промисы для поиска команд
-      const searchPromises: Promise<void>[] = [];
-
-      for (const [stageName, stagesList] of Object.entries(stages)) {
-        for (const stageInfo of stagesList as any[]) {
-          // Обрабатываем либо конкретные ячейки, либо range (для обратной совместимости)
-          const cellsToProcess: string[] = [];
-
-          // Type guard для StageWithCells
-          if ("cells" in stageInfo) {
-            cellsToProcess.push(...stageInfo.cells);
-          }
-          // Type guard для StageWithRange
-          else if ("range" in stageInfo) {
-            const range = XLSX.utils.decode_range(stageInfo.range);
-            for (let R = range.s.r; R <= range.e.r; ++R) {
-              for (let C = range.s.c; C <= range.e.c; ++C) {
-                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                cellsToProcess.push(cellAddress);
-              }
-            }
-          }
-
-          cellsToProcess.forEach((cellAddress: string) => {
-            const cell = worksheet[cellAddress];
-
-            if (cell && cell.v && typeof cell.v === "string" && cell.v.trim()) {
-              const playerName = cell.v.trim();
-
-              // Добавляем промис поиска команды
-              const searchPromise = TeamModel.findTeamByPlayerName(playerName)
-                .then((team) => {
-                  if (team) {
-                    // Проверяем, есть ли уже результат для этой команды в данном кубке
-                    const existingResultIndex = cupTeamResults.findIndex(
-                      (r) => r.teamId === team.id
-                    );
-
-                    if (existingResultIndex !== -1) {
-                      // Команда уже есть, проверяем позицию
-                      const existingPriority =
-                        positionPriority[
-                          cupTeamResults[existingResultIndex].position
-                        ] || 0;
-                      const newPriority =
-                        positionPriority[stageInfo.position] || 0;
-
-                      // Обновляем позицию, если новая позиция лучше
-                      if (newPriority > existingPriority) {
-                        cupTeamResults[existingResultIndex].position =
-                          stageInfo.position;
-                      }
-                    } else {
-                      // Команды еще нет, добавляем
-                      cupTeamResults.push({
-                        teamId: team.id,
-                        position: stageInfo.position,
-                      });
-                    }
-                  } else {
-                    console.log(
-                      `Игрок "${playerName}" не найден ни в одной команде`
-                    );
-                  }
-                })
-                .catch((error) => {
-                  console.error(
-                    `Ошибка при поиске команды для игрока "${playerName}":`,
-                    error
-                  );
-                });
-
-              searchPromises.push(searchPromise);
-            }
-          });
-        }
-      }
-
-      // Ждем завершения всех поисков команд
-      await Promise.all(searchPromises);
-
-      // Определяем победителя финала (1 место) из ячейки N18
-      try {
-        const winnerCell = worksheet["N18"];
-        if (
-          winnerCell &&
-          winnerCell.v &&
-          typeof winnerCell.v === "string" &&
-          winnerCell.v.trim()
-        ) {
-          const winnerPlayerName = winnerCell.v.trim();
-          const winnerTeam = await TeamModel.findTeamByPlayerName(
-            winnerPlayerName
-          );
-
-          if (winnerTeam) {
-            // Ищем команду победителя в результатах и устанавливаем позицию WINNER
-            const winnerTeamIndex = cupTeamResults.findIndex(
-              (r) => r.teamId === winnerTeam.id
-            );
-            if (winnerTeamIndex !== -1) {
-              cupTeamResults[winnerTeamIndex].position = CupPosition.WINNER;
-              console.log(
-                `Победитель кубка ${cupName}: команда ID ${winnerTeam.id} (${winnerPlayerName})`
-              );
-            } else {
-              cupTeamResults.push({
-                teamId: winnerTeam.id,
-                position: CupPosition.WINNER,
-              });
-              console.log(
-                `Добавлен победитель кубка ${cupName}: команда ID ${winnerTeam.id} (${winnerPlayerName})`
-              );
-            }
-          } else {
-            console.log(
-              `Команда победителя "${winnerPlayerName}" не найдена в кубке ${cupName}`
-            );
-          }
-        }
-      } catch (error) {
-        console.warn(
-          `Ошибка при чтении ячейки победителя для кубка ${cupName}: ${
-            (error as Error).message
-          }`
-        );
-      }
-
-      // Добавляем результаты кубка
-      cupTeamResults.forEach((result) => {
-        cupResults.push({
-          teamId: result.teamId,
-          cup: cupName as "A" | "B",
-          position: result.position,
-        });
-      });
-    }
-
-    // Оставляем только лучший результат для каждой команды
-    return selectBestTeamCupResults(cupResults);
-  }
-
-  // Новый метод: парсинг турнира с сохранением команд в БД и валидацией критических ошибок
+  // ################################################################
+  // Парсинг данных турнира
+  // ################################################################
   static async parseTournamentData(
     fileBuffer: Buffer,
     fileName: string,
     tournamentName: string,
     tournamentDate: string,
+    tournamentCategory: "1" | "2",
     providedWorkbook?: XLSX.WorkBook
   ): Promise<{
     tournamentId: number;
@@ -1677,9 +387,6 @@ export class TournamentController {
         );
       }
 
-      // ВАЛИДАЦИЯ КРИТИЧЕСКИХ ОШИБОК
-      console.log("🔍 Выполняется валидация критических ошибок...");
-
       // 1. Проверка наличия обязательных листов
       const structuralErrors = this.validateCriticalErrors(workbook);
       if (structuralErrors.length > 0) {
@@ -1689,250 +396,169 @@ export class TournamentController {
       }
       console.log("✓ Структура файла корректна");
 
-      // 2. Получаем список зарегистрированных игроков для валидации
-      let registeredPlayersNormalizedSet: Set<string>;
-      let registeredPlayersArray: string[];
-      try {
-        const teams = await TournamentParser.parseTeamsFromRegistrationSheet(
-          workbook
-        );
-        registeredPlayersNormalizedSet = new Set();
-        registeredPlayersArray = [];
-
-        teams.forEach((team: Team) => {
-          team.players.forEach((player: string) => {
-            registeredPlayersNormalizedSet.add(normalizeName(player)); // Нормализованные имена для быстрого поиска
-            registeredPlayersArray.push(player); // Сохраняем оригинальный регистр
-          });
-        });
-
-        console.log(
-          `✓ Найдено ${registeredPlayersNormalizedSet.size} зарегистрированных игроков`
-        );
-      } catch (error) {
-        throw new Error(
-          `Ошибка при получении списка игроков для валидации: ${
-            (error as Error).message
-          }`
-        );
-      }
-
-      // 3. Проверка наличия игроков из кубков в листе регистрации
-      const playerValidationErrors = this.validatePlayersInCups(
-        workbook,
-        registeredPlayersNormalizedSet,
-        registeredPlayersArray
+      // 2. Парсинг данных c листов
+      // Сбор данных о командах
+      const teams = await TournamentParser.parseTeamsFromRegistrationSheet(
+        workbook
       );
-      if (playerValidationErrors.length > 0) {
-        throw new Error(
-          `Критические ошибки в данных игроков:\n${playerValidationErrors.join(
-            "\n"
-          )}`
-        );
-      }
-      console.log("✓ Все игроки в кубках найдены в листе регистрации");
 
-      console.log("✅ Валидация критических ошибок пройдена успешно");
-
-      // Определяем категорию турнира из названия файла
-      const fileNameLower = fileName.toLowerCase();
-      let category: "1" | "2" = "1"; // по умолчанию первая категория
-
-      if (
-        fileNameLower.includes("2 категория") ||
-        fileNameLower.includes("2категория") ||
-        fileNameLower.includes("вторая категория") ||
-        fileNameLower.includes("ii категория") ||
-        fileNameLower.includes("категория 2")
-      ) {
-        category = "2";
-        console.log("Определена 2-я категория турнира из названия файла");
-      } else if (
-        fileNameLower.includes("1 категория") ||
-        fileNameLower.includes("1категория") ||
-        fileNameLower.includes("первая категория") ||
-        fileNameLower.includes("i категория") ||
-        fileNameLower.includes("категория 1")
-      ) {
-        category = "1";
-        console.log("Определена 1-я категория турнира из названия файла");
-      } else {
-        console.log(
-          "Категория турнира не определена из названия файла, используется 1-я категория по умолчанию"
-        );
-      }
-
-      // ВАЖНО: После валидации начинается сохранение данных
-      // При любой ошибке после этой точки нужно откатывать изменения
-
-      // 1. Создаем турнир (используем отдельное соединение)
-      let tournamentId: number;
-      try {
-        const [tournamentResult] = await pool.execute(
-          "INSERT INTO tournaments (name, date, created_at) VALUES (?, ?, NOW())",
-          [tournamentName, tournamentDate]
-        );
-        tournamentId = (tournamentResult as any).insertId;
-        console.log(`✓ Создан турнир: ID ${tournamentId}`);
-      } catch (error) {
-        throw new Error(
-          `Ошибка при создании турнира: ${(error as Error).message}`
-        );
-      }
-
-      // 2. Парсим и сохраняем команды из листа регистрации в БД (используем отдельное соединение)
-      let savedTeams: Array<{ teamId: number; players: string[] }>;
-
-      try {
-        savedTeams = await this.parseAndSaveTeamsFromRegistrationSheet(
-          workbook,
-          tournamentId
-        );
-        console.log(`✓ Сохранено команд: ${savedTeams.length}`);
-      } catch (error) {
-        // Откатываем турнир и связанные данные при ошибке парсинга команд
-        console.error(
-          `❌ Ошибка при парсинге команд, откатываем турнир ${tournamentId}...`
-        );
-
-        try {
-          // Удаляем турнир (каскадно удалятся связанные результаты через ON DELETE CASCADE)
-          await pool.execute("DELETE FROM tournaments WHERE id = ?", [
-            tournamentId,
-          ]);
-          console.log(
-            `✓ Турнир ${tournamentId} и связанные результаты удалены`
-          );
-
-          // ВАЖНО: Игроки НЕ удаляются, так как:
-          // 1. Они не связаны с турниром напрямую (через команды)
-          // 2. Могут быть полезны для будущих турниров
-          // 3. Их удаление может нарушить целостность, если они используются в других командах
-
-          // Команды и связи игрок-команда НЕ удаляются автоматически,
-          // но это не критично - они останутся сиротами и не будут влиять на систему
-        } catch (deleteError) {
-          console.error(
-            `❌ Не удалось удалить турнир: ${(deleteError as Error).message}`
-          );
-        }
-
-        throw new Error(
-          `Ошибка при парсинге и сохранении команд: ${(error as Error).message}`
-        );
-      }
-
-      // 3. Парсим результаты кубков с поиском команд в БД (используем отдельное соединение)
-      let cupResults: Array<{
-        teamId: number;
-        cup: "A" | "B";
-        position: CupPosition;
-      }>;
-      try {
-        cupResults = await this.parseCupResultsFromDB(workbook, tournamentId);
-        console.log(`✓ Найдено результатов кубков: ${cupResults.length}`);
-      } catch (error) {
-        console.warn(
-          `Предупреждение при парсинге результатов кубков: ${
-            (error as Error).message
-          }`
-        );
-        // Не бросаем ошибку, продолжаем с пустыми результатами
-        cupResults = [];
-      }
-
-      // 4. Парсим данные квалификационного этапа для получения побед команд
-      let teamWins = new Map<string, number>();
+      // 3. Сбор данных об играх квалификационного этапа
+      let teamQualifyingResults = new Map<number, TeamQualifyingResults>();
 
       const swissSheet = TournamentParser.findXlsSheet(
         workbook,
-        normalizeName(swissResultsSheetName)
+        normalizeName(SWISS_RESULTS_LIST)
       );
       const groupSheet = TournamentParser.findXlsSheet(workbook, /Группа \w+/);
 
-      if (!swissSheet || !groupSheet) {
-        console.error(
-          `Не найдены данные квалификационного этапа. Ожидалось наличие листов: "Результаты швейцарки" или "Группа А"`
+      // Либо находим результаты Швейцарки, либо групп
+      if (swissSheet) {
+        teamQualifyingResults = await TournamentParser.parseSwissSystemResults(
+          workbook,
+          teams
+        );
+      } else if (groupSheet) {
+        teamQualifyingResults = await TournamentParser.parseGroupResults(
+          workbook,
+          teams
         );
       }
 
-      try {
-        if (swissSheet) {
-          console.log("🎯 Парсим результаты Швейарки");
-          teamWins = TournamentParser.parseSwissSystemResults(swissSheet);
-        }
-
-        if (groupSheet) {
-          console.log("🎯 Парсим результаты группового этапа");
-          teamWins = TournamentParser.parseGroupResults(workbook);
-        }
-      } catch (error) {
-        console.warn(
-          `Ошибка при парсинге данных квалификационного этапа': ${
-            (error as Error).message
-          }`
+      console.log(`### Определены результаты квалификационного этапа`);
+      for (const [teamOrderNum, results] of teamQualifyingResults) {
+        console.log(
+          `Team #${teamOrderNum} : ${JSON.stringify(results, null, 0)}`
         );
-        // Не бросаем ошибку, продолжаем без данных о победах
       }
 
-      // 5. Сохраняем результаты турнира для команд кубков (используем отдельные соединения для каждого блока)
-      let cupResultsCount = 0;
-      for (const result of cupResults) {
-        try {
-          await this.saveCupTeamResult(
-            result,
-            tournamentId,
-            teamWins,
-            category,
-            savedTeams.length
-          );
-          cupResultsCount++;
-        } catch (error) {
-          console.error(
-            `Ошибка при сохранении результата команды ${result.teamId}:`,
-            error
-          );
-          // Продолжаем с другими командами
-        }
-      }
+      const aCupTeamsResults = await TournamentParser.parseCupResults(
+        workbook,
+        "A",
+        teams
+      );
+      const bCupTeamsResults = await TournamentParser.parseCupResults(
+        workbook,
+        "B",
+        teams
+      );
+      const cCupTeamsResults = await TournamentParser.parseCupResults(
+        workbook,
+        "C",
+        teams
+      );
 
-      // 6. Сохраняем результаты команд швейцарки (не попавших в кубки)
-      let swissResultsCount = 0;
-      for (const savedTeam of savedTeams) {
-        // Проверяем, есть ли эта команда уже в результатах кубков
-        const isInCup = cupResults.some(
-          (cupResult) => cupResult.teamId === savedTeam.teamId
-        );
+      // Сохраняем данные
+      const tournamentPlayersIds: number[] = [];
 
-        if (!isInCup) {
-          try {
-            const swissResult = await this.saveSwissTeamResult(
-              savedTeam,
-              tournamentId,
-              teamWins,
-              category
-            );
-            if (swissResult) {
-              swissResultsCount++;
-            }
-          } catch (error) {
-            console.error(
-              `Ошибка при сохранении швейцарки для команды ${savedTeam.teamId}:`,
-              error
-            );
-            // Продолжаем с другими командами
-          }
+      console.log(
+        `Список команд до сохранения в БД\n${JSON.stringify(teams, null, 2)}`
+      );
+
+      // Сохраняем команды в БД
+      for (const team of teams) {
+        const teamPlayers: number[] = [];
+        for (const player of team.players) {
+          teamPlayers.push(player.id);
+          tournamentPlayersIds.push(player.id);
         }
+
+        let teamId;
+
+        const foundedTeam = await TeamModel.findExistingTeam(teamPlayers);
+
+        if (!teamPlayers) {
+          teamId = await TeamModel.createTeam(teamPlayers);
+        } else {
+          teamId = foundedTeam?.id;
+        }
+        team.teamId = teamId;
       }
 
       console.log(
-        `✅ Парсинг завершен успешно: турнир ID ${tournamentId}, команд - ${savedTeams.length}, результатов кубков - ${cupResultsCount}, результатов швейцарки - ${swissResultsCount}, категория - ${category}`
+        `Список команд  после  сохранения в БД\n${JSON.stringify(
+          teams,
+          null,
+          2
+        )}`
+      );
+
+      const teamResults: Map<number, TeamResults> = new Map(); // key = teamId
+
+      // Привзяка результатов квалификационного этапа команде
+      console.log("### Link qualifing reuslts to team");
+      for (const [teamOrderNum, qualifyingResults] of teamQualifyingResults) {
+        teamResults.set(teams[teamOrderNum].teamId!, {
+          qualifyingWins: qualifyingResults.wins,
+          wins: qualifyingResults.wins,
+          loses: qualifyingResults.loses,
+        });
+      }
+
+      // Привзяка результатов кубков - команде
+      // Кубок А
+      await this.modifyTeamResultsWithCupResults(
+        "A",
+        aCupTeamsResults,
+        teams,
+        teamResults
+      );
+
+      if (bCupTeamsResults) {
+        await this.modifyTeamResultsWithCupResults(
+          "B",
+          bCupTeamsResults,
+          teams,
+          teamResults
+        );
+      }
+
+      if (cCupTeamsResults) {
+        await this.modifyTeamResultsWithCupResults(
+          "C",
+          cCupTeamsResults,
+          teams,
+          teamResults
+        );
+      }
+
+      const tournamentId = await TournamentModel.createTournament(
+        tournamentName,
+        tournamentDate
+      );
+
+      // Рассчёт рейтинговых очков и сохранение результатов команды в БД
+      for (const [teamId, results] of teamResults) {
+        let points = 0;
+        if (results.cup!) {
+          points = getCupPoints(
+            tournamentCategory,
+            results.cup!,
+            results.cupPosition!,
+            teams.length
+          );
+        } else {
+          points = getWinsPoints(tournamentCategory, results.qualifyingWins!);
+        }
+
+        TournamentModel.addTournamentResult(
+          tournamentId,
+          teamId,
+          results.wins!,
+          results.loses!,
+          results.cupPosition,
+          results.cup,
+          results.qualifyingWins!
+        );
+      }
+
+      console.log(
+        `✅ Парсинг завершен успешно: турнир ID ${tournamentId}, команд - ${teams.length}`
       );
 
       return {
         tournamentId,
-        teamsCount: savedTeams.length,
-        resultsCount: cupResultsCount + swissResultsCount,
+        teamsCount: teams.length,
+        resultsCount: 0, //TODO: избавиться
       };
     } catch (error) {
       console.error(
@@ -1944,586 +570,8 @@ export class TournamentController {
       // Просто пробрасываем ошибку дальше - турнир либо не был создан,
       // либо уже удалён в блоке try-catch выше
 
-      throw new Error(
-        `Не удалось обработать файл турнира "${fileName}": ${
-          (error as Error).message
-        }`
-      );
+      throw new Error((error as Error).message);
     }
-  }
-
-  // Сохранение результата команды кубка
-  static async saveCupTeamResult(
-    result: { teamId: number; cup: "A" | "B"; position: CupPosition },
-    tournamentId: number,
-    teamWins: Map<string, number>,
-    category: "1" | "2",
-    totalTeams: number
-  ): Promise<void> {
-    // Гарантируем наличие колонки points в tournament_results (если миграция не применена)
-    try {
-      const [colCheck] = await pool.execute<RowDataPacket[]>(
-        `SELECT COUNT(*) as count
-         FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'tournament_results'
-           AND COLUMN_NAME = 'points'`
-      );
-      if ((colCheck[0] as any)?.count === 0) {
-        await pool.execute(
-          "ALTER TABLE tournament_results ADD COLUMN points INT NOT NULL DEFAULT 0 AFTER qualifying_wins"
-        );
-      }
-    } catch (e) {
-      // no-op: если нет прав на ALTER, последующие INSERT без points продолжат работать в старой схеме
-    }
-    // Ищем количество побед для этой команды
-    let qualifying_wins = 0;
-
-    // Получаем информацию о команде для поиска побед
-    const [teamRow] = await pool.execute<any[]>(
-      `SELECT t.id, GROUP_CONCAT(p.name SEPARATOR ', ') as player_names
-       FROM teams t
-       LEFT JOIN team_players tp ON t.id = tp.team_id
-       LEFT JOIN players p ON tp.player_id = p.id
-       WHERE t.id = ?
-       GROUP BY t.id`,
-      [result.teamId]
-    );
-
-    if (teamRow && teamRow.length > 0) {
-      const teamInfo = teamRow[0];
-      const playerNames = teamInfo.player_names || "";
-
-      // Ищем точное совпадение или частичное совпадение по именам игроков
-      for (const [teamName, teamWinsCount] of teamWins.entries()) {
-        // Проверяем различные варианты совпадения
-        if (
-          playerNames.toLowerCase().includes(teamName.toLowerCase()) ||
-          teamName.toLowerCase().includes(playerNames.toLowerCase())
-        ) {
-          qualifying_wins = teamWinsCount;
-          console.log(
-            `✓ Найдено совпадение: команда ID ${result.teamId} (${playerNames}) -> ${qualifying_wins} побед`
-          );
-          break;
-        }
-
-        // Дополнительная проверка по отдельным именам игроков
-        const playersArray = playerNames.split(", ");
-        for (const playerName of playersArray) {
-          // Убираем запятые и улучшаем сопоставление
-          const cleanTeamName = teamName.replace(/[,\s]+$/, "").toLowerCase();
-          const cleanPlayerName = playerName.toLowerCase();
-
-          // Проверяем точное совпадение фамилии или полного имени
-          if (
-            cleanTeamName === cleanPlayerName ||
-            cleanTeamName.includes(cleanPlayerName.split(" ")[0]) ||
-            cleanPlayerName.includes(cleanTeamName.split(" ")[0])
-          ) {
-            qualifying_wins = teamWinsCount;
-            console.log(
-              `✓ Найдено совпадение по игроку: команда ID ${result.teamId} (${cleanPlayerName}) совпадает с "${cleanTeamName}" -> ${qualifying_wins} побед`
-            );
-            break;
-          }
-        }
-        if (qualifying_wins > 0) break;
-      }
-    }
-
-    // Проверяем, есть ли в команде лицензированные игроки
-    let isLicensed = false;
-    const [licensedRow] = await pool.execute<any[]>(
-      `SELECT COUNT(*) as licensed_count
-       FROM teams t
-       JOIN team_players tp ON t.id = tp.team_id
-       JOIN players p ON tp.player_id = p.id
-       LEFT JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = 1
-       WHERE t.id = ? AND lp.id IS NOT NULL`,
-      [result.teamId]
-    );
-
-    if (licensedRow && licensedRow.length > 0) {
-      isLicensed = licensedRow[0].licensed_count > 0;
-    }
-
-    // Рассчитываем очки команды (только для лицензированных)
-    let points = 0;
-
-    if (isLicensed) {
-      if (result.cup) {
-        // Лицензированные команды, попавшие в кубки А/Б, получают очки за место в кубке
-        points = getCupPoints(
-          category,
-          result.cup,
-          result.position as any,
-          totalTeams
-        );
-      } else {
-        // Лицензированные команды НЕ в кубках получают очки за победы в швейцарке
-        points = getWinsPoints(category, qualifying_wins);
-      }
-    } else {
-      // Нелицензированные команды не получают очки
-      points = 0;
-    }
-
-    console.log(
-      `📊 Команда ${result.teamId}: кубок ${result.cup}, позиция ${result.position}, побед: ${qualifying_wins}, лицензирована: ${isLicensed}, очков: ${points}`
-    );
-
-    // Позиция уже является правильным enum значением
-    let pointsReason: PointsReason;
-
-    switch (result.position) {
-      case CupPosition.WINNER:
-        pointsReason = PointsReason.CUP_WINNER;
-        break;
-      case CupPosition.RUNNER_UP:
-        pointsReason = PointsReason.CUP_RUNNER_UP;
-        break;
-      case CupPosition.THIRD_PLACE:
-        pointsReason = PointsReason.CUP_THIRD_PLACE;
-        break;
-      case CupPosition.SEMI_FINAL:
-        pointsReason = PointsReason.CUP_SEMI_FINAL;
-        break;
-      case CupPosition.QUARTER_FINAL:
-        pointsReason = PointsReason.CUP_QUARTER_FINAL;
-        break;
-      default:
-        pointsReason = PointsReason.CUP_QUARTER_FINAL; // значение по умолчанию
-    }
-
-    // Собираем очки команды для записи сразу в tournament_results.points
-    let teamPoints = 0;
-
-    // Получаем всех игроков команды
-    const [teamPlayers] = await pool.execute(
-      "SELECT player_id FROM team_players WHERE team_id = ?",
-      [result.teamId]
-    );
-
-    for (const teamPlayer of teamPlayers as any[]) {
-      const playerId = teamPlayer.player_id;
-
-      // Рассчитываем очки для игрока
-      let playerPoints = 0;
-
-      // Проверяем лицензию игрока
-      const [licenseRows] = await pool.execute(
-        `SELECT COUNT(*) as count FROM licensed_players
-         WHERE year = YEAR(CURDATE()) AND is_active = TRUE
-         AND player_id = ?`,
-        [playerId]
-      );
-      const playerIsLicensed = (licenseRows as any[])[0]?.count > 0;
-
-      if (playerIsLicensed) {
-        if (result.cup) {
-          // Игрок в кубке - получает очки за место в кубке
-          playerPoints = getCupPoints(
-            category,
-            result.cup,
-            result.position as any,
-            totalTeams
-          );
-        } else {
-          // Игрок не в кубке - получает очки за победы в швейцарке
-          playerPoints = getWinsPoints(category, qualifying_wins);
-        }
-      }
-      teamPoints = Math.max(teamPoints, playerPoints);
-    }
-    await pool.execute(
-      "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins, points) VALUES (?, ?, ?, ?, ?, ?)",
-      [
-        tournamentId,
-        result.teamId,
-        pointsReason,
-        result.cup,
-        qualifying_wins,
-        teamPoints,
-      ]
-    );
-
-    // На некоторых данных запись могла быть создана ранее без поля points
-    // По аналогии со швейцаркой, гарантируем, что очки обновятся для записи кубка
-    await pool.execute(
-      "UPDATE tournament_results SET points = ? WHERE tournament_id = ? AND team_id = ? AND cup = ?",
-      [teamPoints, tournamentId, result.teamId, result.cup]
-    );
-  }
-
-  // Сохранение результата команды швейцарки
-  static async saveSwissTeamResult(
-    savedTeam: { teamId: number; players: string[] },
-    tournamentId: number,
-    teamWins: Map<string, number>,
-    category: "1" | "2"
-  ): Promise<boolean> {
-    // Гарантируем наличие колонки points (на случай неподнятой миграции)
-    try {
-      const [colCheck] = await pool.execute<RowDataPacket[]>(
-        `SELECT COUNT(*) as count
-         FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'tournament_results'
-           AND COLUMN_NAME = 'points'`
-      );
-      if ((colCheck[0] as any)?.count === 0) {
-        await pool.execute(
-          "ALTER TABLE tournament_results ADD COLUMN points INT NOT NULL DEFAULT 0 AFTER qualifying_wins"
-        );
-      }
-    } catch (e) {
-      // no-op
-    }
-    // Эта команда не в кубках, значит она в швейцарке
-    let qualifying_wins = 0;
-    const playerNames = savedTeam.players.join(", ");
-
-    // Ищем победы для этой команды
-    for (const [teamName, teamWinsCount] of teamWins.entries()) {
-      let found = false;
-
-      // Проверяем совпадение по именам игроков
-      for (const playerName of savedTeam.players) {
-        const cleanTeamName = teamName.replace(/[,\s]+$/, "").toLowerCase();
-        const cleanPlayerName = playerName.toLowerCase();
-
-        // Разбиваем имена на части для более точного сравнения
-        const teamParts = cleanTeamName.split(" ");
-        const playerParts = cleanPlayerName.split(" ");
-
-        // Проверяем различные варианты совпадения
-        let match = false;
-
-        // 1. Точное совпадение
-        if (cleanTeamName === cleanPlayerName) {
-          match = true;
-        }
-
-        // 2. Совпадение по фамилии (первое слово)
-        else if (teamParts[0] === playerParts[0]) {
-          match = true;
-        }
-
-        // 3. Совпадение по фамилии, если в швейцарке только фамилия
-        else if (
-          teamParts.length === 1 &&
-          playerParts.length >= 1 &&
-          teamParts[0] === playerParts[0]
-        ) {
-          match = true;
-        }
-
-        if (match) {
-          qualifying_wins = teamWinsCount;
-          found = true;
-          break;
-        }
-      }
-      if (found) break;
-    }
-
-    // Проверяем лицензированность команды
-    let isLicensed = false;
-    const [licensedRow] = await pool.execute<any[]>(
-      `SELECT COUNT(*) as licensed_count
-       FROM teams t
-       JOIN team_players tp ON t.id = tp.team_id
-       JOIN players p ON tp.player_id = p.id
-       LEFT JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = 1
-       WHERE t.id = ? AND lp.id IS NOT NULL`,
-      [savedTeam.teamId]
-    );
-    isLicensed = licensedRow && licensedRow[0].licensed_count > 0;
-
-    // Рассчитываем очки для швейцарки
-    let points = 0;
-    if (isLicensed && qualifying_wins > 0) {
-      points = getWinsPoints(category, qualifying_wins);
-    }
-
-    // Сохраняем результат швейцарки только для команд с победами (qualifying_wins > 0)
-    if (qualifying_wins > 0) {
-      // Определяем причину получения очков в зависимости от количества побед
-      let pointsReason;
-      if (qualifying_wins >= 3) {
-        pointsReason = "QUALIFYING_HIGH";
-      } else {
-        pointsReason = "QUALIFYING_LOW";
-      }
-
-      await pool.execute(
-        "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins) VALUES (?, ?, ?, ?, ?)",
-        [
-          tournamentId,
-          savedTeam.teamId,
-          pointsReason,
-          null, // не кубок
-          qualifying_wins,
-        ]
-      );
-
-      // Рассчитываем очки команды для сохранения в tournament_results.points
-      let teamPoints = 0;
-
-      // Получаем всех игроков команды
-      const [teamPlayers] = await pool.execute(
-        "SELECT player_id FROM team_players WHERE team_id = ?",
-        [savedTeam.teamId]
-      );
-
-      for (const teamPlayer of teamPlayers as any[]) {
-        const playerId = teamPlayer.player_id;
-
-        // Рассчитываем очки для игрока
-        let playerPoints = 0;
-
-        // Проверяем лицензию игрока
-        const [licenseRows] = await pool.execute(
-          `SELECT COUNT(*) as count FROM licensed_players
-           WHERE year = YEAR(CURDATE()) AND is_active = TRUE
-           AND player_id = ?`,
-          [playerId]
-        );
-        const playerIsLicensed = (licenseRows as any[])[0]?.count > 0;
-
-        // Игроки в швейцарке получают очки за победы (только лицензированные)
-        if (playerIsLicensed && qualifying_wins > 0) {
-          playerPoints = getWinsPoints(category, qualifying_wins);
-        }
-        teamPoints = Math.max(teamPoints, playerPoints);
-      }
-
-      // Обновляем ранее вставленную строку tournament_results очками
-      await pool.execute(
-        "UPDATE tournament_results SET points = ? WHERE tournament_id = ? AND team_id = ? AND cup IS NULL AND qualifying_wins = ?",
-        [teamPoints, tournamentId, savedTeam.teamId, qualifying_wins]
-      );
-
-      return true;
-    }
-
-    return false;
-  }
-
-  // Парсинг результатов кубков с использованием существующего соединения
-  static async parseCupResultsFromDBWithConnection(
-    workbook: XLSX.WorkBook,
-    tournamentId: number,
-    connection: any
-  ): Promise<Array<{ teamId: number; cup: "A" | "B"; position: CupPosition }>> {
-    const cupResults: Array<{
-      teamId: number;
-      cup: "A" | "B";
-      position: CupPosition;
-    }> = [];
-    const cupNames = ["A", "B"] as const; // Обрабатываем только кубки A и B
-
-    for (const cupName of cupNames) {
-      const possibleSheetNames = [
-        `Кубок ${cupName}`,
-        `Кубок${cupName}`,
-        `КУБОК ${cupName}`,
-        cupName === "A" ? "Кубок А" : "Кубок Б",
-      ];
-
-      let worksheet = null;
-      let foundSheetName = null;
-
-      for (const possibleName of possibleSheetNames) {
-        if (workbook.Sheets[possibleName]) {
-          worksheet = workbook.Sheets[possibleName];
-          foundSheetName = possibleName;
-          break;
-        }
-      }
-
-      if (!worksheet) {
-        console.log(`Лист для кубка ${cupName} не найден, пропускаем`);
-        continue;
-      }
-
-      console.log(`Найден лист кубка ${cupName}: "${foundSheetName}"`);
-
-      const stages = {
-        quarterFinals: [
-          {
-            cells: TournamentController.quarterFinalsPlayersCells,
-            position: CupPosition.QUARTER_FINAL,
-          },
-        ],
-        semiFinals: [
-          {
-            cells: TournamentController.semiFinalsPlayersCells,
-            position: CupPosition.SEMI_FINAL,
-          },
-        ],
-        finals: [
-          {
-            cells: TournamentController.finalsPlayersCells,
-            position: CupPosition.RUNNER_UP,
-          },
-        ],
-        thirdPlace: [{ range: "F38", position: CupPosition.THIRD_PLACE }],
-      };
-
-      const cupTeamResults: Array<{ teamId: number; position: CupPosition }> =
-        [];
-      const positionPriority: { [key: string]: number } = {
-        [CupPosition.WINNER]: 5,
-        [CupPosition.RUNNER_UP]: 4,
-        [CupPosition.THIRD_PLACE]: 3,
-        [CupPosition.SEMI_FINAL]: 2,
-        [CupPosition.QUARTER_FINAL]: 1,
-      };
-
-      for (const [stageName, stageRanges] of Object.entries(stages)) {
-        for (const stageInfo of stageRanges as any[]) {
-          const cellsToProcess: string[] = [];
-
-          if ("cells" in stageInfo) {
-            cellsToProcess.push(...stageInfo.cells);
-          } else if ("range" in stageInfo) {
-            const range = XLSX.utils.decode_range(stageInfo.range);
-            for (let row = range.s.r; row <= range.e.r; row++) {
-              for (let col = range.s.c; col <= range.e.c; col++) {
-                const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-                cellsToProcess.push(cellAddress);
-              }
-            }
-          }
-
-          for (const cellAddress of cellsToProcess) {
-            const cell = worksheet[cellAddress];
-            if (cell && cell.v && typeof cell.v === "string" && cell.v.trim()) {
-              const playerName = cell.v.trim();
-
-              // Ищем команду по имени игрока через новую структуру team_players (с частичным совпадением)
-              const [teamResult] = (await connection.execute(
-                `
-                SELECT t.id as team_id 
-                FROM teams t
-                JOIN team_players tp ON t.id = tp.team_id
-                JOIN players p ON tp.player_id = p.id
-                WHERE p.name LIKE ? OR p.name LIKE ?
-                LIMIT 1
-              `,
-                [`%${playerName}%`, `${playerName}%`]
-              )) as any;
-
-              if (teamResult.length > 0) {
-                const teamId = teamResult[0].team_id;
-                console.log(
-                  `✓ Найдена команда ${teamId} для игрока "${playerName}" в позиции ${stageInfo.position}`
-                );
-
-                const existingResultIndex = cupTeamResults.findIndex(
-                  (r) => r.teamId === teamId
-                );
-
-                if (existingResultIndex !== -1) {
-                  const existingPriority =
-                    positionPriority[
-                      cupTeamResults[existingResultIndex].position
-                    ] || 0;
-                  const newPriority = positionPriority[stageInfo.position] || 0;
-
-                  if (newPriority > existingPriority) {
-                    console.log(
-                      `✓ Обновляем позицию команды ${teamId} с ${cupTeamResults[existingResultIndex].position} на ${stageInfo.position}`
-                    );
-                    cupTeamResults[existingResultIndex].position =
-                      stageInfo.position;
-                  }
-                } else {
-                  cupTeamResults.push({ teamId, position: stageInfo.position });
-                  console.log(
-                    `✓ Добавляем результат для команды ${teamId}: ${stageInfo.position}`
-                  );
-                }
-              } else {
-                console.log(`⚠️ Команда для игрока "${playerName}" не найдена`);
-              }
-            }
-          }
-        }
-      }
-
-      // Определяем победителя из ячейки N18
-      try {
-        const winnerCell = worksheet["N18"];
-        if (
-          winnerCell &&
-          winnerCell.v &&
-          typeof winnerCell.v === "string" &&
-          winnerCell.v.trim()
-        ) {
-          const winnerPlayerName = winnerCell.v.trim();
-          const [winnerTeamResult] = (await connection.execute(
-            `
-            SELECT t.id as team_id 
-            FROM teams t
-            JOIN team_players tp ON t.id = tp.team_id
-            JOIN players p ON tp.player_id = p.id
-            WHERE p.name LIKE ? OR p.name LIKE ?
-            LIMIT 1
-          `,
-            [`%${winnerPlayerName}%`, `${winnerPlayerName}%`]
-          )) as any;
-
-          if (winnerTeamResult.length > 0) {
-            const winnerTeamId = winnerTeamResult[0].team_id;
-            console.log(
-              `🏆 Найден победитель кубка ${cupName}: команда ${winnerTeamId} (игрок "${winnerPlayerName}")`
-            );
-
-            // Ищем команду победителя в результатах и устанавливаем позицию WINNER
-            const winnerTeamIndex = cupTeamResults.findIndex(
-              (r) => r.teamId === winnerTeamId
-            );
-            if (winnerTeamIndex !== -1) {
-              cupTeamResults[winnerTeamIndex].position = CupPosition.WINNER;
-            } else {
-              cupTeamResults.push({
-                teamId: winnerTeamId,
-                position: CupPosition.WINNER,
-              });
-            }
-          } else {
-            console.log(
-              `⚠️ Команда победителя "${winnerPlayerName}" не найдена в кубке ${cupName}`
-            );
-          }
-        } else {
-          console.log(
-            `⚠️ Ячейка N18 пуста или не содержит данных о победителе в кубке ${cupName}`
-          );
-        }
-      } catch (error) {
-        console.warn(
-          `Ошибка при чтении ячейки победителя для кубка ${cupName}: ${
-            (error as Error).message
-          }`
-        );
-      }
-
-      cupTeamResults.forEach((result) => {
-        cupResults.push({
-          teamId: result.teamId,
-          cup: cupName,
-          position: result.position,
-        });
-      });
-    }
-
-    // Оставляем только лучший результат для каждой команды
-    return selectBestTeamCupResults(cupResults);
   }
 
   // Диагностика структуры Excel файла
@@ -2725,7 +773,8 @@ export class TournamentController {
   static async parseTournamentFromGoogleSheets(
     googleSheetsUrl: string,
     tournamentName: string,
-    tournamentDate: string
+    tournamentDate: string,
+    tournamentCategory: "1" | "2"
   ): Promise<{
     tournamentId: number;
     teamsCount: number;
@@ -2761,15 +810,12 @@ export class TournamentController {
         fileName,
         tournamentName,
         tournamentDate,
+        tournamentCategory,
         workbook // Передаем готовый workbook
       );
     } catch (error) {
       console.error("Ошибка при загрузке турнира из Google Sheets:", error);
-      throw new Error(
-        `Не удалось загрузить турнир из Google таблицы: ${
-          (error as Error).message
-        }`
-      );
+      throw new Error((error as Error).message);
     }
   }
 

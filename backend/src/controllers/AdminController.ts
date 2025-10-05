@@ -41,7 +41,12 @@ export class AdminController {
     res: Response
   ): Promise<void> {
     try {
-      const { tournament_name, tournament_date, google_sheets_url } = req.body;
+      const {
+        tournament_name,
+        tournament_date,
+        tournament_category,
+        google_sheets_url,
+      } = req.body;
 
       if (!tournament_name || !tournament_date || !google_sheets_url) {
         res.status(400).json({
@@ -66,7 +71,8 @@ export class AdminController {
       const result = await TournamentController.parseTournamentFromGoogleSheets(
         google_sheets_url,
         tournament_name,
-        tournament_date
+        tournament_date,
+        tournament_category
       );
 
       res.json({

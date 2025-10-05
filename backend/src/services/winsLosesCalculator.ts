@@ -1,4 +1,4 @@
-import { PointsReason } from "../types";
+import { CupPosition, PointsReason } from "../types";
 
 /**
  * Рассчитывает общее количество побед на основе квалификационных побед и позиции в кубке
@@ -18,31 +18,26 @@ import { PointsReason } from "../types";
  * @returns общее количество побед
  */
 export function calculateWins(
-  points_reason: string,
+  points_reason: CupPosition,
   qualifying_wins: number
 ): number {
   let totalWins = qualifying_wins;
 
   // Добавляем победы за позицию в кубке
   switch (points_reason) {
-    case PointsReason.CUP_WINNER:
-    case "CUP_WINNER":
+    case CupPosition.WINNER:
       totalWins += 3;
       break;
-    case PointsReason.CUP_RUNNER_UP:
-    case "CUP_RUNNER_UP":
+    case CupPosition.RUNNER_UP:
       totalWins += 2;
       break;
-    case PointsReason.CUP_THIRD_PLACE:
-    case "CUP_THIRD_PLACE":
+    case CupPosition.THIRD_PLACE:
       totalWins += 2;
       break;
-    case PointsReason.CUP_SEMI_FINAL:
-    case "CUP_SEMI_FINAL":
+    case CupPosition.SEMI_FINAL:
       totalWins += 1;
       break;
-    case PointsReason.CUP_QUARTER_FINAL:
-    case "CUP_QUARTER_FINAL":
+    case CupPosition.QUARTER_FINAL:
       // Четвертьфинал не добавляет победы
       break;
     default:
@@ -70,7 +65,7 @@ export function calculateWins(
  * @returns общее количество поражений
  */
 export function calculateLoses(
-  points_reason: string,
+  points_reason: CupPosition,
   qualifying_wins: number
 ): number {
   // Базовое количество поражений в швейцарке (5 игр всего)
@@ -78,24 +73,19 @@ export function calculateLoses(
 
   // Добавляем поражения за позицию в кубке
   switch (points_reason) {
-    case PointsReason.CUP_SEMI_FINAL:
-    case "CUP_SEMI_FINAL":
+    case CupPosition.SEMI_FINAL:
       totalLoses += 1; // Проиграл в полуфинале
       break;
-    case PointsReason.CUP_THIRD_PLACE:
-    case "CUP_THIRD_PLACE":
+    case CupPosition.THIRD_PLACE:
       totalLoses += 1; // Проиграл в полуфинале, потом играл за 3 место
       break;
-    case PointsReason.CUP_RUNNER_UP:
-    case "CUP_RUNNER_UP":
+    case CupPosition.RUNNER_UP:
       totalLoses += 1; // Проиграл финал
       break;
-    case PointsReason.CUP_WINNER:
-    case "CUP_WINNER":
+    case CupPosition.WINNER:
       // Победитель не получает дополнительных поражений
       break;
-    case PointsReason.CUP_QUARTER_FINAL:
-    case "CUP_QUARTER_FINAL":
+    case CupPosition.QUARTER_FINAL:
       // Четвертьфинал - проиграл в четвертьфинале, но это уже учтено в швейцарке
       break;
     default:
@@ -113,7 +103,7 @@ export function calculateLoses(
  * @returns объект с количеством побед и поражений
  */
 export function calculateWinsAndLoses(
-  points_reason: string,
+  points_reason: CupPosition,
   qualifying_wins: number
 ): {
   wins: number;

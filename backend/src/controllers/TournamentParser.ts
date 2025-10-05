@@ -1,137 +1,167 @@
 import * as XLSX from "xlsx";
-import {
-  CupPosition,
-  CupTeamResult,
-  PlayersTeam,
-  StageInfo,
-  Team,
-} from "../types";
 import { PlayerModel } from "../models/PlayerModel";
+import { Cup, CupPosition, Player, StageWithCells } from "../types";
 
 type SheetCell = {
-  columnIndex: number;
+  column: string;
   rowIndex: number;
 };
+
+function parseCellAddress(address: string): SheetCell | null {
+  const match = address.match(/^([A-Z]+)(\d+)$/i);
+  if (!match) {
+    return null; // если формат не совпадает с "буквы+числа"
+  }
+  const [, column, row] = match;
+  return {
+    column: column.toUpperCase(),
+    rowIndex: parseInt(row, 10),
+  };
+}
+
+function getCellText(cell: { v?: any }) {
+  if (isCellEmpty(cell)) {
+    return "";
+  } else {
+    return normalizeName(cell.v);
+  }
+}
+
+function isCellEmpty(cell?: { v?: any }): boolean {
+  if (!cell) return true; // ячейка отсутствует
+  if (cell.v === undefined || cell.v === null) return true; // нет значения
+  if (typeof cell.v === "string" && cell.v.trim() === "") return true; // пустая строка
+  return false; // есть содержимое
+}
 
 type FoundedSheet = {
   sheet: XLSX.WorkSheet;
   name: string;
 };
 
-export const swissResultsSheetName = "Итоги Швейцарки";
+/**
+ * Проверить игрока на наличие в составах команд с листа регистрации
+ * @param player
+ * @param teamsPlayers // информация с Листа решистрации
+ * @returns порядковый номер команды с листа регистрации
+ */
+function detectPlayerTeamOrderNum(
+  player: Player,
+  teamsPlayers: TeamPlayers[]
+): TeamPlayers | undefined {
+  for (const team of teamsPlayers) {
+    for (const teamPlayer of team.players) {
+      if (teamPlayer.id === player.id) {
+        return team;
+      }
+    }
+  }
+}
+
+const COMMAND_HEADER = "Команда";
+export const REGISTRATION_LIST = "Лист регистрации";
+export const SWISS_RESULTS_LIST = "Итоги Швейцарки";
 
 // Нормализация имени игрока для сравнения
 export function normalizeName(name: string): string {
   return name
     .toLowerCase()
     .replace(/\s+/g, " ") // заменяем множественные пробелы на одинарные
-    .replace(/[-.]/g, " ") // заменяем дефисы и точки на пробелы
+    .replace(/[*.]/g, " ") // заменяем дефисы и точки на пробелы
     .trim();
 }
+
+export type TeamPlayers = {
+  orderNum: number;
+  teamId?: number;
+  players: Player[];
+};
+
+export type TeamQualifyingResults = {
+  wins: number;
+  loses: number;
+};
 
 export class TournamentParser {
   /**
    * Парсит команды из листа регистрации
    * @param workbook
    * @returns
+   *
+   * Правила заполнения листа:
+   * 1) Лист должен называться "Лист регистрации"
+   * 2) Составы команд идут в столбце под ячейкой с текстом "Команда"
+   * 3) Состав команды - это строка с перечислением игроков с запятой в качестве разделителя
+   * 4) Каждый игрок должен однозначно идентифицироваться
+   *
    */
   static async parseTeamsFromRegistrationSheet(
     workbook: XLSX.WorkBook
-  ): Promise<Team[]> {
-    const possibleRegistrationSheetNames = [
-      "Лист регистрации",
-      "Лист Регистрации",
-    ];
-
-    let registrationSheet: XLSX.WorkSheet | null = null;
-    let foundSheetName: string | null = null;
-
-    for (const possibleName of possibleRegistrationSheetNames) {
-      if (workbook.Sheets[possibleName]) {
-        registrationSheet = workbook.Sheets[possibleName];
-        foundSheetName = possibleName;
-        break;
-      }
-    }
-
-    if (!registrationSheet && workbook.SheetNames.length > 0) {
-      const firstSheetName = workbook.SheetNames[0];
-      registrationSheet = workbook.Sheets[firstSheetName];
-      foundSheetName = firstSheetName;
-      console.log(
-        `Не найден лист регистрации с ожидаемым названием. Используется первый лист: "${firstSheetName}"`
-      );
-    }
+  ): Promise<TeamPlayers[]> {
+    let registrationSheet = this.findXlsSheet(workbook, REGISTRATION_LIST);
 
     if (!registrationSheet) {
-      const availableSheets = workbook.SheetNames.join(", ");
-      throw new Error(
-        `Не найден лист регистрации команд. Проверенные варианты: ${possibleRegistrationSheetNames.join(
-          ", "
-        )}. Доступные листы в файле: ${availableSheets}`
-      );
+      throw new Error(`Не найден обязательный лист "${REGISTRATION_LIST}"`);
     }
 
-    console.log(`Найден лист регистрации: "${foundSheetName}"`);
+    const userDetectErrors = [];
 
-    const teams: Team[] = [];
+    let teamOrderNum = 0;
+    const teams: TeamPlayers[] = [];
 
-    const registrationData = XLSX.utils.sheet_to_json(registrationSheet, {
-      header: 1,
-    });
-
-    if (registrationData.length === 0) {
-      throw new Error(
-        `Лист "${foundSheetName}" пуст или не содержит данных для парсинга`
-      );
-    }
-
-    console.log(
-      `Найдено строк в листе регистрации: ${registrationData.length}`
+    // Ищем столбцец с заголовком "Команда"
+    const teamNameColumnCell = this.findCellByText(
+      registrationSheet,
+      COMMAND_HEADER
     );
 
-    for (let i = 0; i < registrationData.length; i++) {
-      const row = registrationData[i] as any[];
-      if (row && row.length >= 2) {
-        const colA = String(row[0] || "").toLowerCase();
-        const colB = String(row[1] || "").toLowerCase();
-        if (colA.includes("№") && colB.includes("команда")) {
-          continue;
+    if (!teamNameColumnCell) {
+      throw new Error(
+        `Ошибка структуры листа "${REGISTRATION_LIST}" : не найдена ячейка со значением "${COMMAND_HEADER}", являющаяся заголовком таблицы с участниками`
+      );
+    }
+
+    // Проходим по столбцу "Команда" и разбираем игроков
+    for (
+      let rowIndex = teamNameColumnCell?.rowIndex + 1;
+      rowIndex < 100;
+      rowIndex++
+    ) {
+      let teamCell =
+        registrationSheet[`${teamNameColumnCell.column}${rowIndex}`];
+
+      if (isCellEmpty(teamCell)) {
+        // Если нашли пустую ячейку - значит список игроков закончился
+        break;
+      } else {
+        // Обработка ячейки со списком игроков
+        const players: Player[] = [];
+
+        const teamPlayersString = String(teamCell.v).trim();
+        const rawTeamPlayers: string[] = teamPlayersString.split(",");
+
+        for (const rawTeamPlayer of rawTeamPlayers) {
+          try {
+            const foundedPlayer = await this.detectPlayer(rawTeamPlayer);
+            players.push(foundedPlayer);
+          } catch (error) {
+            userDetectErrors.push((error as Error).message);
+          }
         }
-        const teamNumber = parseInt(String(row[0]));
-        if (!isNaN(teamNumber)) {
-          const players: string[] = [];
-          const playersString = String(row[1] || "").trim();
-          if (playersString) {
-            const parsedPlayers = playersString
-              .split(",")
-              .map((player) => normalizeName(player))
-              .filter((player) => player && player !== "undefined");
 
-            for (const rawPlayerName of parsedPlayers) {
-              const foundedPlayer = await PlayerModel.getPlayerByName(
-                rawPlayerName
-              );
-              console.log(`Найденный игрок: ${foundedPlayer}`);
-
-              if (foundedPlayer) {
-                players.push(foundedPlayer.name);
-              } else {
-                throw new Error(
-                  `Игрок с листа регистрации: "${rawPlayerName}" не найден в базе данных.\nУкажите на листе регистрации полнную фамилию и имя игрока, либо создайте игрока в Админ панели`
-                );
-              }
-            }
-          }
-
-          if (players.length > 0) {
-            teams.push({
-              number: teamNumber,
-              players: players,
-            });
-          }
+        if (players.length > 0) {
+          teams.push({
+            orderNum: teamOrderNum,
+            players: players,
+          });
+          teamOrderNum++;
         }
       }
+    }
+
+    // Укажите на листе регистрации полнную фамилию и имя игрока, либо создайте игрока в Админ панели
+    if (userDetectErrors.length > 0) {
+      throw new Error(`Критическая ошибка\n${userDetectErrors}`);
     }
 
     console.log(`Найдено команд: ${teams.length}`);
@@ -144,50 +174,16 @@ export class TournamentParser {
    * @param teams
    * @returns
    */
-  static parseCupResults(
+  static async parseCupResults(
     workbook: XLSX.WorkBook,
-    teams: Team[]
-  ): CupTeamResult[] {
-    const playerToTeam = new Map<string, Team>();
-    teams.forEach((team) => {
-      team.players.forEach((player) => {
-        playerToTeam.set(player.toLowerCase(), team);
-      });
-    });
+    cup: Cup,
+    teams: TeamPlayers[]
+  ): Promise<Map<number, CupPosition>> {
+    let worksheet = this.findXlsSheet(workbook, `Кубок ${cup}`);
 
-    const cupResults: CupTeamResult[] = [];
-    const cupNames = ["A", "B", "C"] as const;
+    const cupTeamResults: Map<number, CupPosition> = new Map();
 
-    for (const cupName of cupNames) {
-      const possibleSheetNames = [
-        `Кубок ${cupName}`,
-        `Кубок${cupName}`,
-        `КУБОК ${cupName}`,
-        cupName === "A" ? "Кубок А" : "Кубок Б",
-      ];
-
-      let worksheet: XLSX.WorkSheet | null = null;
-      let foundSheetName: string | null = null;
-
-      for (const possibleName of possibleSheetNames) {
-        if (workbook.Sheets[possibleName]) {
-          worksheet = workbook.Sheets[possibleName];
-          foundSheetName = possibleName;
-          break;
-        }
-      }
-
-      if (!worksheet) {
-        console.log(
-          `Лист для кубка ${cupName} не найден, пропускаем. Проверены варианты: ${possibleSheetNames.join(
-            ", "
-          )}`
-        );
-        continue;
-      }
-
-      console.log(`Найден лист кубка ${cupName}: "${foundSheetName}"`);
-
+    if (worksheet) {
       const stages = {
         quarterFinals: [
           {
@@ -201,123 +197,61 @@ export class TournamentParser {
             position: CupPosition.SEMI_FINAL,
           },
         ],
+        thirdPlace: [{ cells: ["F38"], position: CupPosition.THIRD_PLACE }],
         finals: [{ cells: ["J10", "J26"], position: CupPosition.RUNNER_UP }],
-        thirdPlace: [{ range: "F38", position: CupPosition.THIRD_PLACE }],
-      } as Record<string, StageInfo[]>;
+        winner: [{ cells: ["N18"], position: CupPosition.WINNER }],
+      } as Record<string, StageWithCells[]>;
 
-      const cupTeamResults: Array<{ team: Team; position: CupPosition }> = [];
+      const errors: string[] = [];
 
-      const positionPriority: { [key: string]: number } = {
-        [CupPosition.WINNER]: 5,
-        [CupPosition.RUNNER_UP]: 4,
-        [CupPosition.THIRD_PLACE]: 3,
-        [CupPosition.SEMI_FINAL]: 2,
-        [CupPosition.QUARTER_FINAL]: 1,
-      };
-
-      Object.values(stages).forEach((stageRanges) => {
-        stageRanges.forEach((stageInfo: StageInfo) => {
-          const cellsToProcess: string[] = [];
-          if ("cells" in stageInfo) {
-            cellsToProcess.push(...stageInfo.cells);
-          } else if ("range" in stageInfo) {
-            const range = XLSX.utils.decode_range(stageInfo.range);
-            for (let row = range.s.r; row <= range.e.r; row++) {
-              for (let col = range.s.c; col <= range.e.c; col++) {
-                const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-                cellsToProcess.push(cellAddress);
-              }
-            }
-          }
-
-          cellsToProcess.forEach((cellAddress: string) => {
-            const cell = (worksheet as XLSX.WorkSheet)[cellAddress];
-
-            if (cell && cell.v && typeof cell.v === "string" && cell.v.trim()) {
-              const playerName = cell.v.trim();
-              const team = playerToTeam.get(playerName.toLowerCase());
-
-              if (team) {
-                const existingResultIndex = cupTeamResults.findIndex(
-                  (r) => r.team.number === team.number
-                );
-
-                if (existingResultIndex !== -1) {
-                  const existingPriority =
-                    positionPriority[
-                      cupTeamResults[existingResultIndex].position
-                    ] || 0;
-                  const newPriority = positionPriority[stageInfo.position] || 0;
-                  if (newPriority > existingPriority) {
-                    cupTeamResults[existingResultIndex].position =
-                      stageInfo.position;
-                  }
+      for (const stage of Object.values(stages)) {
+        for (const stageInfo of stage) {
+          for (const cellAddress of stageInfo.cells) {
+            let player: Player;
+            try {
+              if (isCellEmpty(worksheet[cellAddress])) {
+                // Игра за третье место может отсутствовать
+                if (stageInfo.position == CupPosition.THIRD_PLACE) {
+                  continue;
                 } else {
-                  cupTeamResults.push({ team, position: stageInfo.position });
+                  throw new Error(
+                    `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+                  );
                 }
               } else {
-                console.log(`Игрок "${playerName}" не найден в командах`);
-              }
-            }
-          });
-        });
-      });
+                const playerName = getCellText(worksheet[cellAddress]);
+                player = await this.detectPlayer(playerName);
+                const team = detectPlayerTeamOrderNum(player, teams);
 
-      try {
-        const winnerCell = (worksheet as XLSX.WorkSheet)["N18"];
-        if (
-          winnerCell &&
-          winnerCell.v &&
-          typeof winnerCell.v === "string" &&
-          winnerCell.v.trim()
-        ) {
-          const winnerPlayerName = winnerCell.v.trim();
-          const winnerTeam = playerToTeam.get(winnerPlayerName.toLowerCase());
-          if (winnerTeam) {
-            const winnerTeamIndex = cupTeamResults.findIndex(
-              (r) => r.team.number === winnerTeam.number
-            );
-            if (winnerTeamIndex !== -1) {
-              cupTeamResults[winnerTeamIndex].position = CupPosition.WINNER;
-              console.log(
-                `Победитель кубка ${cupName}: команда ${winnerTeam.number} (${winnerPlayerName})`
-              );
-            } else {
-              cupTeamResults.push({
-                team: winnerTeam,
-                position: CupPosition.WINNER,
-              });
-              console.log(
-                `Добавлен победитель кубка ${cupName}: команда ${winnerTeam.number} (${winnerPlayerName})`
-              );
+                if (!team) {
+                  throw new Error(
+                    `Игрок "${playerName}" с листа ${SWISS_RESULTS_LIST} не найден среди игроков команд на Листе регистрации`
+                  );
+                }
+                cupTeamResults.set(team.orderNum, stageInfo.position);
+              }
+            } catch (error) {
+              errors.push((error as Error).message);
             }
-          } else {
-            console.warn(
-              `Команда игрока-победителя "${winnerPlayerName}" не найдена в ячейке N18 кубка ${cupName}`
-            );
           }
-        } else {
-          console.warn(
-            `Ячейка N18 пуста или не содержит данных о победителе в кубке ${cupName}`
-          );
         }
-      } catch (error) {
-        console.error(
-          `Ошибка при чтении победителя из ячейки N18 в кубке ${cupName}:`,
-          error
+      }
+
+      if (errors.length !== 0) {
+        throw new Error(
+          `Ошибки парсинга данных на листе "Кубок ${cup}":\n${errors}`
         );
       }
 
-      cupTeamResults.forEach((result) => {
-        cupResults.push({
-          team: result.team,
-          cup: cupName,
-          points_reason: result.position,
-        });
-      });
+      console.log(`### Определены результаты кубка ${cup}`);
+      for (const [teamOrderNum, results] of cupTeamResults) {
+        console.log(
+          `Team #${teamOrderNum} : ${JSON.stringify(results, null, 0)}`
+        );
+      }
     }
 
-    return cupResults;
+    return cupTeamResults;
   }
 
   /**
@@ -329,8 +263,6 @@ export class TournamentParser {
   ): XLSX.WorkSheet | undefined {
     // Проверяем все возможные варианты названий
     for (const sheetName of workbook.SheetNames) {
-      //const pattern = /^Группа \w+$/; // Регулярное выражение для "Группа [X]"
-
       const pattern =
         expectedListName instanceof RegExp
           ? expectedListName
@@ -347,14 +279,25 @@ export class TournamentParser {
    * @param workbook
    * @returns
    */
-  static parseSwissSystemResults(swissSheet: XLSX.Sheet): Map<string, number> {
+  static async parseSwissSystemResults(
+    workbook: XLSX.WorkBook,
+    teams: TeamPlayers[]
+  ): Promise<Map<number, TeamQualifyingResults>> {
+    console.log("🎯 Парсим результаты Швейарки");
+
+    const errors = [];
     try {
       // Парсим данные из листа
-      const swissData = XLSX.utils.sheet_to_json(swissSheet.sheet, {
+      const swissSheet = TournamentParser.findXlsSheet(
+        workbook,
+        normalizeName(SWISS_RESULTS_LIST)
+      );
+
+      const swissData = XLSX.utils.sheet_to_json(swissSheet!.sheet, {
         header: 1,
       });
 
-      const teamWins = new Map<string, number>();
+      const teamResults = new Map<number, TeamQualifyingResults>();
 
       // Начинаем обработку со строки 2 (индекс 1), так как в B2 начинаются команды
       // В таблице: A=Место, B=Имя, C=Результат(победы), D=Бхгц, E=Прогресс, F=Детал
@@ -372,7 +315,7 @@ export class TournamentParser {
         const winsValue = row[2];
 
         if (!teamName || teamName === "" || typeof teamName !== "string") {
-          continue; // Пропускаем пустые строки
+          break; // Нашли пустуб строку - завершили парсинг результатов
         }
 
         // Парсим количество побед
@@ -387,13 +330,26 @@ export class TournamentParser {
           qualifying_wins = 0;
         }
 
-        teamWins.set(normalizeName(normalizeName(teamName)), qualifying_wins);
-        console.log(
-          `Найдена команда "${teamName}" с ${qualifying_wins} побед(ами)`
-        );
+        let player: Player;
+        try {
+          player = await this.detectPlayer(teamName);
+          const team = detectPlayerTeamOrderNum(player, teams);
+          if (!team) {
+            throw new Error(
+              `Игрок "${teamName}" с листа ${SWISS_RESULTS_LIST} не найден среди игроков команд на Листе регистрации`
+            );
+          }
+
+          teamResults.set(team.orderNum, {
+            wins: qualifying_wins,
+            loses: 5 - qualifying_wins,
+          });
+        } catch (error) {
+          errors.push((error as Error).message);
+        }
       }
 
-      return teamWins;
+      return teamResults;
     } catch (error) {
       console.error(`Ошибка при парсинге результатов Швейцарки`, error);
       return new Map(); // Возвращаем пустую карту при ошибке
@@ -401,7 +357,7 @@ export class TournamentParser {
   }
 
   /**
-   * Поиск столбца с заголовком
+   * Поиск ячейки по тексту (для поиска заголовков таблиц)
    * @param sheet
    * @param header
    * @returns
@@ -410,34 +366,41 @@ export class TournamentParser {
     sheet: XLSX.WorkSheet,
     textToFind: string
   ): SheetCell | null {
-    for (let row = 0; row < sheet.length; row++) {
-      for (let col = 0; col < sheet[row].length; col++) {
-        if (sheet[row][col] === textToFind) {
-          return { columnIndex: col, rowIndex: row + 1 };
-        }
+    for (const cellAddress in sheet) {
+      if (cellAddress[0] === "!") continue; // пропускаем служебные поля
+      const cell = sheet[cellAddress];
+      if (cell && cell.v && cell.v === textToFind) {
+        return parseCellAddress(cellAddress); // найден адрес ячейки
       }
     }
-    return null; // Если не найдена
+    return null;
   }
 
   /**
-   * Парсинг листов групповых игр для извлечения количества побед команд
+   * Парсинг листов групповых игр для извлечения количества побед команд на квалификационном этапе
    * @param workbook
-   * @returns
+   * @returns Map<playerId: number, {wins: number, loses: number}>
    */
-  static parseGroupResults(workbook: XLSX.WorkBook): Map<string, number> {
-    const teamWins = new Map<string, number>();
+  static async parseGroupResults(
+    workbook: XLSX.WorkBook,
+    teams: TeamPlayers[]
+  ): Promise<Map<number, TeamQualifyingResults>> {
+    console.log("🎯 Парсим результаты группового этапа");
 
-    for (const sheet of Object.values(workbook.Sheets)) {
-      if (sheet.sheetName.includes("Группа")) {
+    const teamResults = new Map<number, TeamQualifyingResults>();
+
+    const errors: string[] = [];
+
+    for (const sheetName of Object.values(workbook.SheetNames)) {
+      if (sheetName.includes("Группа")) {
         // Парсим данные из листа
 
-        console.log(`Парсим данные с листа: "${sheet.sheetName}"`);
+        console.log(`Парсим данные с листа: "${sheetName}"`);
 
-        const swissData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const sheet = workbook.Sheets[sheetName];
 
         const teamNameColumnHeader = "Команда";
-        const teamWinsColumnHeader = "Победы";
+        const teamWinsColumnHeader = "победы";
 
         const teamNameColumnCell = this.findCellByText(
           sheet,
@@ -449,50 +412,96 @@ export class TournamentParser {
           teamWinsColumnHeader
         );
 
+        let groupTeamCount = 0;
+
+        console.log(
+          `teamNameColumnCell = ${JSON.stringify(teamNameColumnCell, null, 2)}`
+        );
+        console.log(
+          `teamWinsColumnCell = ${JSON.stringify(teamWinsColumnCell, null, 2)}`
+        );
+
+        const teamWins: Map<number, number> = new Map();
+        let emptyRows = 0;
+
         if (teamNameColumnCell && teamWinsColumnCell) {
           for (
             let rowIndex = teamNameColumnCell?.rowIndex + 1;
-            rowIndex < swissData.length;
+            rowIndex < 30;
             rowIndex++
           ) {
-            const row = swissData[rowIndex] as any[];
+            let teamCell = sheet[`${teamNameColumnCell.column}${rowIndex}`];
 
-            const teamNameColumnIndex = teamNameColumnCell.columnIndex;
-            const teamWinsColumnIndex = teamWinsColumnCell.columnIndex;
+            if (isCellEmpty(teamCell)) {
+              emptyRows++;
+              if (emptyRows == 2) {
+                break;
+              }
+            } else {
+              emptyRows = 0;
+              let player: Player;
+              //try {
+              const playerName = getCellText(teamCell);
+              player = await this.detectPlayer(playerName);
 
-            let teamName = row[teamNameColumnIndex];
+              const team = detectPlayerTeamOrderNum(player, teams);
+              if (!team) {
+                throw new Error(
+                  `Игрок "${playerName}" с листа "${sheetName}" не найден среди игроков на Листе регистрации`
+                );
+              }
 
-            if (!teamName || teamName === "" || typeof teamName !== "string") {
-              break;
+              // Парсим количество побед
+              const qualifying_wins = Number(
+                sheet[`${teamWinsColumnCell.column}${rowIndex}`].v
+              );
+
+              teamWins.set(team.orderNum, qualifying_wins);
+              //   } catch (error) {
+              //     errors.push((error as Error).message);
+              //   }
+
+              //   if (typeof winsValue === "number") {
+              //     qualifying_wins = Math.floor(winsValue); // Округляем до целого числа
+              //   } else if (typeof winsValue === "string") {
+              //     const parsed = parseInt(winsValue, 10);
+              //     qualifying_wins = isNaN(parsed) ? 0 : parsed;
+              //   } else if (winsValue === undefined || winsValue === null) {
+              //     qualifying_wins = 0;
+              //   }
+
+              groupTeamCount++;
             }
-
-            teamName = teamName.replace(/,?$/, "").trim();
-            // Парсим количество побед
-            let qualifying_wins = 0;
-
-            const winsValue = row[teamWinsColumnIndex];
-
-            if (typeof winsValue === "number") {
-              qualifying_wins = Math.floor(winsValue); // Округляем до целого числа
-            } else if (typeof winsValue === "string") {
-              const parsed = parseInt(winsValue, 10);
-              qualifying_wins = isNaN(parsed) ? 0 : parsed;
-            } else if (winsValue === undefined || winsValue === null) {
-              qualifying_wins = 0;
-            }
-
-            teamWins.set(
-              normalizeName(normalizeName(teamName)),
-              qualifying_wins
-            );
-            console.log(
-              `Найдена команда "${teamName}" с ${qualifying_wins} побед(ами)`
-            );
           }
+        }
+        for (const [player, wins] of teamWins) {
+          teamResults.set(player, { wins, loses: groupTeamCount - 1 - wins });
         }
       }
     }
 
-    return teamWins;
+    if (errors.length > 0) {
+      throw new Error(`Критические ошибки\n${errors}`);
+    }
+
+    return teamResults;
+  }
+
+  /**
+   * Определить пользователя по строке поиска
+   * @param teamName : string
+   * @returns
+   */
+  static async detectPlayer(teamName: string): Promise<Player> {
+    const foundedPlayers = await PlayerModel.getPlayerByName(
+      normalizeName(teamName)
+    );
+    if (!foundedPlayers || foundedPlayers.length === 0) {
+      throw new Error(`Игрок "${teamName}" не найден в базе данных`);
+    }
+    if (foundedPlayers.length > 1) {
+      throw new Error(`Найдено несколько игроков по строке: "${teamName}"`);
+    }
+    return foundedPlayers[0];
   }
 }

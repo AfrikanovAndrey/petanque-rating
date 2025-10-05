@@ -1,18 +1,18 @@
+import { ResultSetHeader, RowDataPacket } from "mysql2";
+import { getCupPoints, getWinsPoints } from "../config/cupPoints";
 import { pool } from "../config/database";
+import { calculateWinsAndLoses } from "../services/winsLosesCalculator";
 import {
+  Cup,
+  CupPosition,
+  PointsReason,
   Tournament,
   TournamentResult,
-  TournamentUploadData,
   TournamentTeamUploadData,
-  CupPosition,
-  TeamWithMembers,
+  TournamentUploadData,
 } from "../types";
-import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { PlayerModel } from "./PlayerModel";
 import { TeamModel } from "./TeamModel";
-import { SettingsModel } from "./SettingsModel";
-import { getCupPoints, getWinsPoints } from "../config/cupPoints";
-import { calculateWinsAndLoses } from "../services/winsLosesCalculator";
 
 export class TournamentModel {
   static async getAllTournaments(): Promise<Tournament[]> {
@@ -105,23 +105,57 @@ export class TournamentModel {
   static async addTournamentResult(
     tournamentId: number,
     teamId: number,
-    pointsReason: string,
-    cup?: "A" | "B" | null,
-    qualifying_wins?: number
+    wins: number,
+    loses: number,
+    cupPosition?: CupPosition,
+    cup?: Cup,
+    qualifying_wins?: number,
+    points?: number
   ): Promise<number> {
-    // Рассчитываем wins и loses на основе данных
-    const winsLoses = calculateWinsAndLoses(pointsReason, qualifying_wins || 0);
+    // Определяем points reason
+    let pointsReason;
+    if (cupPosition) {
+      switch (cupPosition) {
+        case CupPosition.WINNER:
+          pointsReason = PointsReason.CUP_WINNER;
+          break;
+
+        case CupPosition.RUNNER_UP:
+          pointsReason = PointsReason.CUP_RUNNER_UP;
+          break;
+
+        case CupPosition.THIRD_PLACE:
+          pointsReason = PointsReason.CUP_THIRD_PLACE;
+          break;
+
+        case CupPosition.SEMI_FINAL:
+          pointsReason = PointsReason.CUP_SEMI_FINAL;
+          break;
+
+        case CupPosition.QUARTER_FINAL:
+          pointsReason = PointsReason.CUP_QUARTER_FINAL;
+          break;
+      }
+    } else {
+      if (qualifying_wins && qualifying_wins >= 3) {
+        pointsReason = "QUALIFYING_HIGH";
+      }
+      if (qualifying_wins && qualifying_wins >= 1 && qualifying_wins <= 2) {
+        pointsReason = "QUALIFYING_LOW";
+      }
+    }
 
     const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins, wins, loses) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins, wins, loses, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         tournamentId,
         teamId,
-        pointsReason,
-        cup || null,
-        qualifying_wins || 0,
-        winsLoses.wins,
-        winsLoses.loses,
+        pointsReason === undefined ? pointsReason : null,
+        cup === undefined ? cup : null,
+        qualifying_wins === undefined ? 0 : qualifying_wins,
+        wins === undefined ? 0 : wins,
+        loses === undefined ? 0 : loses,
+        points === undefined ? 0 : points,
       ]
     );
     return result.insertId;
