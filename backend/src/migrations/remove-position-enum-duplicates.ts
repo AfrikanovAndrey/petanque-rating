@@ -13,7 +13,7 @@ interface TableColumn extends RowDataPacket {
 export const removePositionEnumDuplicates = async () => {
   try {
     console.log(
-      "🔄 Миграция: Удаление дублирующихся POSITION_* значений в enum points_reason..."
+      "🔄 Миграция: Удаление дублирующихся POSITION_* значений в enum cup_position..."
     );
 
     // Проверяем структуру таблицы
@@ -21,12 +21,10 @@ export const removePositionEnumDuplicates = async () => {
       "DESCRIBE tournament_results"
     );
 
-    const hasPointsReason = columns.some(
-      (col) => col.Field === "points_reason"
-    );
+    const hasPointsReason = columns.some((col) => col.Field === "cup_position");
 
     if (!hasPointsReason) {
-      console.log("❌ Столбец points_reason не найден");
+      console.log("❌ Столбец cup_position не найден");
       return;
     }
 
@@ -35,7 +33,7 @@ export const removePositionEnumDuplicates = async () => {
 
     // POSITION_1 -> CUP_WINNER
     const [result1] = await pool.execute<ResultSetHeader>(
-      "UPDATE tournament_results SET points_reason = 'CUP_WINNER' WHERE points_reason = 'POSITION_1'"
+      "UPDATE tournament_results SET cup_position = 'CUP_WINNER' WHERE cup_position = 'POSITION_1'"
     );
     console.log(
       `✅ POSITION_1 -> CUP_WINNER: обновлено ${result1.affectedRows} записей`
@@ -43,7 +41,7 @@ export const removePositionEnumDuplicates = async () => {
 
     // POSITION_2 -> CUP_RUNNER_UP
     const [result2] = await pool.execute<ResultSetHeader>(
-      "UPDATE tournament_results SET points_reason = 'CUP_RUNNER_UP' WHERE points_reason = 'POSITION_2'"
+      "UPDATE tournament_results SET cup_position = 'CUP_RUNNER_UP' WHERE cup_position = 'POSITION_2'"
     );
     console.log(
       `✅ POSITION_2 -> CUP_RUNNER_UP: обновлено ${result2.affectedRows} записей`
@@ -51,7 +49,7 @@ export const removePositionEnumDuplicates = async () => {
 
     // POSITION_3 -> CUP_THIRD_PLACE
     const [result3] = await pool.execute<ResultSetHeader>(
-      "UPDATE tournament_results SET points_reason = 'CUP_THIRD_PLACE' WHERE points_reason = 'POSITION_3'"
+      "UPDATE tournament_results SET cup_position = 'CUP_THIRD_PLACE' WHERE cup_position = 'POSITION_3'"
     );
     console.log(
       `✅ POSITION_3 -> CUP_THIRD_PLACE: обновлено ${result3.affectedRows} записей`
@@ -59,7 +57,7 @@ export const removePositionEnumDuplicates = async () => {
 
     // POSITION_1_2 -> CUP_SEMI_FINAL
     const [result4] = await pool.execute<ResultSetHeader>(
-      "UPDATE tournament_results SET points_reason = 'CUP_SEMI_FINAL' WHERE points_reason = 'POSITION_1_2'"
+      "UPDATE tournament_results SET cup_position = 'CUP_SEMI_FINAL' WHERE cup_position = 'POSITION_1_2'"
     );
     console.log(
       `✅ POSITION_1_2 -> CUP_SEMI_FINAL: обновлено ${result4.affectedRows} записей`
@@ -67,7 +65,7 @@ export const removePositionEnumDuplicates = async () => {
 
     // POSITION_1_4 -> CUP_QUARTER_FINAL
     const [result5] = await pool.execute<ResultSetHeader>(
-      "UPDATE tournament_results SET points_reason = 'CUP_QUARTER_FINAL' WHERE points_reason = 'POSITION_1_4'"
+      "UPDATE tournament_results SET cup_position = 'CUP_QUARTER_FINAL' WHERE cup_position = 'POSITION_1_4'"
     );
     console.log(
       `✅ POSITION_1_4 -> CUP_QUARTER_FINAL: обновлено ${result5.affectedRows} записей`
@@ -83,11 +81,11 @@ export const removePositionEnumDuplicates = async () => {
 
     // 2. Обновляем enum в таблице - убираем POSITION_* значения
     console.log(
-      "🔄 Обновляем enum points_reason - убираем POSITION_* значения..."
+      "🔄 Обновляем enum cup_position - убираем POSITION_* значения..."
     );
     await pool.execute(`
       ALTER TABLE tournament_results 
-      MODIFY COLUMN points_reason ENUM(
+      MODIFY COLUMN cup_position ENUM(
         'CUP_WINNER',
         'CUP_RUNNER_UP', 
         'CUP_THIRD_PLACE',
@@ -108,10 +106,10 @@ export const removePositionEnumDuplicates = async () => {
     );
     console.log("📋 Обновлённая структура таблицы tournament_results:");
     const pointsReasonColumn = finalColumns.find(
-      (col) => col.Field === "points_reason"
+      (col) => col.Field === "cup_position"
     );
     if (pointsReasonColumn) {
-      console.log(`  - points_reason: ${pointsReasonColumn.Type}`);
+      console.log(`  - cup_position: ${pointsReasonColumn.Type}`);
     }
   } catch (error) {
     console.error("❌ Ошибка миграции:", error);

@@ -5,7 +5,7 @@ import {
   getAllCupPointsConfig,
   getCupPoints,
   getPointsExample,
-  getWinsPoints,
+  getPointsByQualifyingStage,
 } from "../config/cupPoints";
 import { pool } from "../config/database";
 import { PlayerModel } from "../models/PlayerModel";
@@ -114,8 +114,9 @@ export class TournamentController {
         teamResults.set(teams[teamOrderNum].teamId!, {
           cup,
           cupPosition,
-          wins: curTeamResults.wins! + winsModifier,
-          loses: curTeamResults.loses! + losesModifier,
+          qualifyingWins: curTeamResults.wins,
+          wins: curTeamResults.wins + winsModifier,
+          loses: curTeamResults.loses + losesModifier,
         });
       }
     }
@@ -211,8 +212,8 @@ export class TournamentController {
         }
 
         // Затем сортируем по приоритету позиции внутри одного кубка
-        const aPriority = positionPriority[a.points_reason] || 999;
-        const bPriority = positionPriority[b.points_reason] || 999;
+        const aPriority = positionPriority[a.cup_position] || 999;
+        const bPriority = positionPriority[b.cup_position] || 999;
 
         return aPriority - bPriority;
       });
@@ -450,10 +451,6 @@ export class TournamentController {
       // Сохраняем данные
       const tournamentPlayersIds: number[] = [];
 
-      console.log(
-        `Список команд до сохранения в БД\n${JSON.stringify(teams, null, 2)}`
-      );
-
       // Сохраняем команды в БД
       for (const team of teams) {
         const teamPlayers: number[] = [];
@@ -463,24 +460,15 @@ export class TournamentController {
         }
 
         let teamId;
-
         const foundedTeam = await TeamModel.findExistingTeam(teamPlayers);
 
-        if (!teamPlayers) {
+        if (!foundedTeam) {
           teamId = await TeamModel.createTeam(teamPlayers);
         } else {
           teamId = foundedTeam?.id;
         }
         team.teamId = teamId;
       }
-
-      console.log(
-        `Список команд  после  сохранения в БД\n${JSON.stringify(
-          teams,
-          null,
-          2
-        )}`
-      );
 
       const teamResults: Map<number, TeamResults> = new Map(); // key = teamId
 
@@ -521,13 +509,24 @@ export class TournamentController {
         );
       }
 
+      console.log(`### Data before save to DB`);
+      for (const [teamOrderNum, results] of teamResults) {
+        console.log(
+          `Team #${teamOrderNum} : ${JSON.stringify(results, null, 2)}`
+        );
+      }
+
+      // throw new Error("Debug");
+
       const tournamentId = await TournamentModel.createTournament(
         tournamentName,
         tournamentDate
       );
 
+      console.log("### Summary results");
       // Рассчёт рейтинговых очков и сохранение результатов команды в БД
       for (const [teamId, results] of teamResults) {
+        console.log(JSON.stringify(results, null, 2));
         let points = 0;
         if (results.cup!) {
           points = getCupPoints(
@@ -537,7 +536,10 @@ export class TournamentController {
             teams.length
           );
         } else {
-          points = getWinsPoints(tournamentCategory, results.qualifyingWins!);
+          points = getPointsByQualifyingStage(
+            tournamentCategory,
+            results.qualifyingWins!
+          );
         }
 
         TournamentModel.addTournamentResult(
@@ -547,7 +549,8 @@ export class TournamentController {
           results.loses!,
           results.cupPosition,
           results.cup,
-          results.qualifyingWins!
+          results.qualifyingWins!,
+          points
         );
       }
 
@@ -905,5 +908,28 @@ export class TournamentController {
     }
   }
 }
+
+// CREATE TABLE `tournament_results` (
+//   `id` int NOT NULL AUTO_INCREMENT,
+//   `tournament_id` int NOT NULL,
+//   `team_id` int NOT NULL,
+//   `cup` enum('A','B') DEFAULT NULL,
+//   `qualifying_wins` int DEFAULT '0',
+//   `points` int NOT NULL DEFAULT '0',
+//   `wins` int DEFAULT '0',
+//   `loses` int DEFAULT '0',
+//   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+//   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+//   `cup_position` enum('CUP_WINNER','CUP_RUNNER_UP','CUP_THIRD_PLACE','CUP_SEMI_FINAL','CUP_QUARTER_FINAL','QUALIFYING_HIGH','QUALIFYING_LOW') NOT NULL,
+//   PRIMARY KEY (`id`),
+//   KEY `team_id` (`team_id`),
+//   KEY `idx_tournament_team` (`tournament_id`,`team_id`),
+//   KEY `idx_tournament_cup` (`tournament_id`,`cup`),
+//   KEY `idx_qualifying_wins` (`qualifying_wins`),
+//   KEY `idx_wins` (`wins`),
+//   KEY `idx_loses` (`loses`),
+//   CONSTRAINT `tournament_results_ibfk_1` FOREIGN KEY (`tournament_id`) REFERENCES `tournaments` (`id`) ON DELETE CASCADE,
+//   CONSTRAINT `tournament_results_ibfk_2` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE
+// ) ENGINE=InnoDB AUTO_INCREMENT=777 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 
 export default TournamentController;

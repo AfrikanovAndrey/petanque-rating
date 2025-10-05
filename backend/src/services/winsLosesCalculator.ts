@@ -13,18 +13,18 @@ import { CupPosition, PointsReason } from "../types";
  *   - CUP_QUARTER_FINAL: +0 побед
  *   - Другие: +0 побед
  *
- * @param points_reason - причина получения очков (позиция в турнире)
+ * @param cup_position - причина получения очков (позиция в турнире)
  * @param qualifying_wins - количество побед в квалификационной части
  * @returns общее количество побед
  */
 export function calculateWins(
-  points_reason: CupPosition,
+  cup_position: CupPosition,
   qualifying_wins: number
 ): number {
   let totalWins = qualifying_wins;
 
   // Добавляем победы за позицию в кубке
-  switch (points_reason) {
+  switch (cup_position) {
     case CupPosition.WINNER:
       totalWins += 3;
       break;
@@ -60,19 +60,19 @@ export function calculateWins(
  *   - CUP_WINNER: +0 поражений
  *   - Другие: +0 поражений
  *
- * @param points_reason - причина получения очков (позиция в турнире)
+ * @param cup_position - причина получения очков (позиция в турнире)
  * @param qualifying_wins - количество побед в квалификационной части
  * @returns общее количество поражений
  */
 export function calculateLoses(
-  points_reason: CupPosition,
+  cup_position: CupPosition,
   qualifying_wins: number
 ): number {
   // Базовое количество поражений в швейцарке (5 игр всего)
   let totalLoses = Math.max(0, 5 - qualifying_wins);
 
   // Добавляем поражения за позицию в кубке
-  switch (points_reason) {
+  switch (cup_position) {
     case CupPosition.SEMI_FINAL:
       totalLoses += 1; // Проиграл в полуфинале
       break;
@@ -98,19 +98,19 @@ export function calculateLoses(
 
 /**
  * Рассчитывает оба показателя одновременно для эффективности
- * @param points_reason - причина получения очков
+ * @param cup_position - причина получения очков
  * @param qualifying_wins - количество побед в квалификации
  * @returns объект с количеством побед и поражений
  */
 export function calculateWinsAndLoses(
-  points_reason: CupPosition,
+  cup_position: CupPosition,
   qualifying_wins: number
 ): {
   wins: number;
   loses: number;
 } {
   return {
-    wins: calculateWins(points_reason, qualifying_wins),
-    loses: calculateLoses(points_reason, qualifying_wins),
+    wins: calculateWins(cup_position, qualifying_wins),
+    loses: calculateLoses(cup_position, qualifying_wins),
   };
 }

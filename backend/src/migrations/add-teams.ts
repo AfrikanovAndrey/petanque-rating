@@ -34,7 +34,7 @@ const teamsMigrations = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     tournament_id INT NOT NULL,
     team_id INT NOT NULL,
-    points_reason ENUM('CUP_WINNER', 'CUP_RUNNER_UP', 'CUP_THIRD_PLACE', 'CUP_SEMI_FINAL', 'CUP_QUARTER_FINAL', 'QUALIFYING_HIGH', 'QUALIFYING_LOW') NOT NULL DEFAULT 'CUP_QUARTER_FINAL',
+    cup_position ENUM('CUP_WINNER', 'CUP_RUNNER_UP', 'CUP_THIRD_PLACE', 'CUP_SEMI_FINAL', 'CUP_QUARTER_FINAL', 'QUALIFYING_HIGH', 'QUALIFYING_LOW') NOT NULL DEFAULT 'CUP_QUARTER_FINAL',
     points INT NOT NULL DEFAULT 0,
     cup ENUM('A', 'B') NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -44,7 +44,7 @@ const teamsMigrations = [
     INDEX idx_tournament_team (tournament_id, team_id),
     INDEX idx_tournament_cup (tournament_id, cup),
     INDEX idx_points (points DESC),
-    INDEX idx_points_reason (points_reason)
+    INDEX idx_cup_position (cup_position)
   )`,
 ];
 
@@ -73,11 +73,11 @@ const dataMigration = `
   JOIN teams t ON t.name = p.name AND t.tournament_id = tr.tournament_id;
   
   -- Копируем результаты в новую таблицу
-  INSERT INTO tournament_results_new (tournament_id, team_id, points_reason, points, cup, created_at, updated_at)
+  INSERT INTO tournament_results_new (tournament_id, team_id, cup_position, points, cup, created_at, updated_at)
   SELECT
     tr.tournament_id,
     t.id as team_id,
-    tr.points_reason,
+    tr.cup_position,
     tr.points,
     tr.cup,
     tr.created_at,

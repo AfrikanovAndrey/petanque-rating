@@ -9,7 +9,7 @@ import { useQuery } from "react-query";
 import { tournamentsApi } from "../services/api";
 import { TournamentResult, TournamentWithResults } from "../types";
 import { formatDate, handleApiError } from "../utils";
-import { getPointsReasonText, getPointsReasonColor } from "../types";
+import { getCupPositionText, getPointsReasonColor } from "../types";
 
 const TournamentsList: React.FC = () => {
   const [expandedTournament, setExpandedTournament] = useState<number | null>(
@@ -71,7 +71,7 @@ const TournamentsList: React.FC = () => {
     cup?: "A" | "B" | "C" | null,
     qualifyingWins?: number
   ) => {
-    return getPointsReasonText(position, cup, qualifyingWins);
+    return getCupPositionText(position, cup, qualifyingWins);
   };
 
   const getPositionColor = (position: string) => {
@@ -234,12 +234,11 @@ const TournamentsList: React.FC = () => {
                                                 <div className="flex flex-col">
                                                   <div
                                                     className={`text-sm font-medium ${getPositionColor(
-                                                      result.points_reason || ""
+                                                      result.cup_position || ""
                                                     )}`}
                                                   >
                                                     {getPositionBadge(
-                                                      result.points_reason ||
-                                                        "",
+                                                      result.cup_position || "",
                                                       result.cup,
                                                       result.qualifying_wins
                                                     )}

@@ -11,7 +11,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { adminApi } from "../../services/api";
 import { formatDate, formatDateTime, handleApiError } from "../../utils";
-import { getPointsReasonText } from "../../types";
+import { getCupPositionText } from "../../types";
 
 interface TournamentUploadForm {
   tournament_name: string;
@@ -822,8 +822,8 @@ const AdminTournaments: React.FC = () => {
                       "1/4": 5, // четвертьфинал
                     };
 
-                    const aPriority = positionPriority[a.points_reason] || 999;
-                    const bPriority = positionPriority[b.points_reason] || 999;
+                    const aPriority = positionPriority[a.cup_position] || 999;
+                    const bPriority = positionPriority[b.cup_position] || 999;
 
                     return aPriority - bPriority;
                   });
@@ -854,16 +854,13 @@ const AdminTournaments: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {sortedResults.map((result: any, index: number) => (
-                              <tr
-                                key={result.id}
-                                className={index < 3 ? "bg-yellow-50" : ""}
-                              >
+                            {sortedResults.map((result: any) => (
+                              <tr key={result.id}>
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   <div className="flex flex-col">
                                     <div className="text-sm font-medium text-gray-900">
-                                      {getPointsReasonText(
-                                        result.points_reason,
+                                      {getCupPositionText(
+                                        result.cup_position,
                                         result.cup,
                                         result.qualifyingWins
                                       )}

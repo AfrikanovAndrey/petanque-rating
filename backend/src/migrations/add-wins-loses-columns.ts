@@ -52,14 +52,14 @@ export const addWinsLosesColumns = async () => {
     console.log("🔄 Заполняем данные wins и loses для существующих записей...");
 
     const [existingRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT id, points_reason, qualifying_wins FROM tournament_results"
+      "SELECT id, cup_position, qualifying_wins FROM tournament_results"
     );
 
     console.log(`📊 Найдено ${existingRows.length} записей для обновления`);
 
     for (const row of existingRows) {
-      const wins = calculateWins(row.points_reason, row.qualifying_wins || 0);
-      const loses = calculateLoses(row.points_reason, row.qualifying_wins || 0);
+      const wins = calculateWins(row.cup_position, row.qualifying_wins || 0);
+      const loses = calculateLoses(row.cup_position, row.qualifying_wins || 0);
 
       await pool.execute(
         "UPDATE tournament_results SET wins = ?, loses = ? WHERE id = ?",

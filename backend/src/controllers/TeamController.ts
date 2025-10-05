@@ -283,7 +283,7 @@ export class TeamController {
             tr.id,
             tr.tournament_id,
             tr.team_id,
-            tr.points_reason,
+            tr.cup_position,
             tr.points,
             tr.cup,
             tr.created_at,

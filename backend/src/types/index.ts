@@ -32,8 +32,8 @@ export interface TournamentResult {
   id: number;
   tournament_id: number;
   team_id: number;
-  points_reason: PointsReason;
-  cup?: "A" | "B" | null;
+  cup_position: PointsReason | null;
+  cup?: "A" | "B" | "C" | null;
   qualifying_wins?: number; // Количество побед команды в квалификационной части
   wins?: number; // Общее количество побед (qualifying_wins + бонусы за кубки)
   loses?: number; // Общее количество поражений
@@ -91,13 +91,13 @@ export interface PlayerRating {
 }
 
 export interface TournamentResultWithTournament
-  extends Omit<TournamentResult, "points_reason"> {
+  extends Omit<TournamentResult, "cup_position"> {
   tournament_name: string;
   tournament_date: string;
   is_counted: boolean; // Входит ли результат в топ-8 лучших
   team_players: string; // Строка с именами игроков команды через запятую
   points: number; // Очки за этот результат (добавлено для совместимости с рейтингом)
-  points_reason: string; // Причина получения очков (может быть из разных источников)
+  cup_position: string; // Причина получения очков (может быть из разных источников)
 }
 
 export interface RatingTableRow {
@@ -114,7 +114,7 @@ export interface TournamentUploadData {
   tournament_category?: "1" | "2"; // категория турнира (1 - высшая, 2 - вторая)
   results: Array<{
     player_name: string;
-    points_reason: string;
+    cup_position: string;
     cup?: "A" | "B" | null;
   }>;
 }
@@ -130,11 +130,11 @@ export interface AuthResponse {
   message?: string;
 }
 export enum CupPosition {
-  WINNER = "1",
-  RUNNER_UP = "2",
-  THIRD_PLACE = "3",
-  SEMI_FINAL = "1/2",
-  QUARTER_FINAL = "1/4",
+  WINNER = "WINNER",
+  RUNNER_UP = "RUNNER_UP",
+  THIRD_PLACE = "THIRD_PLACE",
+  SEMI_FINAL = "SEMI_FINAL",
+  QUARTER_FINAL = "QUARTER_FINAL",
 }
 
 export interface Team {
@@ -152,7 +152,7 @@ export type Cup = "A" | "B" | "C";
 export interface CupTeamResult {
   team: string;
   cup: Cup;
-  points_reason: CupPosition;
+  cup_position: CupPosition;
 }
 
 export interface LicensedPlayer {
@@ -222,7 +222,7 @@ export interface TournamentTeamUploadData {
   results: Array<{
     team_name: string;
     team_players: string[]; // массив имен игроков в команде (1-4)
-    points_reason: string;
+    cup_position: string;
     cup?: "A" | "B" | null;
   }>;
 }
@@ -236,8 +236,8 @@ export type StageWithCells = {
 export type TeamResults = {
   cup?: Cup;
   cupPosition?: CupPosition;
-  qualifyingWins?: number;
-  wins?: number;
-  loses?: number;
+  qualifyingWins: number;
+  wins: number;
+  loses: number;
   points?: number;
 };

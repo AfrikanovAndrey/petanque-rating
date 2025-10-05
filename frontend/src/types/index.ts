@@ -45,87 +45,84 @@ export interface TeamWithMembers extends Team {
 }
 
 // Enum для причин получения очков
-export enum PointsReason {
+export enum CupPosition {
   // Кубки
-  CUP_WINNER = "CUP_WINNER",
-  CUP_RUNNER_UP = "CUP_RUNNER_UP",
-  CUP_THIRD_PLACE = "CUP_THIRD_PLACE",
-  CUP_SEMI_FINAL = "CUP_SEMI_FINAL",
-  CUP_QUARTER_FINAL = "CUP_QUARTER_FINAL",
+  WINNER = "WINNER",
+  RUNNER_UP = "RUNNER_UP",
+  THIRD_PLACE = "THIRD_PLACE",
+  SEMI_FINAL = "SEMI_FINAL",
+  QUARTER_FINAL = "QUARTER_FINAL",
 
   // Квалификация (швейцарка)
   QUALIFYING_HIGH = "QUALIFYING_HIGH", // >=3 побед
   QUALIFYING_LOW = "QUALIFYING_LOW", // 1-2 побед
-
-  // Результат игрока
-  PLAYER_RESULT = "PLAYER_RESULT",
 }
 
-export function getPointsReasonText(
-  reason: PointsReason | string,
+export function getCupPositionText(
+  cupPosition: CupPosition | string,
   cup?: "A" | "B" | "C" | null,
   qualifyingWins?: number
 ): string {
   // Для обратной совместимости со старыми данными
-  if (typeof reason === "string") {
+  if (typeof cupPosition === "string") {
     // Проверяем, является ли строка валидным значением PointsReason
-    if (Object.values(PointsReason).includes(reason as PointsReason)) {
+    if (Object.values(CupPosition).includes(cupPosition as CupPosition)) {
       // Преобразуем строку в соответствующий enum
-      reason = reason as PointsReason;
+      cupPosition = cupPosition as CupPosition;
     } else {
-      return reason; // Возвращаем как есть, если не нашли соответствие
+      return cupPosition; // Возвращаем как есть, если не нашли соответствие
     }
   }
 
-  switch (reason) {
-    case PointsReason.QUALIFYING_HIGH:
-      if (qualifyingWins !== undefined && qualifyingWins >= 3) {
-        return `Победы в квалификационном этапе: >= 3`;
-      }
-      return "Квалификация >=3 побед";
+  if (cup) {
+    switch (cupPosition) {
+      case CupPosition.WINNER:
+        return `🥇 1 ${cup}`;
 
-    case PointsReason.QUALIFYING_LOW:
-      if (
-        qualifyingWins !== undefined &&
-        qualifyingWins > 0 &&
-        qualifyingWins <= 2
-      ) {
-        return `Победы в квалификационном этапе: 1-2`;
-      }
-      return "Квалификация 1-2 победы";
+      case CupPosition.RUNNER_UP:
+        return `🥈 2 ${cup}`;
 
-    case PointsReason.CUP_WINNER:
-      return cup ? `1 ${cup}` : "1 место";
+      case CupPosition.THIRD_PLACE:
+        return `🥉 3 ${cup}`;
 
-    case PointsReason.CUP_RUNNER_UP:
-      return cup ? `2 ${cup}` : "2 место";
+      case CupPosition.SEMI_FINAL:
+        return `1/2 ${cup}`;
 
-    case PointsReason.CUP_THIRD_PLACE:
-      return cup ? `3 ${cup}` : "3 место";
-
-    case PointsReason.CUP_SEMI_FINAL:
-      return cup ? `1/2 ${cup}` : "Полуфинал";
-
-    case PointsReason.CUP_QUARTER_FINAL:
-      return cup ? `1/4 ${cup}` : "Четвертьфинал";
-
-    case PointsReason.PLAYER_RESULT:
-      return "Результат игрока";
-
-    default:
-      throw new Error(`Неизвестное значение PointsReason: ${reason}`);
+      case CupPosition.QUARTER_FINAL:
+        return `1/4 ${cup}`;
+    }
   }
 
-  return "Результат турнира";
+  // TODO: доделать очки за победы в квалификационном этапе
+  // switch (cupPosition) {
+  //   case CupPosition.QUALIFYING_HIGH:
+  //     if (qualifyingWins !== undefined && qualifyingWins >= 3) {
+  //       return `Победы в квалификационном этапе: >= 3`;
+  //     }
+  //     return "Квалификация >=3 побед";
+
+  //   case CupPosition.QUALIFYING_LOW:
+  //     if (
+  //       qualifyingWins !== undefined &&
+  //       qualifyingWins > 0 &&
+  //       qualifyingWins <= 2
+  //     ) {
+  //       return `Победы в квалификационном этапе: 1-2`;
+  //     }
+  //     return "Квалификация 1-2 победы";
+
+  //   default:
+  //     throw new Error(`Неизвестное значение PointsReason: ${cupPosition}`);
+  // }
 }
 
 // Функция для получения цвета позиции (для обратной совместимости)
-export function getPointsReasonColor(reason: PointsReason | string): string {
-  if (reason === PointsReason.CUP_WINNER || reason === "CUP_WINNER")
+export function getPointsReasonColor(reason: CupPosition | string): string {
+  if (reason === CupPosition.WINNER || reason === "WINNER")
     return "text-yellow-600";
-  if (reason === PointsReason.CUP_RUNNER_UP || reason === "CUP_RUNNER_UP")
+  if (reason === CupPosition.RUNNER_UP || reason === "RUNNER_UP")
     return "text-gray-600";
-  if (reason === PointsReason.CUP_THIRD_PLACE || reason === "CUP_THIRD_PLACE")
+  if (reason === CupPosition.THIRD_PLACE || reason === "THIRD_PLACE")
     return "text-amber-600";
   return "text-gray-900";
 }
@@ -135,7 +132,7 @@ export interface TournamentResult {
   id: number;
   tournament_id: number;
   team_id: number;
-  points_reason: PointsReason;
+  cup_position: CupPosition;
   points: number;
   cup?: "A" | "B" | null; // Кубок А или Б, null если не попал в кубки
   qualifying_wins?: number; // Количество побед команды в квалификационной части

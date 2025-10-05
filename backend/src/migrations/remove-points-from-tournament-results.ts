@@ -29,7 +29,7 @@ export async function removePointsFromTournamentResults(): Promise<void> {
     const [tournamentResultsCount] = await connection.execute(`
       SELECT COUNT(*) as count 
       FROM tournament_results
-      WHERE points_reason IS NOT NULL AND points_reason != ''
+      WHERE cup_position IS NOT NULL AND cup_position != ''
     `);
 
     const [playerTournamentPointsCount] = await connection.execute(`

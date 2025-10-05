@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS tournament_results (
   id INT AUTO_INCREMENT PRIMARY KEY,
   tournament_id INT NOT NULL,
   team_id INT NOT NULL,
-  points_reason ENUM(
+  cup_position ENUM(
     'CUP_WINNER',
     'CUP_RUNNER_UP', 
     'CUP_THIRD_PLACE',
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS tournament_results (
   FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
   INDEX idx_tournament_team (tournament_id, team_id),
   INDEX idx_tournament_cup (tournament_id, cup),
-  INDEX idx_points_reason (points_reason),
+  INDEX idx_cup_position (cup_position),
   INDEX idx_qualifying_wins (qualifying_wins),
   INDEX idx_wins (wins),
   INDEX idx_loses (loses)

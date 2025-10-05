@@ -1,11 +1,10 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
-import { getCupPoints, getWinsPoints } from "../config/cupPoints";
+import { getCupPoints, getPointsByQualifyingStage } from "../config/cupPoints";
 import { pool } from "../config/database";
 import { calculateWinsAndLoses } from "../services/winsLosesCalculator";
 import {
   Cup,
   CupPosition,
-  PointsReason,
   Tournament,
   TournamentResult,
   TournamentTeamUploadData,
@@ -13,6 +12,7 @@ import {
 } from "../types";
 import { PlayerModel } from "./PlayerModel";
 import { TeamModel } from "./TeamModel";
+import { getCupPositionByValue } from "../utils/cupResults";
 
 export class TournamentModel {
   static async getAllTournaments(): Promise<Tournament[]> {
@@ -95,11 +95,15 @@ export class TournamentModel {
       JOIN players p ON tp.player_id = p.id
       WHERE tr.tournament_id = ?
       GROUP BY tr.id, t.name, t.date
-      ORDER BY tr.points_reason ASC
+      ORDER BY tr.cup_position ASC
     `,
       [tournamentId]
     );
     return rows;
+  }
+
+  static ensureValue<T>(value: T | undefined | null, defaultValue: T) {
+    return value === undefined || value === null ? defaultValue : value;
   }
 
   static async addTournamentResult(
@@ -112,50 +116,21 @@ export class TournamentModel {
     qualifying_wins?: number,
     points?: number
   ): Promise<number> {
-    // Определяем points reason
-    let pointsReason;
-    if (cupPosition) {
-      switch (cupPosition) {
-        case CupPosition.WINNER:
-          pointsReason = PointsReason.CUP_WINNER;
-          break;
-
-        case CupPosition.RUNNER_UP:
-          pointsReason = PointsReason.CUP_RUNNER_UP;
-          break;
-
-        case CupPosition.THIRD_PLACE:
-          pointsReason = PointsReason.CUP_THIRD_PLACE;
-          break;
-
-        case CupPosition.SEMI_FINAL:
-          pointsReason = PointsReason.CUP_SEMI_FINAL;
-          break;
-
-        case CupPosition.QUARTER_FINAL:
-          pointsReason = PointsReason.CUP_QUARTER_FINAL;
-          break;
-      }
-    } else {
-      if (qualifying_wins && qualifying_wins >= 3) {
-        pointsReason = "QUALIFYING_HIGH";
-      }
-      if (qualifying_wins && qualifying_wins >= 1 && qualifying_wins <= 2) {
-        pointsReason = "QUALIFYING_LOW";
-      }
-    }
+    console.log(
+      `Запусь результаты команды:\n tournamentId: ${tournamentId}\nteamId: ${teamId}\nwins:${wins}\nloses:${loses}\ncupPosition=${cupPosition}\ncup=${cup}\nqualifying_wins=${qualifying_wins}\npoints=${points}`
+    );
 
     const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins, wins, loses, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tournament_results (tournament_id, team_id, cup, cup_position, qualifying_wins, wins, loses, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
-        tournamentId,
-        teamId,
-        pointsReason === undefined ? pointsReason : null,
-        cup === undefined ? cup : null,
-        qualifying_wins === undefined ? 0 : qualifying_wins,
-        wins === undefined ? 0 : wins,
-        loses === undefined ? 0 : loses,
-        points === undefined ? 0 : points,
+        TournamentModel.ensureValue(tournamentId, 0),
+        TournamentModel.ensureValue(teamId, 0),
+        TournamentModel.ensureValue(cup, null),
+        TournamentModel.ensureValue(cupPosition, null),
+        TournamentModel.ensureValue(qualifying_wins, 0),
+        TournamentModel.ensureValue(wins, 0),
+        TournamentModel.ensureValue(loses, 0),
+        TournamentModel.ensureValue(points, 0),
       ]
     );
     return result.insertId;
@@ -171,7 +146,7 @@ export class TournamentModel {
     const winsLoses = calculateWinsAndLoses(pointsReason, qualifying_wins || 0);
 
     const [result] = await pool.execute<ResultSetHeader>(
-      "UPDATE tournament_results SET points_reason = ?, cup = ?, qualifying_wins = ?, wins = ?, loses = ? WHERE id = ?",
+      "UPDATE tournament_results SET cup_position = ?, cup = ?, qualifying_wins = ?, wins = ?, loses = ? WHERE id = ?",
       [
         pointsReason,
         cup || null,
@@ -290,9 +265,9 @@ export class TournamentModel {
         let points = 0;
         const totalTeams = data.total_teams || 16;
         const category = data.tournament_category || "1";
-        const pointsReason = result.points_reason;
+        const pointsReason = result.cup_position;
 
-        // Преобразуем points_reason в CupPosition для функции getCupPoints
+        // Преобразуем cup_position в CupPosition для функции getCupPoints
         let cupPosition: CupPosition;
         switch (pointsReason) {
           case "CUP_WINNER":
@@ -327,7 +302,7 @@ export class TournamentModel {
             // Лицензированные команды НЕ в кубках получают очки за победы в швейцарке
             // TODO: Извлечь количество побед команды из данных турнира
             const qualifying_wins = 0; // Пока нет данных о победах в этом методе
-            points = getWinsPoints(category, qualifying_wins);
+            points = getPointsByQualifyingStage(category, qualifying_wins);
           }
         } else {
           // Нелицензированные команды не получают очки
@@ -339,7 +314,7 @@ export class TournamentModel {
         const winsLoses = calculateWinsAndLoses(pointsReason, 0);
 
         await connection.execute(
-          "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins, wins, loses) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO tournament_results (tournament_id, team_id, cup_position, cup, qualifying_wins, wins, loses) VALUES (?, ?, ?, ?, ?, ?, ?)",
           [
             tournamentId,
             teamId,
@@ -459,9 +434,9 @@ export class TournamentModel {
           // Только лицензированные участники кубков А и Б получают очки
           const totalTeams = data.total_teams || 16; // По умолчанию 16 команд если не указано
           const category = data.tournament_category || "1"; // По умолчанию 1 категория
-          const pointsReason = result.points_reason;
+          const pointsReason = result.cup_position;
 
-          // Преобразуем points_reason в CupPosition для функции getCupPoints
+          // Преобразуем cup_position в CupPosition для функции getCupPoints
           let cupPosition: CupPosition;
           switch (pointsReason) {
             case "CUP_WINNER":
@@ -516,12 +491,12 @@ export class TournamentModel {
         }
 
         // Добавляем результат команды
-        const pointsReason = result.points_reason;
+        const pointsReason = result.cup_position;
         // Рассчитываем wins и loses на основе данных
         const winsLoses = calculateWinsAndLoses(pointsReason, 0);
 
         await connection.execute(
-          "INSERT INTO tournament_results (tournament_id, team_id, points_reason, cup, qualifying_wins, wins, loses) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO tournament_results (tournament_id, team_id, cup_position, cup, qualifying_wins, wins, loses) VALUES (?, ?, ?, ?, ?, ?, ?)",
           [
             tournamentId,
             teamId,
@@ -564,7 +539,7 @@ export class TournamentModel {
     // Получаем все результаты турнира из player_tournament_points
     const [resultsRows] = await pool.execute<RowDataPacket[]>(
       `
-      SELECT ptp.id, ptp.points_reason, ptp.cup, ptp.team_id, ptp.points as old_points,
+      SELECT ptp.id, ptp.cup_position, ptp.cup, ptp.team_id, ptp.points as old_points,
              p.name as player_name, p.id as player_id
       FROM player_tournament_points ptp
       JOIN players p ON ptp.player_id = p.id
@@ -602,9 +577,9 @@ export class TournamentModel {
       if (result.cup && isLicensed) {
         const totalTeams = 16; // Используем значение по умолчанию
         const category = "1" as "1" | "2"; // Используем 1 категорию по умолчанию
-        const pointsReason = result.points_reason;
+        const pointsReason = result.cup_position;
 
-        // Преобразуем points_reason в CupPosition для функции getCupPoints
+        // Преобразуем cup_position в CupPosition для функции getCupPoints
         let cupPosition: CupPosition;
         switch (pointsReason) {
           case "CUP_WINNER":
@@ -663,7 +638,7 @@ export class TournamentModel {
               qualifying_wins = 0; // Используем 0 при ошибке
             }
 
-            newPoints = getWinsPoints(category, qualifying_wins);
+            newPoints = getPointsByQualifyingStage(category, qualifying_wins);
           }
         } else {
           // Нелицензированная команда не получает очки
@@ -720,7 +695,7 @@ export class TournamentModel {
       JOIN players p ON tp.player_id = p.id
       WHERE tr.cup IS NOT NULL
       GROUP BY tr.id, t.name, t.date
-      ORDER BY t.date DESC, tr.cup, tr.points_reason
+      ORDER BY t.date DESC, tr.cup, tr.cup_position
       `
     );
     return rows;
@@ -744,7 +719,7 @@ export class TournamentModel {
       JOIN players p ON tp.player_id = p.id
       WHERE tr.tournament_id = ? AND tr.cup IS NOT NULL
       GROUP BY tr.id, t.name, t.date
-      ORDER BY tr.cup, tr.points_reason
+      ORDER BY tr.cup, tr.cup_position
       `,
       [tournamentId]
     );
@@ -767,7 +742,7 @@ export class TournamentModel {
       JOIN players p ON tp.player_id = p.id
       WHERE tr.tournament_id = ? AND tr.cup = ?
       GROUP BY tr.id
-      ORDER BY tr.points_reason
+      ORDER BY tr.cup_position
       `,
       [tournamentId, cup]
     );

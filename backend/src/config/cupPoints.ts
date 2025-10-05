@@ -386,7 +386,7 @@ export function getAllCupPointsConfig(): Record<
  * @param qualifying_wins - количество побед команды
  * @returns количество очков за победы
  */
-export function getWinsPoints(
+export function getPointsByQualifyingStage(
   category: "1" | "2",
   qualifying_wins: number
 ): number {
@@ -518,7 +518,7 @@ export function getPointsExample(): Record<string, any> {
         qualifying_wins: 5,
         wins: calculateWins("QUALIFYING_HIGH", 5),
         loses: calculateLoses("QUALIFYING_HIGH", 5),
-        points: getWinsPoints("1", 5),
+        points: getPointsByQualifyingStage("1", 5),
         explanation: "≥3 побед в 1 категории = 3 очка",
       },
       {
@@ -527,7 +527,7 @@ export function getPointsExample(): Record<string, any> {
         qualifying_wins: 2,
         wins: calculateWins("QUALIFYING_LOW", 2),
         loses: calculateLoses("QUALIFYING_LOW", 2),
-        points: getWinsPoints("1", 2),
+        points: getPointsByQualifyingStage("1", 2),
         explanation: "1-2 победы в 1 категории = 2 очка",
       },
       {
@@ -536,7 +536,7 @@ export function getPointsExample(): Record<string, any> {
         qualifying_wins: 4,
         wins: calculateWins("QUALIFYING_HIGH", 4),
         loses: calculateLoses("QUALIFYING_HIGH", 4),
-        points: getWinsPoints("2", 4),
+        points: getPointsByQualifyingStage("2", 4),
         explanation: "≥3 побед во 2 категории = 2 очка",
       },
       {
@@ -545,7 +545,7 @@ export function getPointsExample(): Record<string, any> {
         qualifying_wins: 1,
         wins: calculateWins("QUALIFYING_LOW", 1),
         loses: calculateLoses("QUALIFYING_LOW", 1),
-        points: getWinsPoints("2", 1),
+        points: getPointsByQualifyingStage("2", 1),
         explanation: "1-2 победы во 2 категории = 1 очко",
       },
       {
@@ -554,7 +554,7 @@ export function getPointsExample(): Record<string, any> {
         qualifying_wins: 0,
         wins: calculateWins("QUALIFYING_LOW", 0),
         loses: calculateLoses("QUALIFYING_LOW", 0),
-        points: getWinsPoints("1", 0),
+        points: getPointsByQualifyingStage("1", 0),
         explanation: "0 побед = 0 очков",
       },
     ],

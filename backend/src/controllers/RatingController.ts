@@ -89,7 +89,7 @@ export class RatingController {
 
         const [results] = await pool.execute<RowDataPacket[]>(
           `SELECT 
-              tr.id, tr.tournament_id, tr.team_id, tr.points_reason, tr.points, tr.cup, tr.qualifying_wins,
+              tr.id, tr.tournament_id, tr.team_id, tr.cup_position, tr.points, tr.cup, tr.qualifying_wins,
               t.name as tournament_name, t.date as tournament_date,
               GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_players
            FROM tournament_results tr
@@ -164,7 +164,7 @@ export class RatingController {
 
       const [results] = await pool.execute<RowDataPacket[]>(
         `SELECT 
-            tr.id, tr.tournament_id, tr.team_id, tr.points_reason, tr.points, tr.cup, tr.qualifying_wins,
+            tr.id, tr.tournament_id, tr.team_id, tr.cup_position, tr.points, tr.cup, tr.qualifying_wins,
             t.name as tournament_name, t.date as tournament_date,
             GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_players
          FROM tournament_results tr
@@ -228,7 +228,7 @@ export class RatingController {
         const playerName = row.player_name;
         const [results] = await pool.execute<RowDataPacket[]>(
           `SELECT 
-             tr.id, tr.tournament_id, tr.team_id, tr.points_reason, tr.points, tr.cup, tr.qualifying_wins,
+             tr.id, tr.tournament_id, tr.team_id, tr.cup_position, tr.points, tr.cup, tr.qualifying_wins,
              t.name as tournament_name, t.date as tournament_date,
              GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_players
            FROM tournament_results tr
@@ -303,7 +303,7 @@ export class RatingController {
         const playerName = row.player_name;
         const [results] = await pool.execute<RowDataPacket[]>(
           `SELECT 
-             tr.id, tr.tournament_id, tr.team_id, tr.points_reason, tr.points, tr.cup, tr.qualifying_wins,
+             tr.id, tr.tournament_id, tr.team_id, tr.cup_position, tr.points, tr.cup, tr.qualifying_wins,
              t.name as tournament_name, t.date as tournament_date,
              GROUP_CONCAT(p2.name ORDER BY p2.name SEPARATOR ', ') as team_players
            FROM tournament_results tr

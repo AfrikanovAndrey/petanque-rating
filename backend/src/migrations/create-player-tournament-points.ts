@@ -1,5 +1,5 @@
 import { pool } from "../config/database";
-import { getCupPoints, getWinsPoints } from "../config/cupPoints";
+import { getCupPoints, getPointsByQualifyingStage } from "../config/cupPoints";
 import { CupPosition } from "../types";
 
 /**
@@ -42,13 +42,13 @@ export async function createPlayerTournamentPoints(): Promise<void> {
     const [tournamentResults] = await connection.execute(`
       SELECT 
         tr.tournament_id,
-        tr.points_reason,
+        tr.cup_position,
         tr.cup,
         tr.qualifying_wins,
         tp.player_id
       FROM tournament_results tr
       JOIN team_players tp ON tr.team_id = tp.team_id
-      WHERE tr.points_reason IS NOT NULL AND tr.points_reason != ''
+      WHERE tr.cup_position IS NOT NULL AND tr.cup_position != ''
       ORDER BY tr.tournament_id, tp.player_id
     `);
 
@@ -65,15 +65,12 @@ export async function createPlayerTournamentPoints(): Promise<void> {
       );
 
       if ((existing as any[])[0].count === 0) {
-        // Рассчитываем очки на основе points_reason, cup и qualifying_wins
+        // Рассчитываем очки на основе cup_position, cup и qualifying_wins
         let points = 0;
 
         // Очки за кубок
-        if (
-          result.points_reason &&
-          result.points_reason !== "QUALIFYING_ONLY"
-        ) {
-          const cupPosition = result.points_reason as CupPosition;
+        if (result.cup_position && result.cup_position !== "QUALIFYING_ONLY") {
+          const cupPosition = result.cup_position as CupPosition;
           points += getCupPoints(
             "2", // категория по умолчанию - 2-я
             result.cup || "A",
@@ -84,7 +81,7 @@ export async function createPlayerTournamentPoints(): Promise<void> {
 
         // Очки за отборочные победы
         if (result.qualifying_wins > 0) {
-          points += getWinsPoints("2", result.qualifying_wins);
+          points += getPointsByQualifyingStage("2", result.qualifying_wins);
         }
 
         if (points > 0) {
@@ -108,7 +105,7 @@ export async function createPlayerTournamentPoints(): Promise<void> {
       SELECT COUNT(*) as count 
       FROM tournament_results tr
       JOIN team_players tp ON tr.team_id = tp.team_id
-      WHERE tr.points_reason IS NOT NULL AND tr.points_reason != ''
+      WHERE tr.cup_position IS NOT NULL AND tr.cup_position != ''
     `);
 
     const [newCount] = await connection.execute(`

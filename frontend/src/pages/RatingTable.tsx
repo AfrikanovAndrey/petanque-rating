@@ -7,7 +7,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { ratingApi } from "../services/api";
-import { PlayerRating, getPointsReasonText } from "../types";
+import { PlayerRating, getCupPositionText } from "../types";
 import { formatDate, formatNumber, handleApiError } from "../utils";
 
 type RatingViewType = "male" | "female";
@@ -330,8 +330,8 @@ const RatingTable: React.FC = () => {
                                                 {result.tournament_name}
                                               </span>
                                               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                                                {getPointsReasonText(
-                                                  result.points_reason || "",
+                                                {getCupPositionText(
+                                                  result.cup_position || "",
                                                   result.cup,
                                                   result.qualifying_wins
                                                 )}

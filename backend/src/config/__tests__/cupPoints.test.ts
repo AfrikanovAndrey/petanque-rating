@@ -2,7 +2,7 @@ import {
   getCupPoints,
   getPointsExample,
   getAllCupPointsConfig,
-  getWinsPoints,
+  getPointsByQualifyingStage,
 } from "../cupPoints";
 import { CupPosition } from "../../types";
 
@@ -144,61 +144,61 @@ describe("getCupPoints", () => {
 describe("getWinsPoints", () => {
   describe("Турниры 1 категории", () => {
     test("должен вернуть 3 очка за 3 победы", () => {
-      const points = getWinsPoints("1", 3);
+      const points = getPointsByQualifyingStage("1", 3);
       expect(points).toBe(3);
     });
 
     test("должен вернуть 3 очка за 5 побед", () => {
-      const points = getWinsPoints("1", 5);
+      const points = getPointsByQualifyingStage("1", 5);
       expect(points).toBe(3);
     });
 
     test("должен вернуть 2 очка за 2 победы", () => {
-      const points = getWinsPoints("1", 2);
+      const points = getPointsByQualifyingStage("1", 2);
       expect(points).toBe(2);
     });
 
     test("должен вернуть 2 очка за 1 победу", () => {
-      const points = getWinsPoints("1", 1);
+      const points = getPointsByQualifyingStage("1", 1);
       expect(points).toBe(2);
     });
 
     test("должен вернуть 0 очков за 0 побед", () => {
-      const points = getWinsPoints("1", 0);
+      const points = getPointsByQualifyingStage("1", 0);
       expect(points).toBe(0);
     });
   });
 
   describe("Турниры 2 категории", () => {
     test("должен вернуть 2 очка за 3 победы", () => {
-      const points = getWinsPoints("2", 3);
+      const points = getPointsByQualifyingStage("2", 3);
       expect(points).toBe(2);
     });
 
     test("должен вернуть 2 очка за 4 победы", () => {
-      const points = getWinsPoints("2", 4);
+      const points = getPointsByQualifyingStage("2", 4);
       expect(points).toBe(2);
     });
 
     test("должен вернуть 1 очко за 2 победы", () => {
-      const points = getWinsPoints("2", 2);
+      const points = getPointsByQualifyingStage("2", 2);
       expect(points).toBe(1);
     });
 
     test("должен вернуть 1 очко за 1 победу", () => {
-      const points = getWinsPoints("2", 1);
+      const points = getPointsByQualifyingStage("2", 1);
       expect(points).toBe(1);
     });
 
     test("должен вернуть 0 очков за 0 побед", () => {
-      const points = getWinsPoints("2", 0);
+      const points = getPointsByQualifyingStage("2", 0);
       expect(points).toBe(0);
     });
   });
 
   describe("Граничные случаи", () => {
     test("должен корректно обрабатывать отрицательные значения", () => {
-      const points = getWinsPoints("1", -1);
+      const points = getPointsByQualifyingStage("1", -1);
       expect(points).toBe(0);
     });
   });
