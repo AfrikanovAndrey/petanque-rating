@@ -39,17 +39,6 @@ export class LicensedPlayerModel {
     return rows[0] || null;
   }
 
-  // Получить лицензионного игрока по номеру лицензии
-  static async getLicensedPlayerByLicenseNumber(
-    licenseNumber: string
-  ): Promise<LicensedPlayer | null> {
-    const [rows] = await pool.execute<LicensedPlayer[] & RowDataPacket[]>(
-      "SELECT * FROM licensed_players WHERE license_number = ?",
-      [licenseNumber]
-    );
-    return rows[0] || null;
-  }
-
   // Проверить является ли игрок лицензированным (по имени)
   static async isPlayerLicensed(
     playerName: string,
@@ -191,14 +180,6 @@ export class LicensedPlayerModel {
     }
 
     return results;
-  }
-
-  // Получить годы для которых есть лицензионные игроки
-  static async getAvailableYears(): Promise<number[]> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT DISTINCT year FROM licensed_players ORDER BY year DESC"
-    );
-    return rows.map((row: any) => row.year);
   }
 
   // Получить статистику по лицензионным игрокам

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 interface LicensedPlayer {
   id: number;
   license_number: string;
-  full_name: string;
+  player_name: string;
   city: string;
   license_date: string;
   year: number;
@@ -33,7 +33,7 @@ const AdminLicensedPlayers: React.FC = () => {
   );
   const [formData, setFormData] = useState({
     license_number: "",
-    full_name: "",
+    player_name: "",
     city: "",
     license_date: "",
     year: new Date().getFullYear(),
@@ -160,7 +160,7 @@ const AdminLicensedPlayers: React.FC = () => {
         setEditingPlayer(null);
         setFormData({
           license_number: "",
-          full_name: "",
+          player_name: "",
           city: "",
           license_date: "",
           year: new Date().getFullYear(),
@@ -180,7 +180,7 @@ const AdminLicensedPlayers: React.FC = () => {
     setEditingPlayer(player);
     setFormData({
       license_number: player.license_number,
-      full_name: player.full_name,
+      player_name: player.player_name,
       city: player.city,
       license_date: player.license_date.split("T")[0],
       year: player.year,
@@ -374,7 +374,7 @@ const AdminLicensedPlayers: React.FC = () => {
                     {player.license_number}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {player.full_name}
+                    {player.player_name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {player.city}
@@ -454,9 +454,9 @@ const AdminLicensedPlayers: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    value={formData.full_name}
+                    value={formData.player_name}
                     onChange={(e) =>
-                      setFormData({ ...formData, full_name: e.target.value })
+                      setFormData({ ...formData, player_name: e.target.value })
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                     required
@@ -517,7 +517,7 @@ const AdminLicensedPlayers: React.FC = () => {
                     setEditingPlayer(null);
                     setFormData({
                       license_number: "",
-                      full_name: "",
+                      player_name: "",
                       city: "",
                       license_date: "",
                       year: new Date().getFullYear(),

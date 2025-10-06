@@ -1,10 +1,12 @@
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { pool } from "../config/database";
 import { LicensedPlayer, LicensedPlayerUploadData } from "../types";
-import { ResultSetHeader, RowDataPacket } from "mysql2";
 
 export class LicensedPlayerModel {
   // Получить всех лицензионных игроков с именами игроков
-  static async getAllLicensedPlayers(year?: number): Promise<(LicensedPlayer & {player_name: string})[]> {
+  static async getAllLicensedPlayers(
+    year?: number
+  ): Promise<(LicensedPlayer & { player_name: string })[]> {
     const query = year
       ? `SELECT lp.*, p.name as player_name 
          FROM licensed_players lp 
@@ -17,18 +19,19 @@ export class LicensedPlayerModel {
          ORDER BY lp.year DESC, p.name`;
     const params = year ? [year] : [];
 
-    const [rows] = await pool.execute<(LicensedPlayer & {player_name: string})[] & RowDataPacket[]>(
-      query,
-      params
-    );
+    const [rows] = await pool.execute<
+      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
+    >(query, params);
     return rows;
   }
 
   // Получить активных лицензионных игроков текущего года
   static async getActiveLicensedPlayers(
     year: number = new Date().getFullYear()
-  ): Promise<(LicensedPlayer & {player_name: string})[]> {
-    const [rows] = await pool.execute<(LicensedPlayer & {player_name: string})[] & RowDataPacket[]>(
+  ): Promise<(LicensedPlayer & { player_name: string })[]> {
+    const [rows] = await pool.execute<
+      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
+    >(
       `SELECT lp.*, p.name as player_name 
        FROM licensed_players lp 
        LEFT JOIN players p ON lp.player_id = p.id 
@@ -42,8 +45,10 @@ export class LicensedPlayerModel {
   // Получить лицензионного игрока по ID
   static async getLicensedPlayerById(
     id: number
-  ): Promise<(LicensedPlayer & {player_name: string}) | null> {
-    const [rows] = await pool.execute<(LicensedPlayer & {player_name: string})[] & RowDataPacket[]>(
+  ): Promise<(LicensedPlayer & { player_name: string }) | null> {
+    const [rows] = await pool.execute<
+      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
+    >(
       `SELECT lp.*, p.name as player_name 
        FROM licensed_players lp 
        LEFT JOIN players p ON lp.player_id = p.id 
@@ -78,7 +83,7 @@ export class LicensedPlayerModel {
 
       // 1. Создаем или находим игрока в таблице players
       let playerId: number;
-      
+
       const [existingPlayer] = await connection.execute<RowDataPacket[]>(
         "SELECT id FROM players WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))",
         [playerData.player_name]
@@ -159,10 +164,8 @@ export class LicensedPlayerModel {
               SELECT player_id FROM licensed_players WHERE player_id = ? AND id != ?
               UNION ALL
               SELECT player_id FROM team_players WHERE player_id = ?
-              UNION ALL
-              SELECT player_id FROM player_tournament_points WHERE player_id = ?
-            ) as usage`,
-            [currentPlayerId, id, currentPlayerId, currentPlayerId]
+            ) as usage_count`,
+            [currentPlayerId, id, currentPlayerId]
           );
 
           if (playerUsage[0].count === 0) {
@@ -256,7 +259,8 @@ export class LicensedPlayerModel {
   }> {
     const connection = await pool.getConnection();
     let success = 0;
-    const errors: Array<{ player: LicensedPlayerUploadData; error: string }> = [];
+    const errors: Array<{ player: LicensedPlayerUploadData; error: string }> =
+      [];
 
     try {
       await connection.beginTransaction();
@@ -294,7 +298,7 @@ export class LicensedPlayerModel {
 
           // Создаем или находим игрока
           let playerId: number;
-          
+
           const [existingPlayer] = await connection.execute<RowDataPacket[]>(
             "SELECT id FROM players WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))",
             [player.player_name]
@@ -339,9 +343,7 @@ export class LicensedPlayerModel {
       }
 
       await connection.commit();
-      console.log(
-        `✅ Загружено ${success} игроков, ошибок: ${errors.length}`
-      );
+      console.log(`✅ Загружено ${success} игроков, ошибок: ${errors.length}`);
 
       return { success, errors };
     } catch (error) {
@@ -357,12 +359,14 @@ export class LicensedPlayerModel {
   static async searchLicensedPlayers(
     searchTerm: string,
     year?: number
-  ): Promise<(LicensedPlayer & {player_name: string})[]> {
+  ): Promise<(LicensedPlayer & { player_name: string })[]> {
     const yearCondition = year ? "AND lp.year = ?" : "";
     const params: any[] = [`%${searchTerm}%`, `%${searchTerm}%`];
     if (year) params.push(year);
 
-    const [rows] = await pool.execute<(LicensedPlayer & {player_name: string})[] & RowDataPacket[]>(
+    const [rows] = await pool.execute<
+      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
+    >(
       `SELECT lp.*, p.name as player_name
        FROM licensed_players lp
        JOIN players p ON lp.player_id = p.id
@@ -384,7 +388,7 @@ export class LicensedPlayerModel {
     total: number;
     active: number;
     inactive: number;
-    cities: Array<{city: string; count: number}>;
+    cities: Array<{ city: string; count: number }>;
   }> {
     const yearCondition = year ? "WHERE year = ?" : "";
     const params = year ? [year, year, year] : [];
@@ -395,12 +399,16 @@ export class LicensedPlayerModel {
     );
 
     const [activeRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as active FROM licensed_players ${yearCondition} ${year ? 'AND' : 'WHERE'} is_active = TRUE`,
+      `SELECT COUNT(*) as active FROM licensed_players ${yearCondition} ${
+        year ? "AND" : "WHERE"
+      } is_active = TRUE`,
       year ? [year] : []
     );
 
     const [inactiveRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as inactive FROM licensed_players ${yearCondition} ${year ? 'AND' : 'WHERE'} is_active = FALSE`,
+      `SELECT COUNT(*) as inactive FROM licensed_players ${yearCondition} ${
+        year ? "AND" : "WHERE"
+      } is_active = FALSE`,
       year ? [year] : []
     );
 
@@ -417,7 +425,26 @@ export class LicensedPlayerModel {
       total: totalRows[0].total,
       active: activeRows[0].active,
       inactive: inactiveRows[0].inactive,
-      cities: cityRows as Array<{city: string; count: number}>
+      cities: cityRows as Array<{ city: string; count: number }>,
     };
+  }
+
+  // Получить лицензионного игрока по номеру лицензии
+  static async getLicensedPlayerByLicenseNumber(
+    licenseNumber: string
+  ): Promise<LicensedPlayer | null> {
+    const [rows] = await pool.execute<LicensedPlayer[] & RowDataPacket[]>(
+      "SELECT * FROM licensed_players WHERE license_number = ?",
+      [licenseNumber]
+    );
+    return rows[0] || null;
+  }
+
+  // Получить годы для которых есть лицензионные игроки
+  static async getAvailableYears(): Promise<number[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      "SELECT DISTINCT year FROM licensed_players ORDER BY year DESC"
+    );
+    return rows.map((row: any) => row.year);
   }
 }
