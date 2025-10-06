@@ -1,5 +1,5 @@
 import { pool } from "../config/database";
-import { addPointsToTournamentResultsAndDropPTP } from "./add-points-to-tournament-results-and-drop-ptp";
+import { addPointsToTournamentResultsAndDropPTP } from "./add-tournament-category-and-teams-count";
 import { populateGender } from "./populate-gender";
 import { updateGender } from "./update-gender";
 import { linkLicensedPlayersWithPlayers } from "./link-licensed-players";
@@ -38,7 +38,7 @@ export const runMigrations = async () => {
 
     // Выполняем только операции, требующие логики приложения
     console.log("🚻 Заполнение пола для существующих игроков...");
-    await populateGender();
+    //await populateGender();
 
     // console.log("🔄 Обновление пола игроков с улучшенным алгоритмом...");
     // await updateGender();

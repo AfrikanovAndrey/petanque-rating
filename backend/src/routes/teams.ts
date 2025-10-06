@@ -15,10 +15,5 @@ router.post("/", authenticateAdmin, TeamController.createTeam);
 router.put("/:id", authenticateAdmin, TeamController.updateTeam);
 router.delete("/:id", authenticateAdmin, TeamController.deleteTeam);
 router.delete("/", authenticateAdmin, TeamController.deleteAllTeams);
-router.post(
-  "/upload",
-  authenticateAdmin,
-  TeamController.uploadTournamentTeamData
-);
 
 export default router;

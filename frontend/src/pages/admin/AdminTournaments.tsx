@@ -11,13 +11,18 @@ import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { adminApi } from "../../services/api";
 import { getCupPositionText } from "../../types";
-import { formatDate, formatDateTime, handleApiError } from "../../utils";
+import {
+  formatDate,
+  formatDateTime,
+  getTornamentCategoryText,
+  handleApiError,
+} from "../../utils";
 
 interface TournamentUploadForm {
   tournament_name: string;
   tournament_date: string;
   tournament_file: FileList;
-  tournament_category: "1" | "2";
+  tournament_category: string;
   google_sheets_url: string;
 }
 
@@ -319,9 +324,15 @@ const AdminTournaments: React.FC = () => {
                     Дата проведения
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Категория
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Количество команд
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата загрузки
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
                   </th>
                 </tr>
@@ -343,6 +354,16 @@ const AdminTournaments: React.FC = () => {
                       <div className="flex items-center">
                         <CalendarIcon className="h-4 w-4 text-gray-400 mr-2" />
                         {formatDate(tournament.date)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center">
+                        {getTornamentCategoryText(tournament.category)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center text-align: justify">
+                        {tournament.teams_count}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -846,8 +867,7 @@ const AdminTournaments: React.FC = () => {
                                     <div className="text-sm font-medium text-gray-900">
                                       {getCupPositionText(
                                         result.cup_position,
-                                        result.cup,
-                                        result.qualifyingWins
+                                        result.cup
                                       )}
                                     </div>
                                   </div>

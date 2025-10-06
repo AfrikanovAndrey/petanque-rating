@@ -335,37 +335,4 @@ export class TeamController {
       });
     }
   }
-
-  /**
-   * Загрузка данных турнира с командами
-   */
-  static async uploadTournamentTeamData(req: Request, res: Response) {
-    try {
-      const data: TournamentTeamUploadData = req.body;
-
-      if (!data.tournament_name || !data.tournament_date || !data.results) {
-        return res.status(400).json({
-          success: false,
-          message: "Отсутствуют обязательные поля",
-        });
-      }
-
-      const tournamentId = await TournamentModel.uploadTournamentTeamData(data);
-
-      res.json({
-        success: true,
-        message: "Данные турнира загружены",
-        tournament_id: tournamentId,
-      });
-    } catch (error) {
-      console.error("Ошибка загрузки данных турнира:", error);
-      res.status(500).json({
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Ошибка загрузки данных турнира",
-      });
-    }
-  }
 }

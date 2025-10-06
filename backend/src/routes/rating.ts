@@ -52,7 +52,4 @@ router.get(
 // GET /api/rating/cups/config - получить конфигурацию очков за кубки (публичный доступ)
 router.get("/cups/config", TournamentController.getCupPointsConfig);
 
-// GET /api/rating/cups/examples - получить примеры расчета очков (публичный доступ)
-router.get("/cups/examples", TournamentController.getCupPointsExamples);
-
 export default router;

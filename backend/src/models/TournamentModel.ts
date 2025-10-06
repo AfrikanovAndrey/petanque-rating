@@ -6,13 +6,12 @@ import {
   Cup,
   CupPosition,
   Tournament,
+  TournamentCategoryEnum,
   TournamentResult,
-  TournamentTeamUploadData,
   TournamentUploadData,
 } from "../types";
 import { PlayerModel } from "./PlayerModel";
 import { TeamModel } from "./TeamModel";
-import { getCupPositionByValue } from "../utils/cupResults";
 
 export class TournamentModel {
   static async getAllTournaments(): Promise<Tournament[]> {
@@ -30,10 +29,15 @@ export class TournamentModel {
     return rows[0] || null;
   }
 
-  static async createTournament(name: string, date: string): Promise<number> {
+  static async createTournament(
+    name: string,
+    category: TournamentCategoryEnum,
+    teamsCount: number,
+    date: string
+  ): Promise<number> {
     const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, date) VALUES (?, ?)",
-      [name, date]
+      "INSERT INTO tournaments (name, category, teams_count, date) VALUES (?, ?, ?, ?)",
+      [name, TournamentCategoryEnum[category], teamsCount, date]
     );
     return result.insertId;
   }
@@ -116,10 +120,6 @@ export class TournamentModel {
     qualifying_wins?: number,
     points?: number
   ): Promise<number> {
-    console.log(
-      `Запусь результаты команды:\n tournamentId: ${tournamentId}\nteamId: ${teamId}\nwins:${wins}\nloses:${loses}\ncupPosition=${cupPosition}\ncup=${cup}\nqualifying_wins=${qualifying_wins}\npoints=${points}`
-    );
-
     const [result] = await pool.execute<ResultSetHeader>(
       "INSERT INTO tournament_results (tournament_id, team_id, cup, cup_position, qualifying_wins, wins, loses, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
@@ -136,205 +136,12 @@ export class TournamentModel {
     return result.insertId;
   }
 
-  static async updateTournamentResult(
-    id: number,
-    pointsReason: string,
-    cup?: "A" | "B" | null,
-    qualifying_wins?: number
-  ): Promise<boolean> {
-    // Рассчитываем wins и loses на основе данных
-    const winsLoses = calculateWinsAndLoses(pointsReason, qualifying_wins || 0);
-
-    const [result] = await pool.execute<ResultSetHeader>(
-      "UPDATE tournament_results SET cup_position = ?, cup = ?, qualifying_wins = ?, wins = ?, loses = ? WHERE id = ?",
-      [
-        pointsReason,
-        cup || null,
-        qualifying_wins || 0,
-        winsLoses.wins,
-        winsLoses.loses,
-        id,
-      ]
-    );
-    return result.affectedRows > 0;
-  }
-
   static async deleteTournamentResult(id: number): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
       "DELETE FROM tournament_results WHERE id = ?",
       [id]
     );
     return result.affectedRows > 0;
-  }
-
-  static async uploadTournamentTeamData(
-    data: TournamentTeamUploadData
-  ): Promise<number> {
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-
-      // 1. Создаем турнир
-      const [tournamentResult] = await connection.execute<ResultSetHeader>(
-        "INSERT INTO tournaments (name, date) VALUES (?, ?)",
-        [data.tournament_name, data.tournament_date]
-      );
-      const tournamentId = tournamentResult.insertId;
-
-      // 2. Обрабатываем результаты команд
-      for (const result of data.results) {
-        // Создаем или находим игроков команды
-        const playerIds: number[] = [];
-
-        for (const playerName of result.team_players) {
-          let playerId: number;
-          let player = await PlayerModel.getPlayerByName(playerName);
-          if (!player) {
-            playerId = await PlayerModel.createPlayer(playerName);
-          } else {
-            playerId = player.id;
-          }
-          playerIds.push(playerId);
-        }
-
-        // Создаем команду или находим существующую
-        let existingTeam = await TeamModel.findExistingTeam(playerIds);
-        let teamId: number;
-
-        if (existingTeam) {
-          teamId = existingTeam.id;
-        } else {
-          teamId = await TeamModel.createTeam(playerIds);
-        }
-
-        // Проверяем лицензии всех игроков команды
-        let hasLicensedPlayer = false;
-        const currentYear = new Date().getFullYear();
-
-        for (const playerName of result.team_players) {
-          const playerNameParts = playerName.trim().split(/\s+/);
-          const playerFirstName = playerNameParts[0]?.toLowerCase() || "";
-          const playerLastName = playerNameParts[1]?.toLowerCase() || "";
-
-          const [licenseCheck] = await connection.execute<RowDataPacket[]>(
-            `SELECT COUNT(*) as count FROM licensed_players 
-             WHERE year = ? AND is_active = TRUE AND (
-               -- Точное совпадение полного имени
-               LOWER(TRIM(full_name)) = LOWER(TRIM(?)) OR
-               -- Совпадение фамилии И имени (прямой порядок)
-               (? != '' AND ? != '' AND 
-                LOWER(SUBSTRING_INDEX(full_name, ' ', 1)) = LOWER(?) AND
-                LOWER(SUBSTRING_INDEX(full_name, ' ', -1)) = LOWER(?)) OR
-               -- Совпадение фамилии И имени (обратный порядок)
-               (? != '' AND ? != '' AND 
-                LOWER(SUBSTRING_INDEX(full_name, ' ', 1)) = LOWER(?) AND
-                LOWER(SUBSTRING_INDEX(full_name, ' ', -1)) = LOWER(?)) OR
-               -- Совпадение фамилии + частичное совпадение имени
-               (? != '' AND ? != '' AND 
-                LOWER(SUBSTRING_INDEX(full_name, ' ', -1)) = LOWER(?) AND
-                LOWER(full_name) REGEXP LOWER(CONCAT('\\\\b', ?, '\\\\b')))
-             )`,
-            [
-              currentYear,
-              playerName, // Полное имя для точного совпадения
-              playerFirstName,
-              playerLastName, // Проверка что оба части не пустые
-              playerFirstName,
-              playerLastName, // Прямой порядок: Имя Фамилия
-              playerFirstName,
-              playerLastName, // Проверка что оба части не пустые для обратного
-              playerLastName,
-              playerFirstName, // Обратный порядок: Фамилия Имя
-              playerFirstName,
-              playerLastName, // Проверка что оба части не пустые для частичного
-              playerLastName,
-              playerFirstName, // Фамилия + частичное имя
-            ]
-          );
-
-          if ((licenseCheck[0] as any).count > 0) {
-            hasLicensedPlayer = true;
-            console.log(
-              `✓ В команде "${result.team_name}" найден лицензированный игрок: "${playerName}"`
-            );
-            break; // Достаточно одного лицензированного игрока в команде
-          }
-        }
-
-        // Получаем очки за позицию или за победы
-        let points = 0;
-        const totalTeams = data.total_teams || 16;
-        const category = data.tournament_category || "1";
-        const pointsReason = result.cup_position;
-
-        // Преобразуем cup_position в CupPosition для функции getCupPoints
-        let cupPosition: CupPosition;
-        switch (pointsReason) {
-          case "CUP_WINNER":
-            cupPosition = CupPosition.WINNER;
-            break;
-          case "CUP_RUNNER_UP":
-            cupPosition = CupPosition.RUNNER_UP;
-            break;
-          case "CUP_THIRD_PLACE":
-            cupPosition = CupPosition.THIRD_PLACE;
-            break;
-          case "CUP_SEMI_FINAL":
-            cupPosition = CupPosition.SEMI_FINAL;
-            break;
-          case "CUP_QUARTER_FINAL":
-            cupPosition = CupPosition.QUARTER_FINAL;
-            break;
-          default:
-            cupPosition = CupPosition.QUARTER_FINAL;
-        }
-
-        if (hasLicensedPlayer) {
-          if (result.cup) {
-            // Лицензированные команды в кубках получают очки за место в кубке
-            points = getCupPoints(
-              category,
-              result.cup,
-              cupPosition,
-              totalTeams
-            );
-          } else {
-            // Лицензированные команды НЕ в кубках получают очки за победы в швейцарке
-            // TODO: Извлечь количество побед команды из данных турнира
-            const qualifying_wins = 0; // Пока нет данных о победах в этом методе
-            points = getPointsByQualifyingStage(category, qualifying_wins);
-          }
-        } else {
-          // Нелицензированные команды не получают очки
-          points = 0;
-        }
-
-        // Добавляем результат команды
-        // Рассчитываем wins и loses на основе данных
-        const winsLoses = calculateWinsAndLoses(pointsReason, 0);
-
-        await connection.execute(
-          "INSERT INTO tournament_results (tournament_id, team_id, cup_position, cup, qualifying_wins, wins, loses) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [
-            tournamentId,
-            teamId,
-            pointsReason,
-            result.cup || null,
-            0, // qualifying_wins - по умолчанию 0, будет обновлено из швейцарской системы если доступно
-            winsLoses.wins,
-            winsLoses.loses,
-          ]
-        );
-      }
-
-      await connection.commit();
-      return tournamentId;
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
   }
 
   static async uploadTournamentData(

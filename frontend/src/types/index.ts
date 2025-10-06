@@ -18,6 +18,8 @@ export interface Player {
 export interface Tournament {
   id: number;
   name: string;
+  category: TournamentCategory;
+  teams_count: number;
   date: string;
   created_at: string;
   updated_at: string;
@@ -44,6 +46,13 @@ export interface TeamWithMembers extends Team {
   members: TeamMember[];
 }
 
+export type TournamentCategory = "FEDERAL" | "REGIONAL";
+
+export enum TournamentCategoryEnum {
+  FEDERAL,
+  REGIONAL,
+}
+
 // Enum для причин получения очков
 export enum CupPosition {
   // Кубки
@@ -60,9 +69,8 @@ export enum CupPosition {
 
 export function getCupPositionText(
   cupPosition: CupPosition | string,
-  cup?: "A" | "B" | "C" | null,
-  qualifyingWins?: number
-): string {
+  cup?: "A" | "B" | "C" | null
+) {
   // Для обратной совместимости со старыми данными
   if (typeof cupPosition === "string") {
     // Проверяем, является ли строка валидным значением PointsReason
@@ -77,13 +85,13 @@ export function getCupPositionText(
   if (cup) {
     switch (cupPosition) {
       case CupPosition.WINNER:
-        return `🥇 1 ${cup}`;
+        return `1 ${cup}`;
 
       case CupPosition.RUNNER_UP:
-        return `🥈 2 ${cup}`;
+        return `2 ${cup}`;
 
       case CupPosition.THIRD_PLACE:
-        return `🥉 3 ${cup}`;
+        return `3 ${cup}`;
 
       case CupPosition.SEMI_FINAL:
         return `1/2 ${cup}`;
@@ -114,17 +122,6 @@ export function getCupPositionText(
   //   default:
   //     throw new Error(`Неизвестное значение PointsReason: ${cupPosition}`);
   // }
-}
-
-// Функция для получения цвета позиции (для обратной совместимости)
-export function getPointsReasonColor(reason: CupPosition | string): string {
-  if (reason === CupPosition.WINNER || reason === "WINNER")
-    return "text-yellow-600";
-  if (reason === CupPosition.RUNNER_UP || reason === "RUNNER_UP")
-    return "text-gray-600";
-  if (reason === CupPosition.THIRD_PLACE || reason === "THIRD_PLACE")
-    return "text-amber-600";
-  return "text-gray-900";
 }
 
 // Результат турнира

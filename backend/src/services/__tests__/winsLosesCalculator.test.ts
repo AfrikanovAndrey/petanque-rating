@@ -3,13 +3,13 @@ import {
   calculateLoses,
   calculateWinsAndLoses,
 } from "../winsLosesCalculator";
-import { PointsReason } from "../../types";
+import { CupPosition, CupPosition } from "../../types";
 
 describe("WinsLosesCalculator", () => {
   describe("calculateWins", () => {
     it("должен правильно рассчитывать победы для CUP_WINNER", () => {
       const qualifying_wins = 3;
-      const cup_position = PointsReason.CUP_WINNER;
+      const cup_position = CupPosition.WINNER;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -19,7 +19,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для CUP_RUNNER_UP", () => {
       const qualifying_wins = 4;
-      const cup_position = PointsReason.CUP_RUNNER_UP;
+      const cup_position = CupPosition.RUNNER_UP;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -29,7 +29,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для CUP_THIRD_PLACE", () => {
       const qualifying_wins = 2;
-      const cup_position = PointsReason.CUP_THIRD_PLACE;
+      const cup_position = CupPosition.THIRD_PLACE;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -39,7 +39,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для CUP_SEMI_FINAL", () => {
       const qualifying_wins = 3;
-      const cup_position = PointsReason.CUP_SEMI_FINAL;
+      const cup_position = CupPosition.SEMI_FINAL;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -49,7 +49,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для CUP_QUARTER_FINAL", () => {
       const qualifying_wins = 3;
-      const cup_position = PointsReason.CUP_QUARTER_FINAL;
+      const cup_position = CupPosition.QUARTER_FINAL;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -59,7 +59,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для QUALIFYING_HIGH", () => {
       const qualifying_wins = 4;
-      const cup_position = PointsReason.QUALIFYING_HIGH;
+      const cup_position = CupPosition.QUALIFYING_HIGH;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -69,7 +69,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для QUALIFYING_LOW", () => {
       const qualifying_wins = 2;
-      const cup_position = PointsReason.QUALIFYING_LOW;
+      const cup_position = CupPosition.QUALIFYING_LOW;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -79,7 +79,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен работать со строковыми значениями cup_position", () => {
       const qualifying_wins = 3;
-      const cup_position = "CUP_WINNER";
+      const cup_position = CupPosition.WINNER;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -88,7 +88,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен обрабатывать нулевое количество qualifying_wins", () => {
       const qualifying_wins = 0;
-      const cup_position = PointsReason.CUP_WINNER;
+      const cup_position = CupPosition.WINNER;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -100,7 +100,7 @@ describe("WinsLosesCalculator", () => {
   describe("calculateLoses", () => {
     it("должен правильно рассчитывать поражения для CUP_WINNER", () => {
       const qualifying_wins = 5;
-      const cup_position = PointsReason.CUP_WINNER;
+      const cup_position = CupPosition.CUP_WINNER;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -110,7 +110,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для CUP_RUNNER_UP", () => {
       const qualifying_wins = 4;
-      const cup_position = PointsReason.CUP_RUNNER_UP;
+      const cup_position = CupPosition.CUP_RUNNER_UP;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -120,7 +120,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для CUP_THIRD_PLACE", () => {
       const qualifying_wins = 3;
-      const cup_position = PointsReason.CUP_THIRD_PLACE;
+      const cup_position = CupPosition.CUP_THIRD_PLACE;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -130,7 +130,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для CUP_SEMI_FINAL", () => {
       const qualifying_wins = 3;
-      const cup_position = PointsReason.CUP_SEMI_FINAL;
+      const cup_position = CupPosition.CUP_SEMI_FINAL;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -140,7 +140,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для CUP_QUARTER_FINAL", () => {
       const qualifying_wins = 2;
-      const cup_position = PointsReason.CUP_QUARTER_FINAL;
+      const cup_position = CupPosition.CUP_QUARTER_FINAL;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -150,7 +150,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для QUALIFYING_HIGH", () => {
       const qualifying_wins = 4;
-      const cup_position = PointsReason.QUALIFYING_HIGH;
+      const cup_position = CupPosition.QUALIFYING_HIGH;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -160,7 +160,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для QUALIFYING_LOW", () => {
       const qualifying_wins = 1;
-      const cup_position = PointsReason.QUALIFYING_LOW;
+      const cup_position = CupPosition.QUALIFYING_LOW;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -170,7 +170,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен обрабатывать случай с 5 квалификационными победами", () => {
       const qualifying_wins = 5;
-      const cup_position = PointsReason.QUALIFYING_HIGH;
+      const cup_position = CupPosition.QUALIFYING_HIGH;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -180,7 +180,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен обрабатывать случай с нулевыми квалификационными победами", () => {
       const qualifying_wins = 0;
-      const cup_position = PointsReason.CUP_RUNNER_UP;
+      const cup_position = CupPosition.CUP_RUNNER_UP;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -201,7 +201,7 @@ describe("WinsLosesCalculator", () => {
   describe("calculateWinsAndLoses", () => {
     it("должен возвращать объект с правильными значениями wins и loses", () => {
       const qualifying_wins = 3;
-      const cup_position = PointsReason.CUP_RUNNER_UP;
+      const cup_position = CupPosition.CUP_RUNNER_UP;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 
@@ -213,7 +213,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать для победителя кубка", () => {
       const qualifying_wins = 4;
-      const cup_position = PointsReason.CUP_WINNER;
+      const cup_position = CupPosition.CUP_WINNER;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 
@@ -225,7 +225,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать для команды без кубков", () => {
       const qualifying_wins = 2;
-      const cup_position = PointsReason.QUALIFYING_LOW;
+      const cup_position = CupPosition.QUALIFYING_LOW;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 
@@ -239,7 +239,7 @@ describe("WinsLosesCalculator", () => {
   describe("Реальные сценарии турнира", () => {
     it("должен правильно рассчитывать для идеального победителя (5-0 в квалификации + победа в кубке)", () => {
       const qualifying_wins = 5;
-      const cup_position = PointsReason.CUP_WINNER;
+      const cup_position = CupPosition.CUP_WINNER;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 
@@ -251,7 +251,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать для финалиста с хорошей квалификацией", () => {
       const qualifying_wins = 4;
-      const cup_position = PointsReason.CUP_RUNNER_UP;
+      const cup_position = CupPosition.CUP_RUNNER_UP;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 
@@ -263,7 +263,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать для полуфиналиста", () => {
       const qualifying_wins = 3;
-      const cup_position = PointsReason.CUP_SEMI_FINAL;
+      const cup_position = CupPosition.CUP_SEMI_FINAL;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 
@@ -275,7 +275,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать для команды с плохой квалификацией", () => {
       const qualifying_wins = 1;
-      const cup_position = PointsReason.QUALIFYING_LOW;
+      const cup_position = CupPosition.QUALIFYING_LOW;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 

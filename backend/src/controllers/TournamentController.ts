@@ -4,7 +4,6 @@ import {
   getAllCupPointsConfig,
   getCupPoints,
   getPointsByQualifyingStage,
-  getPointsExample,
 } from "../config/cupPoints";
 // import removed: PlayerTournamentPointsModel больше не используется
 import {
@@ -18,24 +17,15 @@ import {
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
-import { Cup, CupPosition, TeamResults } from "../types";
+import {
+  Cup,
+  CupPosition,
+  TeamResults,
+  TournamentCategoryEnum,
+} from "../types";
 import ExcelUtils from "../utils/excelUtils";
 
 export class TournamentController {
-  private static readonly quarterFinalsPlayersCells = [
-    "B4",
-    "B8",
-    "B12",
-    "B16",
-    "B20",
-    "B24",
-    "B28",
-    "B32",
-  ];
-  private static readonly semiFinalsPlayersCells = ["F6", "F14", "F22", "F30"];
-  private static readonly finalsPlayersCells = ["J10", "J26"];
-  private static readonly thirdPlacePlayersCells = ["F38"];
-
   // Сопоставление строковых позиций из Excel с enum CupPosition
   static mapExcelPositionToCupPosition(excelPosition: string): CupPosition {
     switch (excelPosition.trim()) {
@@ -48,11 +38,6 @@ export class TournamentController {
       case "1/2":
         return CupPosition.SEMI_FINAL;
       case "1/4":
-        return CupPosition.QUARTER_FINAL;
-      default:
-        console.warn(
-          `Неизвестная позиция из Excel: "${excelPosition}", используем QUARTER_FINAL по умолчанию`
-        );
         return CupPosition.QUARTER_FINAL;
     }
   }
@@ -183,17 +168,12 @@ export class TournamentController {
 
       const sortedResults = filteredResults.sort((a, b) => {
         // Порядок позиций по приоритету (лучшие позиции первыми)
-        const positionPriority: Record<string, number> = {
+        const positionPriority: Record<CupPosition, number> = {
           WINNER: 1,
-          "1": 1, // тоже победитель
           RUNNER_UP: 2,
-          "2": 2, // тоже второе место
           THIRD_PLACE: 3,
-          "3": 3, // тоже третье место
           SEMI_FINAL: 4,
-          "1/2": 4, // полуфинал
           QUARTER_FINAL: 5,
-          "1/4": 5, // четвертьфинал
         };
 
         // Сначала сортируем по кубку (A, затем B)
@@ -335,7 +315,7 @@ export class TournamentController {
     fileName: string,
     tournamentName: string,
     tournamentDate: string,
-    tournamentCategory: "1" | "2",
+    tournamentCategory: TournamentCategoryEnum,
     providedWorkbook?: XLSX.WorkBook
   ): Promise<{
     tournamentId: number;
@@ -470,12 +450,11 @@ export class TournamentController {
         );
       }
 
-      // Сохраняем данные
-
-      const teamResults: Map<number, TeamResults> = new Map(); // key = teamId
-
+      // 5. Сохраняем данные в БД
       const tournamentId = await TournamentModel.createTournament(
         tournamentName,
+        tournamentCategory,
+        teams.length,
         tournamentDate
       );
 
@@ -498,7 +477,7 @@ export class TournamentController {
 
         const results = orderedTeamResults.get(team.orderNum);
         if (!results) {
-          throw new Error();
+          throw new Error("Не может такого быть ))");
         }
 
         // Рассчитываем количество рейтинговых очков
@@ -727,23 +706,6 @@ export class TournamentController {
     }
   }
 
-  // Получить примеры расчета очков (публичный доступ)
-  static async getCupPointsExamples(req: Request, res: Response) {
-    try {
-      const examples = getPointsExample();
-      res.json({
-        success: true,
-        data: examples,
-      });
-    } catch (error) {
-      console.error("Ошибка при получении примеров очков кубка:", error);
-      res.status(500).json({
-        success: false,
-        message: "Внутренняя ошибка сервера",
-      });
-    }
-  }
-
   // ========== МЕТОДЫ ДЛЯ РАБОТЫ С GOOGLE SHEETS ==========
 
   /**
@@ -753,7 +715,7 @@ export class TournamentController {
     googleSheetsUrl: string,
     tournamentName: string,
     tournamentDate: string,
-    tournamentCategory: "1" | "2"
+    tournamentCategory: TournamentCategoryEnum
   ): Promise<{
     tournamentId: number;
     teamsCount: number;
@@ -884,28 +846,5 @@ export class TournamentController {
     }
   }
 }
-
-// CREATE TABLE `tournament_results` (
-//   `id` int NOT NULL AUTO_INCREMENT,
-//   `tournament_id` int NOT NULL,
-//   `team_id` int NOT NULL,
-//   `cup` enum('A','B') DEFAULT NULL,
-//   `qualifying_wins` int DEFAULT '0',
-//   `points` int NOT NULL DEFAULT '0',
-//   `wins` int DEFAULT '0',
-//   `loses` int DEFAULT '0',
-//   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-//   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-//   `cup_position` enum('CUP_WINNER','CUP_RUNNER_UP','CUP_THIRD_PLACE','CUP_SEMI_FINAL','CUP_QUARTER_FINAL','QUALIFYING_HIGH','QUALIFYING_LOW') NOT NULL,
-//   PRIMARY KEY (`id`),
-//   KEY `team_id` (`team_id`),
-//   KEY `idx_tournament_team` (`tournament_id`,`team_id`),
-//   KEY `idx_tournament_cup` (`tournament_id`,`cup`),
-//   KEY `idx_qualifying_wins` (`qualifying_wins`),
-//   KEY `idx_wins` (`wins`),
-//   KEY `idx_loses` (`loses`),
-//   CONSTRAINT `tournament_results_ibfk_1` FOREIGN KEY (`tournament_id`) REFERENCES `tournaments` (`id`) ON DELETE CASCADE,
-//   CONSTRAINT `tournament_results_ibfk_2` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE
-// ) ENGINE=InnoDB AUTO_INCREMENT=777 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 
 export default TournamentController;

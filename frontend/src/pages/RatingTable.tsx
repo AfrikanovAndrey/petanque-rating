@@ -332,9 +332,8 @@ const RatingTable: React.FC = () => {
                                               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
                                                 {getCupPositionText(
                                                   result.cup_position || "",
-                                                  result.cup,
-                                                  result.qualifying_wins
-                                                )}
+                                                  result.cup
+                                                ) || "Квалификация"}
                                               </span>
                                             </div>
                                             <div className="text-sm text-gray-500">

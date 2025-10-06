@@ -1,3 +1,4 @@
+import { TournamentCategory } from "@/types";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -17,6 +18,14 @@ export function formatDate(dateString: string): string {
     });
   } catch {
     return dateString;
+  }
+}
+
+export function getTornamentCategoryText(category: TournamentCategory) {
+  if (category === "FEDERAL") {
+    return "Рейтинговый РФП";
+  } else if (category === "REGIONAL") {
+    return "Региональный рейтинговый";
   }
 }
 
@@ -49,15 +58,6 @@ export function formatDateTime(dateString: string): string {
 // Форматирование чисел с разделителями тысяч
 export function formatNumber(num: number): string {
   return num.toLocaleString("ru-RU");
-}
-
-// Получение порядкового числительного для позиции
-export function getOrdinalPosition(position: number): string {
-  if (position === 1) return "1-е";
-  if (position === 2) return "2-е";
-  if (position === 3) return "3-е";
-
-  return `${position}-е`;
 }
 
 // Валидация email

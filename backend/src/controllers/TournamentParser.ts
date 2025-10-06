@@ -107,7 +107,7 @@ export class TournamentParser {
 
     if (!teamNameColumnCell) {
       throw new Error(
-        `Ошибка структуры листа "${REGISTRATION_LIST}" : не найдена ячейка со значением "${COMMAND_HEADER}", являющаяся заголовком таблицы с участниками`
+        `Ошибка структуры листа "${REGISTRATION_LIST}" : не найден столбец с заголовком "${COMMAND_HEADER}"`
       );
     }
 
@@ -155,7 +155,11 @@ export class TournamentParser {
 
     // Укажите на листе регистрации полнную фамилию и имя игрока, либо создайте игрока в Админ панели
     if (userDetectErrors.length > 0) {
-      throw new Error(`${userDetectErrors.join("\n")}`);
+      throw new Error(
+        `#Ошибки на листе "${REGISTRATION_LIST}"\n${userDetectErrors.join(
+          "\n"
+        )}`
+      );
     }
 
     console.log(`Найдено команд: ${teams.length}`);
@@ -214,7 +218,7 @@ export class TournamentParser {
               if (stageInfo.position == CupPosition.THIRD_PLACE) {
                 continue;
               } else {
-                throw new Error(
+                errors.push(
                   `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
                 );
               }
@@ -228,11 +232,12 @@ export class TournamentParser {
               );
 
               if (!team) {
-                throw new Error(
+                errors.push(
                   `Игрок "${playerName}" с листа ${SWISS_RESULTS_LIST} не найден среди игроков команд на Листе регистрации`
                 );
+              } else {
+                cupTeamResults.set(team.orderNum, stageInfo.position);
               }
-              cupTeamResults.set(team.orderNum, stageInfo.position);
             }
           } catch (error) {
             errors.push((error as Error).message);
@@ -243,7 +248,7 @@ export class TournamentParser {
 
     if (errors.length !== 0) {
       throw new Error(
-        `Ошибки парсинга данных на листе "Кубок ${cup}":\n${errors}`
+        `#Ошибки парсинга данных на листе "Кубок ${cup}":\n${errors}`
       );
     }
 
@@ -287,12 +292,18 @@ export class TournamentParser {
       teamNameColumnHeader
     );
 
+    if (!teamNameColumnCell) {
+      errors.push(`Не найден столбец с заголовком ${teamNameColumnHeader}`);
+    }
+
     const teamWinsColumnCell = ExcelUtils.findCellByText(
       swissSheet,
       teamWinsColumnHeader
     );
 
-    // const teamWins: Map<number, number> = new Map();
+    if (!teamWinsColumnCell) {
+      errors.push(`Не найден столбец с заголовком ${teamWinsColumnHeader}`);
+    }
 
     if (teamNameColumnCell && teamWinsColumnCell) {
       for (
@@ -332,20 +343,21 @@ export class TournamentParser {
           }
         }
       }
+
+      if (teamResults.size == 0) {
+        errors.push(
+          "Не найдено ни одной строки с результатами Швейцарки. Проверьте что после строки заголовков нет пустой строки"
+        );
+      }
     }
 
     if (errors.length > 0) {
       throw new Error(
-        `#Ошибки парсинга листа "${SWISS_RESULTS_LIST}"\n` + errors.join("\n")
+        `#Ошибки на листе "${SWISS_RESULTS_LIST}"\n` + errors.join("\n")
       );
     }
     return teamResults;
   }
-
-  // } catch (error) {
-  //   console.error(`Ошибка при парсинге результатов Швейцарки`, error);
-  //   return new Map(); // Возвращаем пустую карту при ошибке
-  // }
 
   /**
    * Парсинг листов групповых игр для извлечения количества побед команд на квалификационном этапе
@@ -415,7 +427,11 @@ export class TournamentParser {
               const playerName = ExcelUtils.getCellText(teamCell);
               player = await this.detectPlayer(playerName);
 
-              const team = detectPlayerTeamOrderNum(player, teams);
+              const team = this.detectPlayerTeamOrderNum(
+                player,
+                teams,
+                sheetName
+              );
               if (!team) {
                 throw new Error(
                   `Игрок "${playerName}" с листа "${sheetName}" не найден среди игроков на Листе регистрации`

@@ -9,30 +9,18 @@ export interface Player {
 export interface Tournament {
   id: number;
   name: string;
+  category: string;
+  teamsCount: number;
   date: string;
   created_at: Date;
   updated_at: Date;
-}
-
-// Enum для причин получения очков
-export enum PointsReason {
-  // Кубки
-  CUP_WINNER = "CUP_WINNER",
-  CUP_RUNNER_UP = "CUP_RUNNER_UP",
-  CUP_THIRD_PLACE = "CUP_THIRD_PLACE",
-  CUP_SEMI_FINAL = "CUP_SEMI_FINAL",
-  CUP_QUARTER_FINAL = "CUP_QUARTER_FINAL",
-
-  // Квалификация (швейцарка)
-  QUALIFYING_HIGH = "QUALIFYING_HIGH", // >=3 побед
-  QUALIFYING_LOW = "QUALIFYING_LOW", // 1-2 побед
 }
 
 export interface TournamentResult {
   id: number;
   tournament_id: number;
   team_id: number;
-  cup_position: PointsReason | null;
+  cup_position: CupPosition | null;
   cup?: "A" | "B" | "C" | null;
   qualifying_wins?: number; // Количество побед команды в квалификационной части
   wins?: number; // Общее количество побед (qualifying_wins + бонусы за кубки)
@@ -44,6 +32,8 @@ export interface TournamentResult {
   // Дополнительные поля, добавляемые при JOIN запросах
   team_name?: string;
   tournament_name?: string;
+  tournament_category: TournamentCategory;
+  tournament_teams_count: number;
   tournament_date?: string;
   team_players?: string; // Строка с именами игроков через запятую
 }
@@ -129,6 +119,14 @@ export interface AuthResponse {
   token?: string;
   message?: string;
 }
+
+export type TournamentCategory = "FEDERAL" | "REGIONAL";
+
+export enum TournamentCategoryEnum {
+  FEDERAL = 1,
+  REGIONAL = 2,
+}
+
 export enum CupPosition {
   WINNER = "WINNER",
   RUNNER_UP = "RUNNER_UP",

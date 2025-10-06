@@ -1,4 +1,4 @@
-import { CupPosition } from "../types";
+import { CupPosition, TournamentCategoryEnum } from "../types";
 import { calculateWins, calculateLoses } from "../services/winsLosesCalculator";
 
 // Структура для хранения очков за кубки согласно таблице РФП
@@ -261,20 +261,12 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
  * @returns количество очков
  */
 export function getCupPoints(
-  category: "1" | "2",
+  category: TournamentCategory,
   cup: "A" | "B" | "C",
   position: CupPosition,
   totalTeams: number,
   qualifyingRoundPoints: number = 0
 ): number {
-  // console.log(`🔍 getCupPoints вызвана с параметрами:`, {
-  //   category,
-  //   cup,
-  //   position,
-  //   totalTeams,
-  //   qualifyingRoundPoints,
-  // });
-
   // Специальная обработка для кубка C
   if (cup === "C") {
     let additionalPoints = 0;
@@ -387,7 +379,7 @@ export function getAllCupPointsConfig(): Record<
  * @returns количество очков за победы
  */
 export function getPointsByQualifyingStage(
-  category: "1" | "2",
+  category: TournamentCategoryEnum,
   qualifying_wins: number
 ): number {
   console.log(`🏆 getWinsPoints вызвана с параметрами:`, {
@@ -404,13 +396,13 @@ export function getPointsByQualifyingStage(
 
   if (qualifying_wins >= 3) {
     // Больше или равно трём победам
-    points = category === "1" ? 3 : 2;
+    points = category === TournamentCategoryEnum.FEDERAL ? 3 : 2;
     console.log(
       `✅ ${qualifying_wins} побед (≥3) в категории ${category} = ${points} очков`
     );
   } else if (qualifying_wins >= 1) {
     // 1-2 победы
-    points = category === "1" ? 2 : 1;
+    points = category === TournamentCategoryEnum.FEDERAL ? 2 : 1;
     console.log(
       `✅ ${qualifying_wins} побед (1-2) в категории ${category} = ${points} очков`
     );
@@ -420,155 +412,4 @@ export function getPointsByQualifyingStage(
   }
 
   return points;
-}
-
-export function getPointsExample(): Record<string, any> {
-  return {
-    description:
-      "Примеры начисления очков согласно таблице РФП и системе побед",
-    cupExamples: [
-      {
-        scenario: "16 команд, турнир 1 категории, Кубок А, победитель",
-        teams: 16,
-        category: "1",
-        cup: "A",
-        position: "1",
-        points: getCupPoints("1", "A", CupPosition.WINNER, 16),
-      },
-      {
-        scenario: "24 команды, турнир 1 категории, Кубок Б, полуфинал",
-        teams: 24,
-        category: "1",
-        cup: "B",
-        position: "1/2",
-        points: getCupPoints("1", "B", CupPosition.SEMI_FINAL, 24),
-      },
-      {
-        scenario: "40 команд, турнир 2 категории, Кубок А, финалист",
-        teams: 40,
-        category: "2",
-        cup: "A",
-        position: "2",
-        points: getCupPoints("2", "A", CupPosition.RUNNER_UP, 40),
-      },
-      {
-        scenario:
-          "20 команд, турнир 1 категории, Кубок А, 3 место (полуфинал + 1 бонус)",
-        teams: 20,
-        category: "1",
-        cup: "A",
-        position: "3",
-        points: getCupPoints("1", "A", CupPosition.THIRD_PLACE, 20),
-        explanation:
-          "3 место = полуфинал (8 очков) + бонус за игру за 3 место (1 очко) = 9 очков",
-      },
-      {
-        scenario:
-          "20 команд, турнир 1 категории, Кубок Б, 3 место (только полуфинал)",
-        teams: 20,
-        category: "1",
-        cup: "B",
-        position: "3",
-        points: getCupPoints("1", "B", CupPosition.THIRD_PLACE, 20),
-        explanation: "3 место = полуфинал (4 очка), бонус только для кубка А",
-      },
-      {
-        scenario:
-          "20 команд, турнир 2 категории, Кубок А, 3 место (только полуфинал)",
-        teams: 20,
-        category: "2",
-        cup: "A",
-        position: "3",
-        points: getCupPoints("2", "A", CupPosition.THIRD_PLACE, 20),
-        explanation:
-          "3 место = полуфинал (6 очков), бонус только для 1 категории",
-      },
-      {
-        scenario: "20 команд, кубок С, финалист (5 очков в отборочном туре)",
-        qualifyingRoundPoints: 5,
-        cup: "C",
-        position: "финалист",
-        points: getCupPoints("1", "C", CupPosition.RUNNER_UP, 20, 5),
-        explanation:
-          "Кубок С: 5 (отборочный тур) + 2 (бонус за финал) = 7 очков",
-      },
-      {
-        scenario: "30 команд, кубок С, полуфиналист (3 очка в отборочном туре)",
-        qualifyingRoundPoints: 3,
-        cup: "C",
-        position: "полуфинал",
-        points: getCupPoints("2", "C", CupPosition.SEMI_FINAL, 30, 3),
-        explanation:
-          "Кубок С: 3 (отборочный тур) + 1 (бонус за полуфинал) = 4 очка",
-      },
-      {
-        scenario:
-          "25 команд, кубок С, четвертьфиналист (2 очка в отборочном туре)",
-        qualifyingRoundPoints: 2,
-        cup: "C",
-        position: "четвертьфинал",
-        points: getCupPoints("1", "C", CupPosition.QUARTER_FINAL, 25, 2),
-        explanation: "Кубок С: 2 (отборочный тур) + 0 (нет бонуса) = 2 очка",
-      },
-    ],
-    winsExamples: [
-      {
-        scenario: "Турнир 1 категории, команда с 5 победами",
-        category: "1",
-        qualifying_wins: 5,
-        wins: calculateWins("QUALIFYING_HIGH", 5),
-        loses: calculateLoses("QUALIFYING_HIGH", 5),
-        points: getPointsByQualifyingStage("1", 5),
-        explanation: "≥3 побед в 1 категории = 3 очка",
-      },
-      {
-        scenario: "Турнир 1 категории, команда с 2 победами",
-        category: "1",
-        qualifying_wins: 2,
-        wins: calculateWins("QUALIFYING_LOW", 2),
-        loses: calculateLoses("QUALIFYING_LOW", 2),
-        points: getPointsByQualifyingStage("1", 2),
-        explanation: "1-2 победы в 1 категории = 2 очка",
-      },
-      {
-        scenario: "Турнир 2 категории, команда с 4 победами",
-        category: "2",
-        qualifying_wins: 4,
-        wins: calculateWins("QUALIFYING_HIGH", 4),
-        loses: calculateLoses("QUALIFYING_HIGH", 4),
-        points: getPointsByQualifyingStage("2", 4),
-        explanation: "≥3 побед во 2 категории = 2 очка",
-      },
-      {
-        scenario: "Турнир 2 категории, команда с 1 победой",
-        category: "2",
-        qualifying_wins: 1,
-        wins: calculateWins("QUALIFYING_LOW", 1),
-        loses: calculateLoses("QUALIFYING_LOW", 1),
-        points: getPointsByQualifyingStage("2", 1),
-        explanation: "1-2 победы во 2 категории = 1 очко",
-      },
-      {
-        scenario: "Команда без побед",
-        category: "1",
-        qualifying_wins: 0,
-        wins: calculateWins("QUALIFYING_LOW", 0),
-        loses: calculateLoses("QUALIFYING_LOW", 0),
-        points: getPointsByQualifyingStage("1", 0),
-        explanation: "0 побед = 0 очков",
-      },
-    ],
-    ranges: {
-      "8-12": "8-12 команд",
-      "13-18": "13-18 команд",
-      "19-24": "19-24 команды",
-      "25-30": "25-30 команд",
-      "31-36": "31-36 команд",
-      "36+": "более 36 команд",
-    },
-    categories: {
-      "1": "Турниры 1 категории (высшая)",
-      "2": "Турниры 2 категории",
-    },
-  };
 }

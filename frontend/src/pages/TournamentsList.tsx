@@ -8,8 +8,8 @@ import React, { useState } from "react";
 import { useQuery } from "react-query";
 import { tournamentsApi } from "../services/api";
 import { TournamentResult, TournamentWithResults } from "../types";
-import { formatDate, handleApiError } from "../utils";
-import { getCupPositionText, getPointsReasonColor } from "../types";
+import { formatDate, getTornamentCategoryText, handleApiError } from "../utils";
+import { getCupPositionText } from "../types";
 
 const TournamentsList: React.FC = () => {
   const [expandedTournament, setExpandedTournament] = useState<number | null>(
@@ -66,16 +66,8 @@ const TournamentsList: React.FC = () => {
     }
   };
 
-  const getPositionBadge = (
-    position: string,
-    cup?: "A" | "B" | "C" | null,
-    qualifyingWins?: number
-  ) => {
-    return getCupPositionText(position, cup, qualifyingWins);
-  };
-
-  const getPositionColor = (position: string) => {
-    return getPointsReasonColor(position);
+  const getPositionBadge = (position: string, cup?: "A" | "B" | "C" | null) => {
+    return getCupPositionText(position, cup);
   };
 
   if (isLoading) {
@@ -165,6 +157,12 @@ const TournamentsList: React.FC = () => {
                             <CalendarIcon className="h-4 w-4 mr-1" />
                             {formatDate(tournament.date)}
                           </div>
+                          <div className="flex items-center">
+                            {getTornamentCategoryText(tournament.category)}
+                          </div>
+                          <div className="flex items-center">
+                            {tournament.teams_count} команд
+                          </div>
                         </div>
                       </div>
                       <div className="ml-4">
@@ -218,14 +216,15 @@ const TournamentsList: React.FC = () => {
                                       </thead>
                                       <tbody className="bg-white divide-y divide-gray-200">
                                         {results.map(
-                                          (
-                                            result: TournamentResult,
-                                            index: number
-                                          ) => (
+                                          (result: TournamentResult) => (
                                             <tr
                                               key={result.id}
                                               className={
-                                                index < 3
+                                                [
+                                                  "WINNER",
+                                                  "RUNNER_UP",
+                                                  "THIRD_PLACE",
+                                                ].includes(result.cup_position)
                                                   ? "bg-gradient-to-r from-yellow-50 to-transparent"
                                                   : ""
                                               }
@@ -233,14 +232,11 @@ const TournamentsList: React.FC = () => {
                                               <td className="px-4 py-3 whitespace-nowrap">
                                                 <div className="flex flex-col">
                                                   <div
-                                                    className={`text-sm font-medium ${getPositionColor(
-                                                      result.cup_position || ""
-                                                    )}`}
+                                                    className={`text-sm font-medium`}
                                                   >
                                                     {getPositionBadge(
                                                       result.cup_position || "",
-                                                      result.cup,
-                                                      result.qualifying_wins
+                                                      result.cup
                                                     )}
                                                   </div>
                                                 </div>
