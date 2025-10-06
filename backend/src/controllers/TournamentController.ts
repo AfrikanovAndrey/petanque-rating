@@ -1,14 +1,11 @@
 import { Request, Response } from "express";
-import { RowDataPacket } from "mysql2";
 import * as XLSX from "xlsx";
 import {
   getAllCupPointsConfig,
   getCupPoints,
-  getPointsExample,
   getPointsByQualifyingStage,
+  getPointsExample,
 } from "../config/cupPoints";
-import { pool } from "../config/database";
-import { PlayerModel } from "../models/PlayerModel";
 // import removed: PlayerTournamentPointsModel больше не используется
 import {
   normalizeName,
@@ -21,17 +18,8 @@ import {
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
-import {
-  Cup,
-  CupPosition,
-  CupTeamResult,
-  Player,
-  PointsReason,
-  Team,
-  TeamResults,
-} from "../types";
-import { selectBestTeamCupResults } from "../utils/cupResults";
-import { exit } from "process";
+import { Cup, CupPosition, TeamResults } from "../types";
+import ExcelUtils from "../utils/excelUtils";
 
 export class TournamentController {
   private static readonly quarterFinalsPlayersCells = [
@@ -83,75 +71,77 @@ export class TournamentController {
     teamResults: Map<number, TeamResults>
   ) {
     for (const [teamOrderNum, cupPosition] of cupTeamResults) {
-      const curTeamResults = teamResults.get(teams[teamOrderNum].teamId!);
-      if (curTeamResults) {
-        let winsModifier = 0;
-        let losesModifier = 0;
+      const curTeamResults = teamResults.get(teamOrderNum);
 
-        switch (cupPosition) {
-          case CupPosition.WINNER:
-            winsModifier = 3;
-            losesModifier = 0;
-            break;
-          case CupPosition.RUNNER_UP:
-            winsModifier = 2;
-            losesModifier = 1;
-            break;
-          case CupPosition.THIRD_PLACE:
-            winsModifier = 2;
-            losesModifier = 1;
-            break;
-          case CupPosition.SEMI_FINAL:
-            winsModifier = 1;
-            losesModifier = 1;
-            break;
-          case CupPosition.QUARTER_FINAL:
-            winsModifier = 0;
-            losesModifier = 1;
-            break;
-        }
-
-        teamResults.set(teams[teamOrderNum].teamId!, {
-          cup,
-          cupPosition,
-          qualifyingWins: curTeamResults.wins,
-          wins: curTeamResults.wins + winsModifier,
-          loses: curTeamResults.loses + losesModifier,
-        });
+      if (!curTeamResults) {
+        throw new Error(`Отсутствует запись для команды #${teamOrderNum}`);
       }
+
+      let winsModifier = 0;
+      let losesModifier = 0;
+
+      switch (cupPosition) {
+        case CupPosition.WINNER:
+          winsModifier = 3;
+          losesModifier = 0;
+          break;
+        case CupPosition.RUNNER_UP:
+          winsModifier = 2;
+          losesModifier = 1;
+          break;
+        case CupPosition.THIRD_PLACE:
+          winsModifier = 2;
+          losesModifier = 1;
+          break;
+        case CupPosition.SEMI_FINAL:
+          winsModifier = 1;
+          losesModifier = 1;
+          break;
+        case CupPosition.QUARTER_FINAL:
+          winsModifier = 0;
+          losesModifier = 1;
+          break;
+      }
+
+      teamResults.set(teamOrderNum, {
+        cup,
+        cupPosition,
+        qualifyingWins: curTeamResults.wins,
+        wins: curTeamResults.wins + winsModifier,
+        loses: curTeamResults.loses + losesModifier,
+      });
     }
   }
 
   // Валидация критических ошибок перед парсингом
-  static validateCriticalErrors(workbook: XLSX.WorkBook): string[] {
+  static validateDocumentStructure(workbook: XLSX.WorkBook) {
     console.log("🔍 Выполняется валидация обязательных листов документа");
     const errors: string[] = [];
 
-    if (!TournamentParser.findXlsSheet(workbook, REGISTRATION_LIST)) {
+    if (!ExcelUtils.findXlsSheet(workbook, REGISTRATION_LIST)) {
       errors.push(`Отсутствует обязательный лист регистрации.`);
     }
 
-    if (!TournamentParser.findXlsSheet(workbook, /^Кубок [AА]$/)) {
+    if (!ExcelUtils.findXlsSheet(workbook, /^кубок [aа]$/)) {
       errors.push(`Отсутствует обязательный лист 'Кубок А'`);
     }
 
-    if (!TournamentParser.findXlsSheet(workbook, /^Кубок [BБ]$/)) {
+    if (!ExcelUtils.findXlsSheet(workbook, /^кубок [bб]$/)) {
       errors.push(`Отсутствует обязательный лист 'Кубок Б'`);
     }
 
-    const swissSheet = TournamentParser.findXlsSheet(
-      workbook,
-      normalizeName(SWISS_RESULTS_LIST)
-    );
-    const groupSheet = TournamentParser.findXlsSheet(workbook, /Группа \w+/);
+    const swissSheet = ExcelUtils.findXlsSheet(workbook, SWISS_RESULTS_LIST);
+    const groupSheet = ExcelUtils.findXlsSheet(workbook, /Группа \w+/);
 
     if (!swissSheet && !groupSheet) {
-      throw new Error(
-        `Отсутствуют листы квалификационного этапа: "Результаты швейцарки" или "Группа А"`
+      errors.push(
+        `Отсутствуют листы квалификационного этапа: "${SWISS_RESULTS_LIST}" или "Группа А"`
       );
     }
 
-    return errors;
+    if (errors.length > 0) {
+      throw new Error(errors.join("\n"));
+    }
   }
 
   // Получить список всех турниров (публичный доступ)
@@ -389,12 +379,7 @@ export class TournamentController {
       }
 
       // 1. Проверка наличия обязательных листов
-      const structuralErrors = this.validateCriticalErrors(workbook);
-      if (structuralErrors.length > 0) {
-        throw new Error(
-          `Критические ошибки структуры файла:\n${structuralErrors.join("\n")}`
-        );
-      }
+      this.validateDocumentStructure(workbook);
       console.log("✓ Структура файла корректна");
 
       // 2. Парсинг данных c листов
@@ -406,11 +391,11 @@ export class TournamentController {
       // 3. Сбор данных об играх квалификационного этапа
       let teamQualifyingResults = new Map<number, TeamQualifyingResults>();
 
-      const swissSheet = TournamentParser.findXlsSheet(
+      const swissSheet = ExcelUtils.findXlsSheet(
         workbook,
         normalizeName(SWISS_RESULTS_LIST)
       );
-      const groupSheet = TournamentParser.findXlsSheet(workbook, /Группа \w+/);
+      const groupSheet = ExcelUtils.findXlsSheet(workbook, /Группа \w+/);
 
       // Либо находим результаты Швейцарки, либо групп
       if (swissSheet) {
@@ -448,34 +433,10 @@ export class TournamentController {
         teams
       );
 
-      // Сохраняем данные
-      const tournamentPlayersIds: number[] = [];
-
-      // Сохраняем команды в БД
-      for (const team of teams) {
-        const teamPlayers: number[] = [];
-        for (const player of team.players) {
-          teamPlayers.push(player.id);
-          tournamentPlayersIds.push(player.id);
-        }
-
-        let teamId;
-        const foundedTeam = await TeamModel.findExistingTeam(teamPlayers);
-
-        if (!foundedTeam) {
-          teamId = await TeamModel.createTeam(teamPlayers);
-        } else {
-          teamId = foundedTeam?.id;
-        }
-        team.teamId = teamId;
-      }
-
-      const teamResults: Map<number, TeamResults> = new Map(); // key = teamId
-
-      // Привзяка результатов квалификационного этапа команде
-      console.log("### Link qualifing reuslts to team");
+      // 4. Объединяем все результаты команд вместе
+      const orderedTeamResults: Map<number, TeamResults> = new Map(); // key = teamOrderNum
       for (const [teamOrderNum, qualifyingResults] of teamQualifyingResults) {
-        teamResults.set(teams[teamOrderNum].teamId!, {
+        orderedTeamResults.set(teamOrderNum, {
           qualifyingWins: qualifyingResults.wins,
           wins: qualifyingResults.wins,
           loses: qualifyingResults.loses,
@@ -488,7 +449,7 @@ export class TournamentController {
         "A",
         aCupTeamsResults,
         teams,
-        teamResults
+        orderedTeamResults
       );
 
       if (bCupTeamsResults) {
@@ -496,7 +457,7 @@ export class TournamentController {
           "B",
           bCupTeamsResults,
           teams,
-          teamResults
+          orderedTeamResults
         );
       }
 
@@ -505,30 +466,44 @@ export class TournamentController {
           "C",
           cCupTeamsResults,
           teams,
-          teamResults
+          orderedTeamResults
         );
       }
 
-      console.log(`### Data before save to DB`);
-      for (const [teamOrderNum, results] of teamResults) {
-        console.log(
-          `Team #${teamOrderNum} : ${JSON.stringify(results, null, 2)}`
-        );
-      }
+      // Сохраняем данные
 
-      // throw new Error("Debug");
+      const teamResults: Map<number, TeamResults> = new Map(); // key = teamId
 
       const tournamentId = await TournamentModel.createTournament(
         tournamentName,
         tournamentDate
       );
 
-      console.log("### Summary results");
-      // Рассчёт рейтинговых очков и сохранение результатов команды в БД
-      for (const [teamId, results] of teamResults) {
-        console.log(JSON.stringify(results, null, 2));
+      for (const team of teams) {
+        const teamPlayers: number[] = [];
+        const teamPlayerNames: string[] = [];
+        for (const player of team.players) {
+          teamPlayers.push(player.id);
+          teamPlayerNames.push(player.name);
+        }
+
+        // Находим существующую команду, или создаём новую
+        let teamId;
+        const foundedTeam = await TeamModel.findExistingTeam(teamPlayers);
+        if (!foundedTeam) {
+          teamId = await TeamModel.createTeam(teamPlayers);
+        } else {
+          teamId = foundedTeam?.id;
+        }
+
+        const results = orderedTeamResults.get(team.orderNum);
+        if (!results) {
+          throw new Error();
+        }
+
+        // Рассчитываем количество рейтинговых очков
         let points = 0;
-        if (results.cup!) {
+        if (results.cup) {
           points = getCupPoints(
             tournamentCategory,
             results.cup!,
@@ -542,11 +517,12 @@ export class TournamentController {
           );
         }
 
+        // Записываем результат команды в БД
         TournamentModel.addTournamentResult(
           tournamentId,
           teamId,
-          results.wins!,
-          results.loses!,
+          results.wins,
+          results.loses,
           results.cupPosition,
           results.cup,
           results.qualifyingWins!,

@@ -25,13 +25,13 @@ export class PlayerModel {
     if (name.includes(" ")) {
       [rows] = await pool.execute<Player[] & RowDataPacket[]>(
         "SELECT * FROM players WHERE name LIKE ?",
-        [`%${name}%`]
+        [`${name}%`]
       );
     } else {
       // Если указано только одна часть (имя или фамилия). Например: "Федотов" или "Хафидо"
       [rows] = await pool.execute<Player[] & RowDataPacket[]>(
         "SELECT * FROM players WHERE name LIKE ? OR name LIKE ?",
-        [`%${name} %`, `% ${name}%`]
+        [`${name} %`, `% ${name}`]
       );
     }
 

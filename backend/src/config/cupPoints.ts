@@ -267,13 +267,13 @@ export function getCupPoints(
   totalTeams: number,
   qualifyingRoundPoints: number = 0
 ): number {
-  console.log(`🔍 getCupPoints вызвана с параметрами:`, {
-    category,
-    cup,
-    position,
-    totalTeams,
-    qualifyingRoundPoints,
-  });
+  // console.log(`🔍 getCupPoints вызвана с параметрами:`, {
+  //   category,
+  //   cup,
+  //   position,
+  //   totalTeams,
+  //   qualifyingRoundPoints,
+  // });
 
   // Специальная обработка для кубка C
   if (cup === "C") {

@@ -115,7 +115,7 @@ export interface TournamentUploadData {
   results: Array<{
     player_name: string;
     cup_position: string;
-    cup?: "A" | "B" | null;
+    cup?: Cup | null;
   }>;
 }
 

@@ -1,17 +1,17 @@
-import React, { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
-import { useForm } from "react-hook-form";
-import toast from "react-hot-toast";
 import {
-  PlusIcon,
-  DocumentArrowUpIcon,
-  TrashIcon,
   CalendarIcon,
+  DocumentArrowUpIcon,
+  PlusIcon,
+  TrashIcon,
   TrophyIcon,
 } from "@heroicons/react/24/outline";
+import React, { useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+import { useMutation, useQuery, useQueryClient } from "react-query";
 import { adminApi } from "../../services/api";
-import { formatDate, formatDateTime, handleApiError } from "../../utils";
 import { getCupPositionText } from "../../types";
+import { formatDate, formatDateTime, handleApiError } from "../../utils";
 
 interface TournamentUploadForm {
   tournament_name: string;
@@ -27,6 +27,7 @@ const AdminTournaments: React.FC = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [fileError, setFileError] = useState<string>("");
   const [criticalErrors, setCriticalErrors] = useState<string[]>([]);
+  const [criticalErrorsHeader, setCriticalErrorsHeader] = useState<string>("");
   const [uploadMode, setUploadMode] = useState<"file" | "google-sheets">(
     "file"
   );
@@ -161,24 +162,18 @@ const AdminTournaments: React.FC = () => {
       onError: (error: any) => {
         const errorMessage = handleApiError(error);
 
-        // Проверяем, является ли это ошибкой критической валидации
-        if (errorMessage.includes("Критические ошибки")) {
-          // Разбираем многострочную ошибку на отдельные критические ошибки
-          const errorLines = errorMessage
-            .split("\n")
-            .filter((line) => line.trim() !== "");
-          if (errorLines.length > 1) {
-            // Первая строка - заголовок, остальные - детали ошибок
-            setCriticalErrors(errorLines.slice(1));
-            // НЕ показываем toast - ошибки отображаются в модалке
-          } else {
-            setCriticalErrors([errorMessage]);
-            // НЕ показываем toast - ошибки отображаются в модалке
-          }
+        // Можно показывать ошибку так: //toast.error(errorMessage);
+
+        // Разбираем многострочную ошибку на отдельные критические ошибки
+        const errorLines = errorMessage
+          .split("\n")
+          .filter((line) => line.trim() !== "");
+
+        if (errorLines.length > 1 && errorLines[0].startsWith("#")) {
+          setCriticalErrorsHeader(errorLines[0].slice(1));
+          setCriticalErrors(errorLines.slice(1));
         } else {
-          // Обычные ошибки показываем в toast и закрываем модалку
-          setCriticalErrors([]);
-          toast.error(errorMessage);
+          setCriticalErrors(errorLines);
         }
       },
     }
@@ -553,7 +548,9 @@ const AdminTournaments: React.FC = () => {
                       <h4 className="text-sm font-semibold text-red-800 mb-2 flex items-center justify-between">
                         <div className="flex items-center">
                           <span className="mr-2">⚠️</span>
-                          Критические ошибки в файле:
+                          {criticalErrorsHeader
+                            ? criticalErrorsHeader
+                            : "Критические ошибки в файле:"}
                         </div>
                         <span className="text-xs font-normal bg-red-200 px-2 py-1 rounded-full">
                           {criticalErrors.length} ошибок
@@ -580,21 +577,14 @@ const AdminTournaments: React.FC = () => {
                       <div className="p-3 bg-red-100 border border-red-300 rounded text-xs text-red-800">
                         <p className="font-medium mb-1">💡 Как исправить:</p>
                         <ul className="space-y-1">
+                          <li>• Переименовать листы, колонки в таблицах</li>
                           <li>
-                            • Убедитесь, что в файле есть лист "Лист
-                            регистрации" с командами
+                            • Все игроки на листах швейцарки / групп / кубков
+                            должны присутствовать на листе регистрации
                           </li>
                           <li>
-                            • Проверьте наличие листов "Кубок A" и "Кубок Б" с
-                            результатами
-                          </li>
-                          <li>
-                            • Все игроки в результатах кубков должны быть
-                            зарегистрированы в листе регистрации
-                          </li>
-                          <li>
-                            • Для неоднозначных игроков укажите полное имя
-                            (Фамилия Имя) или инициалы (Фамилия И.)
+                            • Каждый игрок должен быть однозначно определён. Для
+                            однофамильцев стоит указать имя или инициалы
                           </li>
                           <li>
                             • Игроки с полным именем будут автоматически
@@ -696,7 +686,9 @@ const AdminTournaments: React.FC = () => {
                     <div className="mt-4 p-4 bg-red-50 border border-red-300 rounded-lg">
                       <h4 className="text-sm font-semibold text-red-900 mb-2 flex items-center">
                         <span className="mr-2">⚠️</span>
-                        Критические ошибки в файле:
+                        {criticalErrorsHeader
+                          ? criticalErrorsHeader
+                          : "Критические ошибки в файле:"}
                         <span className="ml-auto bg-red-200 text-red-900 px-2 py-1 rounded text-xs">
                           {criticalErrors.length} ошибок
                         </span>
@@ -722,21 +714,14 @@ const AdminTournaments: React.FC = () => {
                       <div className="p-3 bg-red-100 border border-red-300 rounded text-xs text-red-800">
                         <p className="font-medium mb-1">💡 Как исправить:</p>
                         <ul className="space-y-1">
+                          <li>• Переименовать листы, колонки в таблицах</li>
                           <li>
-                            • Убедитесь, что в таблице есть лист "Лист
-                            регистрации" с командами
+                            • Все игроки на листах швейцарки / групп / кубков
+                            должны присутствовать на листе регистрации
                           </li>
                           <li>
-                            • Проверьте наличие листов "Кубок A" и "Кубок Б" с
-                            результатами
-                          </li>
-                          <li>
-                            • Все игроки в результатах кубков должны быть
-                            зарегистрированы в листе регистрации
-                          </li>
-                          <li>
-                            • Для неоднозначных игроков укажите полное имя
-                            (Фамилия Имя) или инициалы (Фамилия И.)
+                            • Каждый игрок должен быть однозначно определён. Для
+                            однофамильцев стоит указать имя или инициалы
                           </li>
                           <li>
                             • Игроки с полным именем будут автоматически
