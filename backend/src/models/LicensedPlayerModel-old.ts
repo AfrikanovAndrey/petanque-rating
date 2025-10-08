@@ -181,36 +181,4 @@ export class LicensedPlayerModel {
 
     return results;
   }
-
-  // Получить статистику по лицензионным игрокам
-  static async getStatistics(year: number = new Date().getFullYear()): Promise<{
-    total: number;
-    active: number;
-    cities: { city: string; count: number }[];
-  }> {
-    const [totalRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT COUNT(*) as count FROM licensed_players WHERE year = ?",
-      [year]
-    );
-
-    const [activeRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT COUNT(*) as count FROM licensed_players WHERE year = ? AND is_active = TRUE",
-      [year]
-    );
-
-    const [citiesRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT city, COUNT(*) as count 
-       FROM licensed_players 
-       WHERE year = ? AND is_active = TRUE 
-       GROUP BY city 
-       ORDER BY count DESC`,
-      [year]
-    );
-
-    return {
-      total: (totalRows[0] as any).count,
-      active: (activeRows[0] as any).count,
-      cities: citiesRows as { city: string; count: number }[],
-    };
-  }
 }

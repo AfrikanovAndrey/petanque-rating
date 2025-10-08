@@ -202,14 +202,18 @@ docker-compose ps
 docker-compose restart mysql
 ```
 
-### Проблемы с миграциями
+### Проблемы с инициализацией БД
 
 ```bash
 # Посмотрите логи backend
 docker-compose logs backend
 
-# Выполните миграции вручную
-docker exec -it petanque-backend npm run migrate
+# Проверьте логи MySQL для инициализации
+docker-compose logs mysql
+
+# Если БД не инициализирована, пересоздайте volume:
+docker-compose down -v
+docker-compose up -d
 ```
 
 ### Порты заняты

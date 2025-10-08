@@ -7,8 +7,7 @@
         "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
         "build": "tsc",
         "start": "node dist/server.js",
-        "migrate": "ts-node src/migrations/migrate.ts",
-        "fix-db": "ts-node src/migrations/fix-cup-position.ts",
+        "check-db": "ts-node src/migrations/migrate.ts",
         "test": "jest",
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage"

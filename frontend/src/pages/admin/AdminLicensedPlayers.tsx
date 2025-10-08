@@ -121,11 +121,8 @@ const AdminLicensedPlayers: React.FC = () => {
       const data = await response.json();
       if (data.success) {
         alert(
-          `Загрузка завершена!\nСоздано: ${data.results.created}\nОбновлено: ${data.results.updated}`
+          `Загрузка завершена!\nСоздано: ${data.results.success}\nОбновлено: ${data.results.updated}\nОшибок: ${data.results.errors.length}`
         );
-        if (data.results.errors.length > 0) {
-          console.warn("Ошибки при загрузке:", data.results.errors);
-        }
         loadData();
         loadStatistics();
         loadYears();

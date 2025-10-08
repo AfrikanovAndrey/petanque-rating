@@ -28,10 +28,13 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE TABLE IF NOT EXISTS tournaments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  category ENUM('FEDERAL', 'REGIONAL') NOT NULL DEFAULT 'REGIONAL',
+  teams_count INT NOT NULL DEFAULT 0,
   date DATE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_date (date)
+  INDEX idx_date (date),
+  INDEX idx_category (category)
 );
 
 -- Глобальная таблица команд (без привязки к конкретному турниру)
@@ -77,6 +80,7 @@ CREATE TABLE IF NOT EXISTS tournament_results (
   qualifying_wins INT DEFAULT 0,
   wins INT DEFAULT 0,
   loses INT DEFAULT 0,
+  points INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
@@ -86,7 +90,8 @@ CREATE TABLE IF NOT EXISTS tournament_results (
   INDEX idx_cup_position (cup_position),
   INDEX idx_qualifying_wins (qualifying_wins),
   INDEX idx_wins (wins),
-  INDEX idx_loses (loses)
+  INDEX idx_loses (loses),
+  INDEX idx_points (points DESC)
 );
 
 -- Таблица рейтинговых очков игроков за турниры
@@ -102,9 +107,7 @@ CREATE TABLE IF NOT EXISTS player_tournament_points (
   UNIQUE KEY unique_player_tournament (player_id, tournament_id),
   INDEX idx_player_points (player_id, points DESC),
   INDEX idx_tournament (tournament_id),
-  INDEX idx_points (points DESC),
-  INDEX idx_player_tournament_points (player_id, tournament_id, points),
-  INDEX idx_tournament_created (tournament_id, created_at)
+  INDEX idx_points (points DESC)
 );
 
 -- ========================================
