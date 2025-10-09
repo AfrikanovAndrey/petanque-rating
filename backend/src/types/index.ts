@@ -62,6 +62,22 @@ export interface RatingSetting {
   updated_at: Date;
 }
 
+export enum UserRole {
+  ADMIN = "ADMIN",
+  MANAGER = "MANAGER",
+}
+
+export interface User {
+  id: number;
+  name: string;
+  username: string;
+  password_hash: string;
+  role: UserRole;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Для обратной совместимости
 export interface Admin {
   id: number;
   username: string;
@@ -118,6 +134,26 @@ export interface AuthResponse {
   success: boolean;
   token?: string;
   message?: string;
+  user?: {
+    id: number;
+    name: string;
+    username: string;
+    role: UserRole;
+  };
+}
+
+export interface CreateUserRequest {
+  name: string;
+  username: string;
+  password: string;
+  role: UserRole;
+}
+
+export interface UpdateUserRequest {
+  name?: string;
+  username?: string;
+  password?: string;
+  role?: UserRole;
 }
 
 export type TournamentCategory = "FEDERAL" | "REGIONAL";

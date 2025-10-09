@@ -135,6 +135,7 @@ export function isAuthenticated(): boolean {
 // Выход из системы
 export function logout(): void {
   localStorage.removeItem("admin_token");
+  localStorage.removeItem("current_user");
   window.location.href = "/admin/login";
 }
 

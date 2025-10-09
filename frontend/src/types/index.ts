@@ -208,6 +208,22 @@ export interface RatingSetting {
   updated_at: string;
 }
 
+// Роли пользователей
+export enum UserRole {
+  ADMIN = "ADMIN",
+  MANAGER = "MANAGER",
+}
+
+// Пользователь
+export interface User {
+  id: number;
+  name: string;
+  username: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
 // Авторизация
 export interface LoginCredentials {
   username: string;
@@ -218,10 +234,23 @@ export interface AuthResponse {
   success: boolean;
   token?: string;
   message?: string;
-  admin?: {
-    id: number;
-    username: string;
-  };
+  user?: User;
+}
+
+// Создание пользователя
+export interface CreateUserRequest {
+  name: string;
+  username: string;
+  password: string;
+  role: UserRole;
+}
+
+// Обновление пользователя
+export interface UpdateUserRequest {
+  name?: string;
+  username?: string;
+  password?: string;
+  role?: UserRole;
 }
 
 // Данные для загрузки турнира

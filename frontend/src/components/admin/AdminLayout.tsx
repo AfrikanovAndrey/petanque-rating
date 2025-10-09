@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   HomeIcon,
@@ -9,8 +9,11 @@ import {
   Bars3Icon,
   XMarkIcon,
   IdentificationIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { logout } from "../../utils";
+import { adminApi } from "../../services/api";
+import { User, UserRole } from "../../types";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -18,13 +21,65 @@ interface AdminLayoutProps {
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const location = useLocation();
+
+  useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      // Сначала пробуем загрузить из localStorage
+      const cachedUser = localStorage.getItem("current_user");
+      if (cachedUser) {
+        try {
+          const user = JSON.parse(cachedUser);
+          setCurrentUser(user);
+          console.log("Загружен пользователь из cache:", user);
+        } catch (e) {
+          console.error("Ошибка парсинга cached user:", e);
+        }
+      }
+
+      // Затем загружаем свежие данные с сервера
+      const response = await adminApi.getCurrentUser();
+      if (response.data.success && response.data.data) {
+        setCurrentUser(response.data.data);
+        localStorage.setItem(
+          "current_user",
+          JSON.stringify(response.data.data)
+        );
+        console.log("Загружен пользователь с сервера:", response.data.data);
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки текущего пользователя:", error);
+      // Если старый токен, очищаем и перенаправляем на логин
+      if ((error as any).response?.status === 401) {
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("current_user");
+        window.location.href = "/admin/login";
+      }
+    }
+  };
+
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+
+  // Debug информация
+  useEffect(() => {
+    if (currentUser) {
+      console.log("Текущий пользователь:", currentUser);
+      console.log("Роль:", currentUser.role);
+      console.log("isAdmin:", isAdmin);
+    }
+  }, [currentUser, isAdmin]);
 
   const navigation = [
     {
       name: "Панель управления",
       href: "/admin/dashboard",
       icon: HomeIcon,
+      adminOnly: true, // Только для ADMIN
     },
     {
       name: "Турниры",
@@ -42,11 +97,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       icon: IdentificationIcon,
     },
     {
+      name: "Пользователи",
+      href: "/admin/users",
+      icon: UserGroupIcon,
+      adminOnly: true, // Только для ADMIN
+    },
+    {
       name: "Настройки",
       href: "/admin/settings",
       icon: CogIcon,
+      adminOnly: true, // Только для ADMIN
     },
-  ];
+  ].filter((item) => !item.adminOnly || isAdmin); // Фильтруем пункты меню
 
   const isCurrentPage = (href: string) => {
     return (
@@ -94,6 +156,21 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <XMarkIcon className="h-6 w-6" />
             </button>
           </div>
+
+          {/* Информация о пользователе */}
+          {currentUser && (
+            <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+              <p className="text-xs text-gray-500">Пользователь</p>
+              <p className="text-sm font-medium text-gray-900">
+                {currentUser.name}
+              </p>
+              <p className="text-xs text-gray-500">
+                {currentUser.role === UserRole.ADMIN
+                  ? "Администратор"
+                  : "Организатор"}
+              </p>
+            </div>
+          )}
 
           <nav className="mt-4 px-3">
             <div className="space-y-1">
