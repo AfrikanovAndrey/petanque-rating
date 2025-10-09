@@ -157,8 +157,7 @@ export class AdminController {
       }
 
       // Проверяем и валидируем категорию турнира (но парсинг также может определить её из файла)
-      const requestedCategory: "1" | "2" =
-        tournament_category === "2" ? "2" : "1";
+      const requestedCategory = tournament_category === "2" ? 2 : 1;
       console.log(`Запрошенная категория турнира: ${requestedCategory}`);
 
       // Используем новый алгоритм парсинга с сохранением в БД
@@ -166,7 +165,8 @@ export class AdminController {
         req.file.buffer,
         req.file.originalname,
         tournament_name,
-        tournament_date
+        tournament_date,
+        requestedCategory
       );
 
       res.json({

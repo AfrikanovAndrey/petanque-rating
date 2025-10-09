@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { PlayerTournamentPointsController } from "../controllers/PlayerTournamentPointsController";
 import { authenticateAdmin } from "../middleware/auth";
 
 const router = Router();

@@ -3,11 +3,6 @@ import { PlayerModel } from "../models/PlayerModel";
 import { Cup, CupPosition, Player, StageWithCells } from "../types";
 import ExcelUtils from "../utils/excelUtils";
 
-type FoundedSheet = {
-  sheet: XLSX.WorkSheet;
-  name: string;
-};
-
 const COMMAND_HEADER = "Команда";
 export const REGISTRATION_LIST = "Лист регистрации";
 export const SWISS_RESULTS_LIST = "Итоги швейцарки";

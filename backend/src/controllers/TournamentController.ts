@@ -26,20 +26,16 @@ import {
 import ExcelUtils from "../utils/excelUtils";
 
 export class TournamentController {
-  // Сопоставление строковых позиций из Excel с enum CupPosition
-  static mapExcelPositionToCupPosition(excelPosition: string): CupPosition {
-    switch (excelPosition.trim()) {
-      case "1":
-        return CupPosition.WINNER;
-      case "2":
-        return CupPosition.RUNNER_UP;
-      case "3":
-        return CupPosition.THIRD_PLACE;
-      case "1/2":
-        return CupPosition.SEMI_FINAL;
-      case "1/4":
-        return CupPosition.QUARTER_FINAL;
-    }
+  /**
+   * Преобразование TournamentCategoryEnum в строковое представление для getCupPoints
+   */
+  private static convertCategoryEnumToString(
+    categoryEnum: TournamentCategoryEnum
+  ): "1" | "2" {
+    return categoryEnum === TournamentCategoryEnum.FEDERAL ||
+      categoryEnum === (TournamentCategoryEnum.FEDERAL as number)
+      ? "1"
+      : "2";
   }
 
   /**
@@ -182,8 +178,12 @@ export class TournamentController {
         }
 
         // Затем сортируем по приоритету позиции внутри одного кубка
-        const aPriority = positionPriority[a.cup_position] || 999;
-        const bPriority = positionPriority[b.cup_position] || 999;
+        const aPriority = a.cup_position
+          ? positionPriority[a.cup_position] || 999
+          : 999;
+        const bPriority = b.cup_position
+          ? positionPriority[b.cup_position] || 999
+          : 999;
 
         return aPriority - bPriority;
       });
@@ -484,7 +484,7 @@ export class TournamentController {
         let points = 0;
         if (results.cup) {
           points = getCupPoints(
-            tournamentCategory,
+            this.convertCategoryEnumToString(tournamentCategory),
             results.cup!,
             results.cupPosition!,
             teams.length
