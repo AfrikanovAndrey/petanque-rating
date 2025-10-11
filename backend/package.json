@@ -5,7 +5,7 @@
     "main": "dist/server.js",
     "scripts": {
         "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-        "build": "node --max-old-space-size=1024 ./node_modules/.bin/tsc -p tsconfig.prod.json",
+        "build": "node --max-old-space-size=1024 ./node_modules/.bin/tsc",
         "build:swc": "swc src -d dist --copy-files",
         "start": "node dist/server.js",
         "check-db": "ts-node src/migrations/migrate.ts",

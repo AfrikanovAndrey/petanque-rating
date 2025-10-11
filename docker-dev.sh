@@ -24,19 +24,6 @@ info() {
     echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $1${NC}"
 }
 
-# Проверка наличия Docker и Docker Compose
-check_dependencies() {
-    if ! command -v docker &> /dev/null; then
-        error "Docker не установлен. Пожалуйста, установите Docker."
-        exit 1
-    fi
-
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-        error "Docker Compose не установлен. Пожалуйста, установите Docker Compose."
-        exit 1
-    fi
-}
-
 # Функция для запуска приложения в production режиме
 prod() {
     log "Запуск приложения в production режиме..."
@@ -89,27 +76,6 @@ dev() {
     log "Dev режим завершен!"
 }
 
-# Функция для запуска только определенных сервисов в dev режиме
-dev_service() {
-    local service=${1:-}
-    
-    if [ -z "$service" ]; then
-        error "Укажите сервис: $0 dev-service <backend|frontend|mysql>"
-        exit 1
-    fi
-    
-    log "Запуск сервиса '$service' в dev режиме..."
-    
-    # Создаем директории если их нет
-    mkdir -p uploads mysql/data
-    
-    if command -v docker-compose &> /dev/null; then
-        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up "$service"
-    else
-        docker compose -f docker-compose.yml -f docker-compose.dev.yml up "$service"
-    fi
-}
-
 # Функция для остановки приложения
 stop() {
     log "Остановка приложения..."
@@ -158,36 +124,6 @@ build() {
     log "Образы собраны!"
 }
 
-# Функция для просмотра логов
-logs() {
-    local service=${1:-}
-    
-    if [ -n "$service" ]; then
-        if command -v docker-compose &> /dev/null; then
-            docker-compose logs -f "$service"
-        else
-            docker compose logs -f "$service"
-        fi
-    else
-        if command -v docker-compose &> /dev/null; then
-            docker-compose logs -f
-        else
-            docker compose logs -f
-        fi
-    fi
-}
-
-# Функция для проверки статуса
-check_status() {
-    info "Статус контейнеров:"
-    
-    if command -v docker-compose &> /dev/null; then
-        docker-compose ps
-    else
-        docker compose ps
-    fi
-}
-
 # Функция для очистки
 clean() {
     warn "Это удалит все контейнеры, образы и данные!"
@@ -214,7 +150,7 @@ clean() {
 
 # Функция для создания бэкапа базы данных
 backup() {
-    local backup_name="petanque_backup_$(date +%Y%m%d_%H%M%S).sql"
+    local backup_name="petanque_rating_dump.sql"
     
     log "Создание бэкапа базы данных: $backup_name"
     
@@ -295,57 +231,3 @@ help() {
     echo "  $0 build production       # Сборка production образов"
     echo "  $0 restore backups/backup_20231120_143000.sql"
 }
-
-# Основная логика
-main() {
-    check_dependencies
-    
-    case "${1:-}" in
-        start)
-            start
-            ;;
-        dev)
-            dev
-            ;;
-        dev-service)
-            dev_service "$2"
-            ;;
-        stop)
-            stop
-            ;;
-        restart)
-            restart
-            ;;
-        build)
-            build "$2"
-            ;;
-        logs)
-            logs "$2"
-            ;;
-        status)
-            check_status
-            ;;
-        clean)
-            clean
-            ;;
-        backup)
-            mkdir -p backups
-            backup
-            ;;
-        restore)
-            restore "$2"
-            ;;
-        help|--help|-h)
-            help
-            ;;
-        *)
-            error "Неизвестная команда: ${1:-}"
-            echo ""
-            help
-            exit 1
-            ;;
-    esac
-}
-
-# Запуск скрипта
-main "$@"
