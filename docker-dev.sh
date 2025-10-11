@@ -38,17 +38,25 @@ check_dependencies() {
 }
 
 # Функция для запуска приложения в production режиме
-start() {
+prod() {
     log "Запуск приложения в production режиме..."
     
     # Создаем директории если их нет
     mkdir -p uploads mysql/data
     
-    # Запускаем контейнеры без override файла
+    # Информируем о сборке
+    info "Backend будет собран с использованием SWC компилятора (быстро и мало памяти)"
+    
+    # Запускаем контейнеры без override файла (docker-compose соберет backend автоматически)
     if command -v docker-compose &> /dev/null; then
-        docker-compose -f docker-compose.yml up -d
+        docker-compose -f docker-compose.yml up -d --build
     else
-        docker compose -f docker-compose.yml up -d
+        docker compose -f docker-compose.yml up -d --build
+    fi
+    
+    if [ $? -ne 0 ]; then
+        error "Ошибка при сборке или запуске контейнеров"
+        exit 1
     fi
     
     # Ждем пока база данных запустится
@@ -137,6 +145,7 @@ build() {
         fi
     else
         log "Сборка production образов..."
+        info "Backend будет собран с использованием SWC компилятора (быстро и мало памяти)"
         
         if command -v docker-compose &> /dev/null; then
             docker-compose -f docker-compose.yml build --no-cache

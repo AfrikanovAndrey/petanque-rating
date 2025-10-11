@@ -35,7 +35,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.swc
     container_name: petanque-backend
     restart: unless-stopped
     environment:

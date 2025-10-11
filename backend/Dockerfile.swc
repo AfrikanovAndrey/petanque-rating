@@ -10,8 +10,8 @@ WORKDIR /app
 # Копируем package.json и package-lock.json
 COPY package*.json ./
 
-# Устанавливаем все зависимости (включая dev для сборки)
-RUN npm ci && npm cache clean --force
+# Устанавливаем все зависимости (используем npm install для установки новых зависимостей)
+RUN npm install && npm cache clean --force
 
 # Копируем исходный код и конфигурацию SWC
 COPY . .
@@ -29,8 +29,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Устанавливаем только production зависимости + необходимые для миграций
-RUN npm ci --omit=dev && \
-    npm install typescript ts-node && \
+RUN npm install --omit=dev typescript ts-node && \
     npm cache clean --force
 
 # Копируем скомпилированный код из builder stage
