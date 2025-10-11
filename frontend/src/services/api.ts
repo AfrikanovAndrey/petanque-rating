@@ -12,6 +12,7 @@ import {
   User,
   CreateUserRequest,
   UpdateUserRequest,
+  TournamentType,
 } from "../types";
 
 // Создаем экземпляр axios
@@ -173,6 +174,7 @@ export const adminApi = {
   uploadTournamentFromGoogleSheets: (data: {
     tournament_name: string;
     tournament_date: string;
+    tournament_type: TournamentType;
     tournament_category: string;
     google_sheets_url: string;
   }): Promise<AxiosResponse<ApiResponse>> => {

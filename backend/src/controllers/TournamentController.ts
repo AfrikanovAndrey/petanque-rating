@@ -22,6 +22,7 @@ import {
   CupPosition,
   TeamResults,
   TournamentCategoryEnum,
+  TournamentType,
 } from "../types";
 import ExcelUtils from "../utils/excelUtils";
 
@@ -315,6 +316,7 @@ export class TournamentController {
     fileName: string,
     tournamentName: string,
     tournamentDate: string,
+    tournamentType: TournamentType,
     tournamentCategory: TournamentCategoryEnum,
     providedWorkbook?: XLSX.WorkBook
   ): Promise<{
@@ -453,6 +455,7 @@ export class TournamentController {
       // 5. Сохраняем данные в БД
       const tournamentId = await TournamentModel.createTournament(
         tournamentName,
+        tournamentType,
         tournamentCategory,
         teams.length,
         tournamentDate
@@ -715,6 +718,7 @@ export class TournamentController {
     googleSheetsUrl: string,
     tournamentName: string,
     tournamentDate: string,
+    tournamentType: TournamentType,
     tournamentCategory: TournamentCategoryEnum
   ): Promise<{
     tournamentId: number;
@@ -751,6 +755,7 @@ export class TournamentController {
         fileName,
         tournamentName,
         tournamentDate,
+        tournamentType,
         tournamentCategory,
         workbook // Передаем готовый workbook
       );

@@ -4,7 +4,7 @@ import { Cup, CupPosition, Player, StageWithCells } from "../types";
 import ExcelUtils from "../utils/excelUtils";
 
 const COMMAND_HEADER = "Команда";
-export const REGISTRATION_LIST = "Лист регистрации";
+export const REGISTRATION_LIST = "Регистрация";
 export const SWISS_RESULTS_LIST = "Итоги швейцарки";
 
 // Нормализация имени игрока для сравнения
@@ -90,7 +90,7 @@ export class TournamentParser {
       throw new Error(`Не найден обязательный лист "${REGISTRATION_LIST}"`);
     }
 
-    const userDetectErrors = [];
+    const userDetectErrors: string[] = [];
 
     let teamOrderNum = 0;
     const teams: TeamPlayers[] = [];
@@ -269,7 +269,7 @@ export class TournamentParser {
   ): Promise<Map<number, TeamQualifyingResults>> {
     console.log("🎯 Парсим результаты Швейцарки");
 
-    const errors = [];
+    const errors: string[] = [];
 
     // Парсим данные из листа
     const swissSheet = ExcelUtils.findXlsSheet(workbook, SWISS_RESULTS_LIST);
@@ -280,7 +280,7 @@ export class TournamentParser {
 
     const teamResults = new Map<number, TeamQualifyingResults>();
 
-    const teamNameColumnHeader = "Команда";
+    const teamNameColumnHeader = COMMAND_HEADER;
     const teamWinsColumnHeader = "Результат";
 
     const teamNameColumnCell = ExcelUtils.findCellByText(
@@ -378,12 +378,11 @@ export class TournamentParser {
 
         const sheet = workbook.Sheets[sheetName];
 
-        const teamNameColumnHeader = "Команда";
         const teamWinsColumnHeader = "победы";
 
         const teamNameColumnCell = ExcelUtils.findCellByText(
           sheet,
-          teamNameColumnHeader
+          COMMAND_HEADER
         );
 
         const teamWinsColumnCell = ExcelUtils.findCellByText(

@@ -6,9 +6,18 @@ export interface Player {
   updated_at: Date;
 }
 
+export enum TournamentType {
+  TRIPLETTE = "TRIPLETTE",
+  DOUBLETTE_MALE = "DOUBLETTE_MALE",
+  DOUBLETTE_FEMALE = "DOUBLETTE_FEMALE",
+  DOUBLETTE_MIXT = "DOUBLETTE_MIXT",
+  TET_A_TET = "TET-A-TET",
+}
+
 export interface Tournament {
   id: number;
   name: string;
+  type: TournamentType;
   category: string;
   teamsCount: number;
   date: string;
@@ -116,6 +125,7 @@ export interface RatingTableRow {
 export interface TournamentUploadData {
   tournament_name: string;
   tournament_date: string;
+  tournament_type: TournamentType; // тип турнира
   total_teams?: number; // общее количество команд для расчета очков кубка
   tournament_category?: "1" | "2"; // категория турнира (1 - высшая, 2 - вторая)
   results: Array<{
@@ -251,6 +261,7 @@ export interface TeamRating {
 export interface TournamentTeamUploadData {
   tournament_name: string;
   tournament_date: string;
+  tournament_type: TournamentType; // тип турнира
   total_teams?: number;
   tournament_category?: "1" | "2";
   results: Array<{

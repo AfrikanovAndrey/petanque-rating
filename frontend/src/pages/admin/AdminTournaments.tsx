@@ -10,17 +10,19 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { adminApi } from "../../services/api";
-import { getCupPositionText } from "../../types";
+import { getCupPositionText, TournamentType } from "../../types";
 import {
   formatDate,
   formatDateTime,
   getTornamentCategoryText,
+  getTournamentTypeText,
   handleApiError,
 } from "../../utils";
 
 interface TournamentUploadForm {
   tournament_name: string;
   tournament_date: string;
+  tournament_type: TournamentType;
   tournament_file: FileList;
   tournament_category: string;
   google_sheets_url: string;
@@ -140,6 +142,7 @@ const AdminTournaments: React.FC = () => {
         const formData = new FormData();
         formData.append("tournament_name", data.tournament_name);
         formData.append("tournament_date", data.tournament_date);
+        formData.append("tournament_type", data.tournament_type);
         formData.append("tournament_file", data.tournament_file[0]);
         formData.append("tournament_category", data.tournament_category);
 
@@ -148,6 +151,7 @@ const AdminTournaments: React.FC = () => {
         return await adminApi.uploadTournamentFromGoogleSheets({
           tournament_name: data.tournament_name,
           tournament_date: data.tournament_date,
+          tournament_type: data.tournament_type,
           tournament_category: data.tournament_category,
           google_sheets_url: data.google_sheets_url,
         });
@@ -324,6 +328,9 @@ const AdminTournaments: React.FC = () => {
                     Дата проведения
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Тип
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Категория
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -354,6 +361,11 @@ const AdminTournaments: React.FC = () => {
                       <div className="flex items-center">
                         <CalendarIcon className="h-4 w-4 text-gray-400 mr-2" />
                         {formatDate(tournament.date)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center">
+                        {getTournamentTypeText(tournament.type)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -466,6 +478,38 @@ const AdminTournaments: React.FC = () => {
                 {errors.tournament_date && (
                   <p className="mt-1 text-sm text-red-600">
                     {errors.tournament_date.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Тип турнира
+                </label>
+                <select
+                  className={`input-field ${
+                    errors.tournament_type ? "border-red-300" : ""
+                  }`}
+                  {...register("tournament_type", {
+                    required: "Тип турнира обязателен",
+                  })}
+                >
+                  <option value="">Выберите тип турнира</option>
+                  <option value={TournamentType.TRIPLETTE}>Триплеты</option>
+                  <option value={TournamentType.DOUBLETTE_MALE}>
+                    Дуплеты мужские
+                  </option>
+                  <option value={TournamentType.DOUBLETTE_FEMALE}>
+                    Дуплеты женские
+                  </option>
+                  <option value={TournamentType.DOUBLETTE_MIXT}>
+                    Дуплеты микст
+                  </option>
+                  <option value={TournamentType.TET_A_TET}>Теты</option>
+                </select>
+                {errors.tournament_type && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.tournament_type.message}
                   </p>
                 )}
               </div>

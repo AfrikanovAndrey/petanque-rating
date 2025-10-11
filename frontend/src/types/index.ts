@@ -14,10 +14,20 @@ export interface Player {
   updated_at: string;
 }
 
+// Тип турнира
+export enum TournamentType {
+  TRIPLETTE = "TRIPLETTE",
+  DOUBLETTE_MALE = "DOUBLETTE_MALE",
+  DOUBLETTE_FEMALE = "DOUBLETTE_FEMALE",
+  DOUBLETTE_MIXT = "DOUBLETTE_MIXT",
+  TET_A_TET = "TET-A-TET",
+}
+
 // Турнир
 export interface Tournament {
   id: number;
   name: string;
+  type: TournamentType;
   category: TournamentCategory;
   teams_count: number;
   date: string;
@@ -257,6 +267,7 @@ export interface UpdateUserRequest {
 export interface TournamentUpload {
   tournament_name: string;
   tournament_date: string;
+  tournament_type: TournamentType;
   tournament_file: File;
 }
 
