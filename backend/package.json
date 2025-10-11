@@ -6,7 +6,6 @@
     "scripts": {
         "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
         "build": "node --max-old-space-size=1024 ./node_modules/.bin/tsc -p tsconfig.prod.json",
-        "build:low-memory": "node --max-old-space-size=384 ./node_modules/.bin/tsc -p tsconfig.prod.json",
         "build:swc": "swc src -d dist --copy-files",
         "start": "node dist/server.js",
         "check-db": "ts-node src/migrations/migrate.ts",

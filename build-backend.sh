@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Скрипт для сборки backend с различными настройками памяти
-# Использование: ./build-backend.sh [standard|lowmem|local]
+# Скрипт для сборки backend с различными настройками
+# Использование: ./build-backend.sh [swc|standard|local|local-swc]
 
 set -e
 
@@ -11,13 +11,8 @@ echo "🔨 Сборка backend в режиме: $MODE"
 
 case $MODE in
   "standard")
-    echo "📦 Стандартная сборка (требуется ~1024 MB RAM)"
+    echo "📦 Стандартная сборка TypeScript (требуется ~1024 MB RAM)"
     docker build -f backend/Dockerfile -t petanque-backend:latest ./backend
-    ;;
-    
-  "lowmem")
-    echo "💾 Сборка с минимальной памятью (требуется ~384 MB RAM)"
-    docker build -f backend/Dockerfile.lowmem -t petanque-backend:latest ./backend
     ;;
     
   "swc")
@@ -26,16 +21,9 @@ case $MODE in
     ;;
     
   "local")
-    echo "🏠 Локальная сборка (без Docker)"
+    echo "🏠 Локальная сборка TypeScript (без Docker)"
     cd backend
     npm run build
-    echo "✅ Сборка завершена! Скомпилированные файлы в backend/dist/"
-    ;;
-    
-  "local-lowmem")
-    echo "🏠 Локальная сборка с минимальной памятью"
-    cd backend
-    npm run build:low-memory
     echo "✅ Сборка завершена! Скомпилированные файлы в backend/dist/"
     ;;
     
@@ -51,11 +39,9 @@ case $MODE in
     echo "❌ Неизвестный режим: $MODE"
     echo ""
     echo "Доступные режимы:"
-    echo "  standard      - Стандартная сборка TypeScript (1024 MB RAM)"
-    echo "  lowmem        - TypeScript с минимальной памятью (384 MB RAM)"
     echo "  swc           - SWC компилятор (< 256 MB RAM, РЕКОМЕНДУЕТСЯ)"
-    echo "  local         - Локальная сборка без Docker"
-    echo "  local-lowmem  - Локальная сборка с ограничением памяти"
+    echo "  standard      - Стандартная сборка TypeScript (1024 MB RAM)"
+    echo "  local         - Локальная сборка TypeScript без Docker"
     echo "  local-swc     - Локальная сборка с SWC"
     echo ""
     echo "Пример: ./build-backend.sh swc"
