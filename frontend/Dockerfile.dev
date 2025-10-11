@@ -1,0 +1,31 @@
+# Development Dockerfile для frontend с hot reload
+
+FROM node:18-alpine AS development
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем package.json и package-lock.json
+COPY package*.json ./
+
+# Устанавливаем все зависимости (включая dev)
+RUN npm ci && npm cache clean --force
+
+# Копируем исходный код (но в dev-режиме он будет монтироваться как volume)
+COPY . .
+
+# Создаем пользователя для безопасности
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Назначаем права на директорию приложения
+RUN chown -R nodejs:nodejs /app
+
+# Переключаемся на пользователя nodejs
+USER nodejs
+
+# Открываем порт для Vite dev server
+EXPOSE 5173
+
+# В dev-режиме используем Vite dev server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]

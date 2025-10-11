@@ -16,6 +16,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTournaments from "./pages/admin/AdminTournaments";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPlayers from "./pages/admin/AdminPlayers";
+import AdminLicensedPlayers from "./pages/admin/AdminLicensedPlayers";
+import AdminUsers from "./pages/admin/AdminUsers";
 
 // Components
 import Layout from "./components/Layout";
@@ -117,6 +119,28 @@ function App() {
                 <ProtectedRoute>
                   <AdminLayout>
                     <AdminSettings />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/licensed-players"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout>
+                    <AdminLicensedPlayers />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout>
+                    <AdminUsers />
                   </AdminLayout>
                 </ProtectedRoute>
               }

@@ -1,16 +1,15 @@
-import React, { useState } from "react";
-import { useQuery } from "react-query";
 import {
+  CalendarIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   TrophyIcon,
-  CalendarIcon,
-  UserGroupIcon,
-  ChartBarIcon,
 } from "@heroicons/react/24/outline";
+import React, { useState } from "react";
+import { useQuery } from "react-query";
 import { tournamentsApi } from "../services/api";
-import { formatDate, handleApiError } from "../utils";
-import { TournamentWithResults } from "../types";
+import { TournamentResult, TournamentWithResults } from "../types";
+import { formatDate, getTornamentCategoryText, handleApiError } from "../utils";
+import { getCupPositionText } from "../types";
 
 const TournamentsList: React.FC = () => {
   const [expandedTournament, setExpandedTournament] = useState<number | null>(
@@ -31,8 +30,11 @@ const TournamentsList: React.FC = () => {
   });
 
   // Загружаем детали конкретного турнира
-  const loadTournamentDetails = async (tournamentId: number) => {
-    if (tournamentDetails[tournamentId]) {
+  const loadTournamentDetails = async (
+    tournamentId: number,
+    forceReload = false
+  ) => {
+    if (tournamentDetails[tournamentId] && !forceReload) {
       return; // Уже загружены
     }
 
@@ -64,18 +66,8 @@ const TournamentsList: React.FC = () => {
     }
   };
 
-  const getPositionBadge = (position: number) => {
-    if (position === 1) return "🥇";
-    if (position === 2) return "🥈";
-    if (position === 3) return "🥉";
-    return `${position}`;
-  };
-
-  const getPositionColor = (position: number) => {
-    if (position === 1) return "text-yellow-600";
-    if (position === 2) return "text-gray-600";
-    if (position === 3) return "text-amber-600";
-    return "text-gray-900";
+  const getPositionBadge = (position: string, cup?: "A" | "B" | "C" | null) => {
+    return getCupPositionText(position, cup);
   };
 
   if (isLoading) {
@@ -131,16 +123,6 @@ const TournamentsList: React.FC = () => {
             </p>
             <p className="text-sm text-gray-500">В этом году</p>
           </div>
-          <div className="text-center">
-            <ChartBarIcon className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900">
-              {tournaments?.reduce((sum, tournament) => {
-                const details = tournamentDetails[tournament.id];
-                return sum + (details?.results.length || 0);
-              }, 0) || "—"}
-            </p>
-            <p className="text-sm text-gray-500">Участий игроков</p>
-          </div>
         </div>
       </div>
 
@@ -175,12 +157,12 @@ const TournamentsList: React.FC = () => {
                             <CalendarIcon className="h-4 w-4 mr-1" />
                             {formatDate(tournament.date)}
                           </div>
-                          {details && (
-                            <div className="flex items-center">
-                              <UserGroupIcon className="h-4 w-4 mr-1" />
-                              {details.results.length} участников
-                            </div>
-                          )}
+                          <div className="flex items-center">
+                            {getTornamentCategoryText(tournament.category)}
+                          </div>
+                          <div className="flex items-center">
+                            {tournament.teams_count} команд
+                          </div>
                         </div>
                       </div>
                       <div className="ml-4">
@@ -198,58 +180,93 @@ const TournamentsList: React.FC = () => {
                     <div className="border-t border-gray-200 px-6 pb-6">
                       {details ? (
                         <div className="pt-4">
-                          <h4 className="text-md font-medium text-gray-900 mb-4">
-                            Результаты турнира
-                          </h4>
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Место
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Игрок
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Очки
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {details.results.map((result, index) => (
-                                  <tr
-                                    key={result.id}
-                                    className={
-                                      index < 3
-                                        ? "bg-gradient-to-r from-yellow-50 to-transparent"
-                                        : ""
-                                    }
-                                  >
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                      <div
-                                        className={`text-sm font-medium ${getPositionColor(
-                                          result.position
-                                        )}`}
-                                      >
-                                        {getPositionBadge(result.position)}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                      <div className="text-sm font-medium text-gray-900">
-                                        {result.player_name}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap">
-                                      <div className="text-sm text-gray-900 font-medium">
-                                        {result.points}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                          {(() => {
+                            // Группируем результаты по кубкам
+                            const cupA = details.results.filter(
+                              (result: TournamentResult) => result.cup === "A"
+                            );
+                            const cupB = details.results.filter(
+                              (result: TournamentResult) => result.cup === "B"
+                            );
+
+                            const renderCupTable = (
+                              results: TournamentResult[],
+                              cupTitle: string
+                            ) => {
+                              if (results.length === 0) return null;
+
+                              return (
+                                <div key={cupTitle} className="mb-6">
+                                  <div className="mb-4">
+                                    <h4 className="text-md font-medium text-gray-900">
+                                      {cupTitle}
+                                    </h4>
+                                  </div>
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Место
+                                          </th>
+                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Команда
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="bg-white divide-y divide-gray-200">
+                                        {results.map(
+                                          (result: TournamentResult) => (
+                                            <tr
+                                              key={result.id}
+                                              className={
+                                                [
+                                                  "WINNER",
+                                                  "RUNNER_UP",
+                                                  "THIRD_PLACE",
+                                                ].includes(result.cup_position)
+                                                  ? "bg-gradient-to-r from-yellow-50 to-transparent"
+                                                  : ""
+                                              }
+                                            >
+                                              <td className="px-4 py-3 whitespace-nowrap">
+                                                <div className="flex flex-col">
+                                                  <div
+                                                    className={`text-sm font-medium`}
+                                                  >
+                                                    {getPositionBadge(
+                                                      result.cup_position || "",
+                                                      result.cup
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 whitespace-nowrap">
+                                                <div className="text-sm font-medium text-gray-900">
+                                                  <div className="flex flex-col">
+                                                    <span className="font-semibold">
+                                                      {result.team_players}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          )
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              );
+                            };
+
+                            return (
+                              <div className="space-y-6">
+                                {renderCupTable(cupA, "Кубок A")}
+                                {renderCupTable(cupB, "Кубок B")}
+                              </div>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <div className="pt-4 text-center">

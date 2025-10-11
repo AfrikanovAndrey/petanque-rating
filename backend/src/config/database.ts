@@ -10,8 +10,10 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || "",
   database: process.env.DB_NAME || "petanque_rating",
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 20, // Увеличено для лучшей параллельности
   queueLimit: 0,
+  acquireTimeout: 60000, // Таймаут получения соединения
+  timeout: 60000, // Общий таймаут запроса
 };
 
 export const pool = mysql.createPool(dbConfig);

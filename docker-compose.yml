@@ -11,6 +11,12 @@ services:
       MYSQL_DATABASE: petanque_rating
       MYSQL_USER: petanque_user
       MYSQL_PASSWORD: petanque_password
+    command: --default-authentication-plugin=mysql_native_password
+      --innodb-buffer-pool-size=256M
+      --innodb-log-file-size=64M
+      --innodb-lock-wait-timeout=50
+      --innodb-rollback-on-timeout=OFF
+      --max-connections=100
     ports:
       - "3306:3306"
     volumes:
@@ -42,6 +48,7 @@ services:
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=admin123
       - FRONTEND_URL=http://localhost:3000
+      - GOOGLE_SHEETS_API_KEY=AIzaSyCyoQvLzeRZmnPBq2EklQQTN9Ns1w2-Pg4
     ports:
       - "3001:3001"
     depends_on:

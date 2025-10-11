@@ -8,8 +8,11 @@ import {
   Tournament,
   TournamentWithResults,
   Player,
-  PositionPoints,
   RatingSetting,
+  User,
+  CreateUserRequest,
+  UpdateUserRequest,
+  TournamentType,
 } from "../types";
 
 // Создаем экземпляр axios
@@ -54,6 +57,26 @@ export const ratingApi = {
   // Получить полную таблицу рейтинга с деталями
   getFullRating: (): Promise<AxiosResponse<ApiResponse<PlayerRating[]>>> =>
     api.get("/rating/full"),
+
+  // Получить мужской рейтинг
+  getMaleRating: (): Promise<
+    AxiosResponse<
+      ApiResponse<RatingTableRow[]> & { gender: string; count: number }
+    >
+  > => api.get("/rating/male"),
+
+  // Получить женский рейтинг
+  getFemaleRating: (): Promise<
+    AxiosResponse<
+      ApiResponse<RatingTableRow[]> & { gender: string; count: number }
+    >
+  > => api.get("/rating/female"),
+
+  // Получить рейтинги разделенные по полу
+  getRatingsByGender: (
+    gender?: string
+  ): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get("/rating/by-gender" + (gender ? `?gender=${gender}` : "")),
 
   // Получить детали игрока
   getPlayerDetails: (
@@ -100,6 +123,40 @@ export const authApi = {
 
 // === АДМИНСКИЕ API ===
 export const adminApi = {
+  // === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для ADMIN) ===
+  // Получить всех пользователей
+  getUsers: (): Promise<
+    AxiosResponse<{
+      success: boolean;
+      users: User[];
+      message?: string;
+    }>
+  > => api.get("/admin/users"),
+
+  // Получить текущего пользователя
+  getCurrentUser: (): Promise<
+    AxiosResponse<{
+      success: boolean;
+      data: User;
+      message?: string;
+    }>
+  > => api.get("/admin/users/current"),
+
+  // Создать пользователя
+  createUser: (data: CreateUserRequest): Promise<AxiosResponse<ApiResponse>> =>
+    api.post("/admin/users", data),
+
+  // Обновить пользователя
+  updateUser: (
+    userId: number,
+    data: UpdateUserRequest
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.put(`/admin/users/${userId}`, data),
+
+  // Удалить пользователя
+  deleteUser: (userId: number): Promise<AxiosResponse<ApiResponse>> =>
+    api.delete(`/admin/users/${userId}`),
+
   // === УПРАВЛЕНИЕ ТУРНИРАМИ ===
   // Загрузка турнира из Excel
   uploadTournament: (
@@ -110,6 +167,36 @@ export const adminApi = {
         "Content-Type": "multipart/form-data",
       },
       timeout: 60000, // 60 секунд для загрузки файла
+    });
+  },
+
+  // Загрузка турнира из Google Sheets
+  uploadTournamentFromGoogleSheets: (data: {
+    tournament_name: string;
+    tournament_date: string;
+    tournament_type: TournamentType;
+    tournament_category: string;
+    google_sheets_url: string;
+  }): Promise<AxiosResponse<ApiResponse>> => {
+    return api.post("/admin/tournaments/upload-from-google-sheets", data, {
+      timeout: 60000, // 60 секунд для загрузки из Google Sheets
+    });
+  },
+
+  // Проверка доступности Google таблицы
+  checkGoogleSheetsAccess: (data: {
+    url: string;
+  }): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        spreadsheetId: string;
+        sheetNames: string[];
+        totalSheets: number;
+      }>
+    >
+  > => {
+    return api.post("/admin/tournaments/check-google-sheets", data, {
+      timeout: 30000, // 30 секунд для проверки доступности
     });
   },
 
@@ -134,10 +221,17 @@ export const adminApi = {
   getPlayers: (): Promise<AxiosResponse<ApiResponse<Player[]>>> =>
     api.get("/admin/players"),
 
+  // Создать игрока
+  createPlayer: (data: {
+    name: string;
+    gender: string;
+  }): Promise<AxiosResponse<ApiResponse<{ player_id: number }>>> =>
+    api.post("/admin/players", data),
+
   // Обновить игрока
   updatePlayer: (
     playerId: number,
-    data: { name: string }
+    data: { name: string; gender: string }
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/players/${playerId}`, data),
 
@@ -145,30 +239,13 @@ export const adminApi = {
   deletePlayer: (playerId: number): Promise<AxiosResponse<ApiResponse>> =>
     api.delete(`/admin/players/${playerId}`),
 
+  // === УПРАВЛЕНИЕ КОМАНДАМИ ===
+  // Удалить все команды
+  deleteAllTeams: (): Promise<
+    AxiosResponse<ApiResponse<{ deleted_count: number }>>
+  > => api.delete("/teams"),
+
   // === НАСТРОЙКИ РЕЙТИНГА ===
-  // Получить настройки очков за позицию
-  getPositionPoints: (): Promise<
-    AxiosResponse<ApiResponse<PositionPoints[]>>
-  > => api.get("/admin/settings/position-points"),
-
-  // Обновить настройки очков за позицию
-  updatePositionPoints: (
-    positionPoints: Array<{ position: number; points: number }>
-  ): Promise<AxiosResponse<ApiResponse>> =>
-    api.put("/admin/settings/position-points", { positionPoints }),
-
-  // Добавить/обновить очки для позиции
-  setPositionPoints: (
-    position: number,
-    points: number
-  ): Promise<AxiosResponse<ApiResponse>> =>
-    api.post("/admin/settings/position-points", { position, points }),
-
-  // Удалить настройку очков для позиции
-  deletePositionPoints: (
-    position: number
-  ): Promise<AxiosResponse<ApiResponse>> =>
-    api.delete(`/admin/settings/position-points/${position}`),
 
   // Получить количество лучших результатов
   getBestResultsCount: (): Promise<

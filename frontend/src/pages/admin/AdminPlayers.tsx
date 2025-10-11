@@ -12,14 +12,29 @@ import { adminApi } from "../../services/api";
 import { Player } from "../../types";
 import { formatDateTime, handleApiError } from "../../utils";
 
+// Функция для форматирования отображения пола
+const formatGender = (gender: string | null | undefined): string => {
+  if (!gender) return "—";
+  switch (gender.toLowerCase()) {
+    case "male":
+      return "М";
+    case "female":
+      return "Ж";
+    default:
+      return "—";
+  }
+};
+
 interface EditPlayerForm {
   name: string;
+  gender: string;
 }
 
 const AdminPlayers: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -41,10 +56,33 @@ const AdminPlayers: React.FC = () => {
     return response.data.data || [];
   });
 
+  // Мутация для создания игрока
+  const createMutation = useMutation(
+    async (data: { name: string; gender: string }) => {
+      return await adminApi.createPlayer(data);
+    },
+    {
+      onSuccess: () => {
+        toast.success("Игрок успешно создан!");
+        queryClient.invalidateQueries("players");
+        queryClient.invalidateQueries("fullRating");
+        queryClient.invalidateQueries("dashboardRating");
+        setIsCreateModalOpen(false);
+        reset();
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
   // Мутация для обновления игрока
   const updateMutation = useMutation(
-    async (data: { id: number; name: string }) => {
-      return await adminApi.updatePlayer(data.id, { name: data.name });
+    async (data: { id: number; name: string; gender: string }) => {
+      return await adminApi.updatePlayer(data.id, {
+        name: data.name,
+        gender: data.gender,
+      });
     },
     {
       onSuccess: () => {
@@ -80,9 +118,20 @@ const AdminPlayers: React.FC = () => {
     }
   );
 
+  const openCreateModal = () => {
+    reset();
+    setIsCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setIsCreateModalOpen(false);
+    reset();
+  };
+
   const openEditModal = (player: Player) => {
     setEditingPlayer(player);
     setValue("name", player.name);
+    setValue("gender", player.gender);
     setIsEditModalOpen(true);
   };
 
@@ -92,11 +141,19 @@ const AdminPlayers: React.FC = () => {
     reset();
   };
 
-  const onSubmit = (data: EditPlayerForm) => {
+  const onSubmitCreate = (data: EditPlayerForm) => {
+    createMutation.mutate({
+      name: data.name.trim(),
+      gender: data.gender,
+    });
+  };
+
+  const onSubmitEdit = (data: EditPlayerForm) => {
     if (editingPlayer) {
       updateMutation.mutate({
         id: editingPlayer.id,
         name: data.name.trim(),
+        gender: data.gender,
       });
     }
   };
@@ -141,12 +198,19 @@ const AdminPlayers: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Заголовок и поиск */}
+      {/* Заголовок и кнопка создания */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Игроки</h1>
           <p className="mt-2 text-gray-600">Управление профилями игроков</p>
         </div>
+        <button
+          onClick={openCreateModal}
+          className="btn-primary flex items-center"
+        >
+          <UsersIcon className="h-5 w-5 mr-2" />
+          Создать игрока
+        </button>
       </div>
 
       {/* Поиск и статистика */}
@@ -180,6 +244,9 @@ const AdminPlayers: React.FC = () => {
                     ФИО
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Пол
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата добавления
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -204,6 +271,9 @@ const AdminPlayers: React.FC = () => {
                           {player.name}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatGender(player.gender)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateTime(player.created_at)}
@@ -294,7 +364,7 @@ const AdminPlayers: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmitEdit)} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   ФИО игрока
@@ -320,6 +390,41 @@ const AdminPlayers: React.FC = () => {
                 )}
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Пол
+                </label>
+                <div className="flex gap-6">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="male"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Мужской</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="female"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Женский</span>
+                  </label>
+                </div>
+                {errors.gender && (
+                  <p className="mt-2 text-sm text-red-600">
+                    {errors.gender.message}
+                  </p>
+                )}
+              </div>
+
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
@@ -335,6 +440,118 @@ const AdminPlayers: React.FC = () => {
                   disabled={updateMutation.isLoading}
                 >
                   {updateMutation.isLoading ? "Сохранение..." : "Сохранить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно создания */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="card max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Создать игрока
+              </h3>
+              <button
+                onClick={closeCreateModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit(onSubmitCreate)} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ФИО игрока
+                </label>
+                <input
+                  type="text"
+                  className={`input-field ${
+                    errors.name ? "border-red-300" : ""
+                  }`}
+                  placeholder="Иванов Иван"
+                  {...register("name", {
+                    required: "ФИО обязательно",
+                    minLength: {
+                      value: 2,
+                      message: "ФИО должно содержать минимум 2 символа",
+                    },
+                    validate: {
+                      hasFullName: (value) => {
+                        const parts = value.trim().split(/\s+/);
+                        if (parts.length < 2) {
+                          return "Укажите Фамилию и Имя (например: Иванов Иван)";
+                        }
+                        // Проверяем, что вторая часть не является инициалом
+                        const secondPart = parts[1];
+                        if (/^[А-ЯA-Z]\.?$/.test(secondPart)) {
+                          return "Нельзя использовать инициалы. Укажите полное имя (например: Иванов Иван)";
+                        }
+                        return true;
+                      },
+                    },
+                  })}
+                />
+                {errors.name && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.name.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Пол
+                </label>
+                <div className="flex gap-6">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="male"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Мужской</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="female"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Женский</span>
+                  </label>
+                </div>
+                {errors.gender && (
+                  <p className="mt-2 text-sm text-red-600">
+                    {errors.gender.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  className="btn-secondary"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={createMutation.isLoading}
+                >
+                  {createMutation.isLoading ? "Создание..." : "Создать"}
                 </button>
               </div>
             </form>

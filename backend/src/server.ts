@@ -8,7 +8,7 @@ import path from "path";
 import routes from "./routes";
 import { testConnection } from "./config/database";
 import { runMigrations } from "./migrations/migrate";
-import { AuthModel } from "./models/AuthModel";
+import { UserModel } from "./models/UserModel";
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -97,13 +97,13 @@ const initializeServer = async () => {
       process.exit(1);
     }
 
-    // 2. Выполняем миграции
-    console.log("🔄 Выполнение миграций...");
+    // 2. Проверяем инициализацию БД
+    console.log("🔄 Проверка структуры БД...");
     await runMigrations();
 
     // 3. Инициализируем администратора по умолчанию
-    console.log("👤 Проверка администраторов...");
-    await AuthModel.ensureDefaultAdmin();
+    console.log("👤 Проверка пользователей...");
+    await UserModel.ensureDefaultAdmin();
 
     // 4. Запускаем сервер
     app.listen(PORT, () => {

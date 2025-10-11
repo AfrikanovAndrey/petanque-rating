@@ -1,115 +1,137 @@
 import { pool } from "../config/database";
+import fs from "fs";
+import path from "path";
 
-const migrations = [
-  // 1. Создание таблицы игроков
-  `CREATE TABLE IF NOT EXISTS players (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_name (name)
-  )`,
+/**
+ * Система миграций базы данных (TypeScript)
+ *
+ * Миграции самоконтролирующие - каждая проверяет сама, нужно ли ее применять.
+ * Не используется отдельная таблица для отслеживания миграций.
+ *
+ * Данный скрипт выполняет:
+ * 1. Проверку наличия основных таблиц
+ * 2. Автоматическое применение всех TypeScript миграций из папки migrations/
+ * 3. Создание базовых настроек (если отсутствуют)
+ *
+ * Запуск: npm run check-db
+ */
 
-  // 2. Создание таблицы турниров
-  `CREATE TABLE IF NOT EXISTS tournaments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    date DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_date (date)
-  )`,
+interface Migration {
+  up: (pool: any) => Promise<void>;
+  down?: (pool: any) => Promise<void>;
+}
 
-  // 3. Создание таблицы результатов турниров
-  `CREATE TABLE IF NOT EXISTS tournament_results (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    tournament_id INT NOT NULL,
-    player_id INT NOT NULL,
-    position INT NOT NULL,
-    points INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
-    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_tournament_player (tournament_id, player_id),
-    INDEX idx_tournament_player (tournament_id, player_id),
-    INDEX idx_points (points DESC)
-  )`,
-
-  // 4. Создание таблицы настроек рейтинга
-  `CREATE TABLE IF NOT EXISTS rating_settings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    setting_name VARCHAR(50) NOT NULL UNIQUE,
-    setting_value TEXT NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`,
-
-  // 5. Создание таблицы очков за позицию
-  `CREATE TABLE IF NOT EXISTS position_points (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    position INT NOT NULL UNIQUE,
-    points INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_position (position)
-  )`,
-
-  // 6. Создание таблицы администраторов
-  `CREATE TABLE IF NOT EXISTS admins (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )`,
-];
-
-const seedData = [
-  // Настройки по умолчанию
-  `INSERT IGNORE INTO rating_settings (setting_name, setting_value, description) VALUES 
-    ('best_results_count', '8', 'Количество лучших результатов для подсчета рейтинга'),
-    ('current_season', '2025', 'Текущий сезон')`,
-
-  // Очки за позиции по умолчанию (первые 20 позиций)
-  `INSERT IGNORE INTO position_points (position, points) VALUES 
-    (1, 100), (2, 90), (3, 80), (4, 75), (5, 70),
-    (6, 65), (7, 60), (8, 55), (9, 50), (10, 45),
-    (11, 40), (12, 38), (13, 36), (14, 34), (15, 32),
-    (16, 30), (17, 28), (18, 26), (19, 24), (20, 22)`,
-];
-
-export const runMigrations = async () => {
+/**
+ * Применить TypeScript миграцию
+ */
+const applyMigration = async (migrationPath: string, migrationName: string) => {
   try {
-    console.log("🚀 Запуск миграций...");
+    // Импортируем TypeScript миграцию
+    const migration: Migration = await import(migrationPath);
 
-    for (let i = 0; i < migrations.length; i++) {
-      console.log(`Выполнение миграции ${i + 1}/${migrations.length}...`);
-      await pool.execute(migrations[i]);
+    // Проверяем наличие функции up
+    if (typeof migration.up !== "function") {
+      throw new Error(`Миграция ${migrationName} не содержит функцию up()`);
     }
 
-    console.log("🌱 Добавление начальных данных...");
-    for (const seed of seedData) {
-      await pool.execute(seed);
-    }
-
-    console.log("✅ Миграции выполнены успешно");
+    // Выполняем миграцию (она сама контролирует, нужно ли применение)
+    await migration.up(pool);
   } catch (error) {
-    console.error("❌ Ошибка при выполнении миграций:", error);
+    console.error(`❌ Ошибка при применении миграции ${migrationName}:`, error);
     throw error;
   }
 };
 
-// Запуск миграций если скрипт вызван напрямую
+/**
+ * Применить все миграции
+ */
+const applyMigrations = async () => {
+  const migrationsDir = __dirname;
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((file) => {
+      // Ищем TypeScript файлы миграций (не migrate.ts)
+      return (
+        (file.endsWith(".ts") || file.endsWith(".js")) &&
+        file !== "migrate.ts" &&
+        file !== "migrate.js" &&
+        !file.endsWith(".d.ts") &&
+        /^\d{3}_/.test(file) // Начинается с трех цифр
+      );
+    })
+    .sort(); // Сортируем для применения в правильном порядке
+
+  if (files.length === 0) {
+    console.log("📋 Миграции не найдены");
+    return;
+  }
+
+  console.log(`📋 Найдено миграций: ${files.length}`);
+
+  for (const file of files) {
+    const migrationPath = path.join(migrationsDir, file);
+    const migrationName = file.replace(/\.(ts|js)$/, ""); // Убираем расширение
+
+    console.log(`📝 Применение миграции: ${migrationName}...`);
+    await applyMigration(migrationPath, migrationName);
+  }
+
+  console.log("✅ Все миграции применены");
+};
+
+export const runMigrations = async () => {
+  try {
+    console.log("🔍 Проверка инициализации БД...");
+
+    // Проверяем, что основные таблицы созданы
+    const [tables] = await pool.execute(`
+      SELECT TABLE_NAME 
+      FROM information_schema.TABLES 
+      WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME IN ('players', 'tournaments', 'teams', 'tournament_results')
+    `);
+
+    if ((tables as any[]).length < 4) {
+      throw new Error(
+        "Основные таблицы не найдены. Убедитесь, что база данных инициализирована через mysql/init/01-init.sql"
+      );
+    }
+
+    console.log("✅ Структура БД инициализирована");
+
+    // Применяем миграции (они самоконтролирующие)
+    await applyMigrations();
+
+    // Проверяем наличие базовых настроек (они должны быть созданы в 01-init.sql, но на всякий случай проверим)
+    const [settings] = await pool.execute(
+      "SELECT COUNT(*) as count FROM rating_settings WHERE setting_name IN ('best_results_count', 'current_season')"
+    );
+
+    if ((settings as any[])[0].count < 2) {
+      console.log("🌱 Добавление базовых настроек...");
+      await pool.execute(`
+        INSERT IGNORE INTO rating_settings (setting_name, setting_value, description) VALUES 
+          ('best_results_count', '8', 'Количество лучших результатов для подсчета рейтинга'),
+          ('current_season', '2025', 'Текущий сезон')
+      `);
+    }
+
+    console.log("✅ БД готова к работе");
+  } catch (error) {
+    console.error("❌ Ошибка при проверке БД:", error);
+    throw error;
+  }
+};
+
+// Запуск проверки если скрипт вызван напрямую
 if (require.main === module) {
   runMigrations()
     .then(() => {
-      console.log("Миграции завершены");
+      console.log("Проверка БД завершена успешно");
       process.exit(0);
     })
     .catch((error) => {
-      console.error("Ошибка миграций:", error);
+      console.error("Ошибка проверки БД:", error);
       process.exit(1);
     });
 }

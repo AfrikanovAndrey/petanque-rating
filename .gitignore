@@ -109,7 +109,6 @@ mysql/data/*
 !mysql/data/.gitkeep
 uploads/*
 !uploads/.gitkeep
-backups/*
 !backups/.gitkeep
 
 # IDE

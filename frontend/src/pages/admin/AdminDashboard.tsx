@@ -1,5 +1,5 @@
-import React from "react";
-import { useQuery } from "react-query";
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
 import {
   TrophyIcon,
@@ -8,11 +8,59 @@ import {
   PlusIcon,
   ArrowUpIcon,
   CogIcon,
+  TrashIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
 import { ratingApi, adminApi } from "../../services/api";
-import { formatNumber } from "../../utils";
+import { formatNumber, handleApiError } from "../../utils";
+import { User, UserRole } from "../../types";
 
 const AdminDashboard: React.FC = () => {
+  const queryClient = useQueryClient();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      // Сначала пробуем загрузить из localStorage
+      const cachedUser = localStorage.getItem("current_user");
+      if (cachedUser) {
+        try {
+          const user = JSON.parse(cachedUser);
+          setCurrentUser(user);
+        } catch (e) {
+          console.error("Ошибка парсинга cached user:", e);
+        }
+      }
+
+      // Затем загружаем свежие данные с сервера
+      const response = await adminApi.getCurrentUser();
+      if (response.data.success && response.data.data) {
+        setCurrentUser(response.data.data);
+        localStorage.setItem(
+          "current_user",
+          JSON.stringify(response.data.data)
+        );
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки текущего пользователя:", error);
+    }
+  };
+
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+
+  // Debug информация
+  useEffect(() => {
+    if (currentUser) {
+      console.log("Dashboard - Текущий пользователь:", currentUser);
+      console.log("Dashboard - isAdmin:", isAdmin);
+    }
+  }, [currentUser, isAdmin]);
+
   // Загружаем данные для статистики
   const { data: ratingData } = useQuery("dashboardRating", async () => {
     const response = await ratingApi.getFullRating();
@@ -31,6 +79,37 @@ const AdminDashboard: React.FC = () => {
     const response = await adminApi.getPlayers();
     return response.data.data || [];
   });
+
+  // Мутация для удаления всех команд
+  const deleteAllTeamsMutation = useMutation(
+    async () => {
+      return await adminApi.deleteAllTeams();
+    },
+    {
+      onSuccess: (response) => {
+        const deletedCount = response.data.data?.deleted_count || 0;
+        toast.success(`Удалено команд: ${deletedCount}`);
+        // Обновляем кеш данных
+        queryClient.invalidateQueries("dashboardRating");
+        queryClient.invalidateQueries("dashboardTournaments");
+        queryClient.invalidateQueries("dashboardPlayers");
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
+  // Обработчик удаления всех команд
+  const handleDeleteAllTeams = () => {
+    if (
+      window.confirm(
+        "Вы уверены, что хотите удалить ВСЕ команды? Это действие нельзя отменить!"
+      )
+    ) {
+      deleteAllTeamsMutation.mutate();
+    }
+  };
 
   // Вычисляем статистику
   const stats = {
@@ -78,11 +157,11 @@ const AdminDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Заголовок */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Панель управления</h1>
-        <p className="mt-2 text-gray-600">Обзор системы рейтинга игроков</p>
+        <p className="mt-1 text-gray-600">Обзор системы рейтинга игроков</p>
       </div>
 
       {/* Статистика */}
@@ -118,7 +197,7 @@ const AdminDashboard: React.FC = () => {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Топ игроков */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-6">
@@ -225,13 +304,17 @@ const AdminDashboard: React.FC = () => {
             <span className="text-gray-600 font-medium">Загрузить турнир</span>
           </Link>
 
-          <Link
-            to="/admin/settings"
-            className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors duration-200"
-          >
-            <CogIcon className="h-5 w-5 text-gray-400 mr-3" />
-            <span className="text-gray-600 font-medium">Настроить рейтинг</span>
-          </Link>
+          {isAdmin && (
+            <Link
+              to="/admin/settings"
+              className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors duration-200"
+            >
+              <CogIcon className="h-5 w-5 text-gray-400 mr-3" />
+              <span className="text-gray-600 font-medium">
+                Настроить рейтинг
+              </span>
+            </Link>
+          )}
 
           <Link
             to="/admin/players"
@@ -242,6 +325,33 @@ const AdminDashboard: React.FC = () => {
               Управление игроками
             </span>
           </Link>
+
+          {isAdmin && (
+            <>
+              <Link
+                to="/admin/users"
+                className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors duration-200"
+              >
+                <UserGroupIcon className="h-5 w-5 text-gray-400 mr-3" />
+                <span className="text-gray-600 font-medium">
+                  Управление пользователями
+                </span>
+              </Link>
+
+              <button
+                onClick={handleDeleteAllTeams}
+                disabled={deleteAllTeamsMutation.isLoading}
+                className="flex items-center p-4 border-2 border-dashed border-red-300 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <TrashIcon className="h-5 w-5 text-red-500 mr-3" />
+                <span className="text-red-600 font-medium">
+                  {deleteAllTeamsMutation.isLoading
+                    ? "Удаление..."
+                    : "Удалить все команды"}
+                </span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

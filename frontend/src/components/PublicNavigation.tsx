@@ -24,13 +24,20 @@ const PublicNavigation: React.FC = () => {
   return (
     <nav className="bg-white shadow mb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between h-36 sm:h-48">
           <div className="flex">
             <div className="flex space-x-8">
               {/* Логотип */}
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-primary-600">
-                  Петанк Рейтинг
+              <div className="flex-shrink-0 flex items-center space-x-3">
+                <img
+                  src="/logo.png"
+                  alt="Логотип Российской федерации петанка"
+                  className="h-30 w-30 sm:h-40 sm:w-40"
+                />
+                <h1 className="text-lg font-bold text-primary-600 sm:text-xl">
+                  Российская федерация петанка
+                  <br className="hidden sm:inline" />
+                  <span>Рейтинг игроков</span>
                 </h1>
               </div>
             </div>

@@ -25,13 +25,31 @@ const AdminLogin: React.FC = () => {
     }
   }, [navigate]);
 
+  // Функция для очистки старых данных
+  const clearOldData = () => {
+    localStorage.removeItem("admin_token");
+    localStorage.removeItem("current_user");
+    toast.success("Старые данные очищены. Теперь войдите заново.");
+  };
+
   const onSubmit = async (data: LoginCredentials) => {
     setIsLoading(true);
     try {
       const response = await authApi.login(data);
 
       if (response.data.success && response.data.token) {
+        // Сохраняем токен
         localStorage.setItem("admin_token", response.data.token);
+
+        // Сохраняем информацию о пользователе
+        if (response.data.user) {
+          localStorage.setItem(
+            "current_user",
+            JSON.stringify(response.data.user)
+          );
+          console.log("Пользователь вошел:", response.data.user);
+        }
+
         toast.success("Успешная авторизация!");
         navigate("/admin/dashboard");
       } else {
@@ -170,6 +188,21 @@ const AdminLogin: React.FC = () => {
             <p>
               Пароль: <span className="font-mono">admin123</span>
             </p>
+          </div>
+        </div>
+
+        {/* Кнопка очистки старых данных */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="text-center text-sm">
+            <p className="text-blue-800 mb-2">
+              После обновления системы нужно войти заново
+            </p>
+            <button
+              onClick={clearOldData}
+              className="text-blue-600 hover:text-blue-800 font-medium underline"
+            >
+              Очистить старые данные и войти заново
+            </button>
           </div>
         </div>
       </div>
