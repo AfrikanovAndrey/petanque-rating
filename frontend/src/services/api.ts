@@ -2,13 +2,11 @@ import axios, { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import {
   ApiResponse,
   PlayerRating,
-  RatingTableRow,
   LoginCredentials,
   AuthResponse,
   Tournament,
   TournamentWithResults,
   Player,
-  RatingSetting,
   User,
   CreateUserRequest,
   UpdateUserRequest,
@@ -50,39 +48,15 @@ api.interceptors.response.use(
 
 // === ПУБЛИЧНЫЕ API (рейтинг) ===
 export const ratingApi = {
-  // Получить таблицу рейтинга
-  getRatingTable: (): Promise<AxiosResponse<ApiResponse<RatingTableRow[]>>> =>
-    api.get("/rating/table"),
-
   // Получить полную таблицу рейтинга с деталями
   getFullRating: (): Promise<AxiosResponse<ApiResponse<PlayerRating[]>>> =>
     api.get("/rating/full"),
-
-  // Получить мужской рейтинг
-  getMaleRating: (): Promise<
-    AxiosResponse<
-      ApiResponse<RatingTableRow[]> & { gender: string; count: number }
-    >
-  > => api.get("/rating/male"),
-
-  // Получить женский рейтинг
-  getFemaleRating: (): Promise<
-    AxiosResponse<
-      ApiResponse<RatingTableRow[]> & { gender: string; count: number }
-    >
-  > => api.get("/rating/female"),
 
   // Получить рейтинги разделенные по полу
   getRatingsByGender: (
     gender?: string
   ): Promise<AxiosResponse<ApiResponse<any>>> =>
     api.get("/rating/by-gender" + (gender ? `?gender=${gender}` : "")),
-
-  // Получить детали игрока
-  getPlayerDetails: (
-    playerId: number
-  ): Promise<AxiosResponse<ApiResponse<PlayerRating>>> =>
-    api.get(`/rating/player/${playerId}`),
 };
 
 export const tournamentsApi = {
@@ -95,10 +69,6 @@ export const tournamentsApi = {
     tournamentId: number
   ): Promise<AxiosResponse<ApiResponse<TournamentWithResults>>> =>
     api.get(`/rating/tournaments/${tournamentId}`),
-
-  // Получить статистику турниров
-  getTournamentsStats: (): Promise<AxiosResponse<ApiResponse<any>>> =>
-    api.get("/rating/tournaments/stats"),
 };
 
 // === API АВТОРИЗАЦИИ ===
@@ -112,13 +82,6 @@ export const authApi = {
   // Проверка токена
   verifyToken: (): Promise<AxiosResponse<AuthResponse>> =>
     api.get("/auth/verify"),
-
-  // Изменение пароля
-  changePassword: (data: {
-    currentPassword: string;
-    newPassword: string;
-  }): Promise<AxiosResponse<ApiResponse>> =>
-    api.put("/auth/change-password", data),
 };
 
 // === АДМИНСКИЕ API ===
@@ -255,10 +218,6 @@ export const adminApi = {
   // Обновить количество лучших результатов
   setBestResultsCount: (count: number): Promise<AxiosResponse<ApiResponse>> =>
     api.put("/admin/settings/best-results-count", { count }),
-
-  // Получить все настройки
-  getAllSettings: (): Promise<AxiosResponse<ApiResponse<RatingSetting[]>>> =>
-    api.get("/admin/settings"),
 };
 
 export default api;

@@ -58,21 +58,6 @@ export class LicensedPlayerModel {
     return rows[0] || null;
   }
 
-  // Проверить, есть ли лицензионный игрок с таким именем в году
-  static async checkPlayerExists(
-    playerName: string,
-    year: number
-  ): Promise<boolean> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as count 
-       FROM licensed_players lp
-       JOIN players p ON lp.player_id = p.id 
-       WHERE LOWER(TRIM(p.name)) = LOWER(TRIM(?)) AND lp.year = ? AND lp.is_active = TRUE`,
-      [playerName, year]
-    );
-    return rows[0].count > 0;
-  }
-
   // Добавить нового лицензионного игрока
   static async addLicensedPlayer(
     playerData: LicensedPlayerUploadData
@@ -241,24 +226,20 @@ export class LicensedPlayerModel {
     return result.affectedRows > 0;
   }
 
-  // Деактивировать лицензионного игрока
-  static async deactivateLicensedPlayer(id: number): Promise<boolean> {
-    const [result] = await pool.execute<ResultSetHeader>(
-      "UPDATE licensed_players SET is_active = FALSE WHERE id = ?",
-      [id]
-    );
-    return result.affectedRows > 0;
-  }
-
   // Загрузить лицензионных игроков массово
   static async uploadLicensedPlayers(
-    playersData: LicensedPlayerUploadData[]
+    playersData: LicensedPlayerUploadData[],
+    replaceExisting: boolean = false
   ): Promise<{
     success: number;
+    created: number;
+    updated: number;
     errors: Array<{ player: LicensedPlayerUploadData; error: string }>;
   }> {
     const connection = await pool.getConnection();
     let success = 0;
+    let created = 0;
+    let updated = 0;
     const errors: Array<{ player: LicensedPlayerUploadData; error: string }> =
       [];
 
@@ -282,20 +263,6 @@ export class LicensedPlayerModel {
             continue;
           }
 
-          // Проверяем, не существует ли уже такая лицензия
-          const [existingLicense] = await connection.execute<RowDataPacket[]>(
-            "SELECT COUNT(*) as count FROM licensed_players WHERE license_number = ?",
-            [player.license_number]
-          );
-
-          if (existingLicense[0].count > 0) {
-            errors.push({
-              player,
-              error: `Лицензия ${player.license_number} уже существует`,
-            });
-            continue;
-          }
-
           // Создаем или находим игрока
           let playerId: number;
 
@@ -314,20 +281,52 @@ export class LicensedPlayerModel {
             playerId = insertResult.insertId;
           }
 
-          // Добавляем лицензионного игрока
-          await connection.execute(
-            `INSERT INTO licensed_players (player_id, license_number, city, license_date, year, is_active) 
-             VALUES (?, ?, ?, ?, ?, TRUE)`,
-            [
-              playerId,
-              player.license_number,
-              player.city,
-              player.license_date,
-              player.year,
-            ]
+          // Проверяем, не существует ли уже такая лицензия
+          const [existingLicense] = await connection.execute<RowDataPacket[]>(
+            "SELECT id FROM licensed_players WHERE license_number = ?",
+            [player.license_number]
           );
 
-          success++;
+          if (existingLicense.length > 0) {
+            if (replaceExisting) {
+              // Обновляем существующую лицензию
+              await connection.execute(
+                `UPDATE licensed_players 
+                 SET player_id = ?, city = ?, license_date = ?, year = ?, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                 WHERE license_number = ?`,
+                [
+                  playerId,
+                  player.city,
+                  player.license_date,
+                  player.year,
+                  player.license_number,
+                ]
+              );
+              updated++;
+              success++;
+            } else {
+              errors.push({
+                player,
+                error: `Лицензия ${player.license_number} уже существует`,
+              });
+              continue;
+            }
+          } else {
+            // Добавляем нового лицензионного игрока
+            await connection.execute(
+              `INSERT INTO licensed_players (player_id, license_number, city, license_date, year, is_active) 
+               VALUES (?, ?, ?, ?, ?, TRUE)`,
+              [
+                playerId,
+                player.license_number,
+                player.city,
+                player.license_date,
+                player.year,
+              ]
+            );
+            created++;
+            success++;
+          }
         } catch (error: any) {
           console.error(
             `Ошибка при обработке игрока "${player.player_name}" (строка ${
@@ -343,9 +342,11 @@ export class LicensedPlayerModel {
       }
 
       await connection.commit();
-      console.log(`✅ Загружено ${success} игроков, ошибок: ${errors.length}`);
+      console.log(
+        `✅ Загружено ${success} игроков (создано: ${created}, обновлено: ${updated}), ошибок: ${errors.length}`
+      );
 
-      return { success, errors };
+      return { success, created, updated, errors };
     } catch (error) {
       await connection.rollback();
       console.error("❌ Ошибка при загрузке лицензионных игроков:", error);
@@ -353,80 +354,6 @@ export class LicensedPlayerModel {
     } finally {
       connection.release();
     }
-  }
-
-  // Поиск лицензионных игроков по имени (для автозаполнения)
-  static async searchLicensedPlayers(
-    searchTerm: string,
-    year?: number
-  ): Promise<(LicensedPlayer & { player_name: string })[]> {
-    const yearCondition = year ? "AND lp.year = ?" : "";
-    const params: any[] = [`%${searchTerm}%`, `%${searchTerm}%`];
-    if (year) params.push(year);
-
-    const [rows] = await pool.execute<
-      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
-    >(
-      `SELECT lp.*, p.name as player_name
-       FROM licensed_players lp
-       JOIN players p ON lp.player_id = p.id
-       WHERE (
-         LOWER(p.name) LIKE LOWER(?) OR
-         LOWER(lp.license_number) LIKE LOWER(?)
-       ) ${yearCondition}
-       AND lp.is_active = TRUE
-       ORDER BY p.name
-       LIMIT 10`,
-      params
-    );
-
-    return rows;
-  }
-
-  // Получить статистику лицензионных игроков
-  static async getLicensedPlayersStats(year?: number): Promise<{
-    total: number;
-    active: number;
-    inactive: number;
-    cities: Array<{ city: string; count: number }>;
-  }> {
-    const yearCondition = year ? "WHERE year = ?" : "";
-    const params = year ? [year, year, year] : [];
-
-    const [totalRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as total FROM licensed_players ${yearCondition}`,
-      year ? [year] : []
-    );
-
-    const [activeRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as active FROM licensed_players ${yearCondition} ${
-        year ? "AND" : "WHERE"
-      } is_active = TRUE`,
-      year ? [year] : []
-    );
-
-    const [inactiveRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as inactive FROM licensed_players ${yearCondition} ${
-        year ? "AND" : "WHERE"
-      } is_active = FALSE`,
-      year ? [year] : []
-    );
-
-    const [cityRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT city, COUNT(*) as count 
-       FROM licensed_players 
-       ${yearCondition} 
-       GROUP BY city 
-       ORDER BY count DESC, city`,
-      year ? [year] : []
-    );
-
-    return {
-      total: totalRows[0].total,
-      active: activeRows[0].active,
-      inactive: inactiveRows[0].inactive,
-      cities: cityRows as Array<{ city: string; count: number }>,
-    };
   }
 
   // Получить лицензионного игрока по номеру лицензии

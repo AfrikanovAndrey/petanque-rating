@@ -1,13 +1,15 @@
-import { CupPosition, TournamentCategoryEnum } from "../types";
-import { calculateWins, calculateLoses } from "../services/winsLosesCalculator";
+import {
+  CupPosition,
+  TournamentCategory,
+  TournamentCategoryEnum,
+} from "../types";
 
 // Структура для хранения очков за кубки согласно таблице РФП
 // Ключ: "category-cup_type-teams_range"
 // Значение: Map<позиция, очки>
 
 type TeamsRange = "8-12" | "13-18" | "19-24" | "25-30" | "31-36" | "36+";
-type TournamentCategory = "1" | "2"; // 1 - высшая категория, 2 - вторая категория
-type CupPointsKey = `${TournamentCategory}-${string}-${TeamsRange}`;
+type CupPointsKey = `${TournamentCategoryEnum}-${string}-${TeamsRange}`;
 
 export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
   // ТУРНИРЫ 1 КАТЕГОРИИ
@@ -261,7 +263,7 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
  * @returns количество очков
  */
 export function getCupPoints(
-  category: TournamentCategory,
+  category: TournamentCategoryEnum,
   cup: "A" | "B" | "C",
   position: CupPosition,
   totalTeams: number,
@@ -327,7 +329,8 @@ export function getCupPoints(
     }
 
     // Для кубка A турниров 1 категории добавляется +1 очко за игру за 3 место
-    const bonusPoint = category === "1" && cup === "A" ? 1 : 0;
+    const bonusPoint =
+      category === TournamentCategoryEnum.FEDERAL && cup === "A" ? 1 : 0;
     const totalPoints = semiFinalPoints + bonusPoint;
 
     console.log(

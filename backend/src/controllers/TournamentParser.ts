@@ -244,7 +244,7 @@ export class TournamentParser {
 
     if (errors.length !== 0) {
       throw new Error(
-        `#Ошибки парсинга данных на листе "Кубок ${cup}":\n${errors}`
+        `#Ошибки парсинга данных на листе "Кубок ${cup}":\n${errors.join("\n")}`
       );
     }
 

@@ -158,24 +158,15 @@ router.post(
   AdminController.uploadLicensedPlayers
 );
 
-// POST /api/admin/tournaments/:id/recalculate-points - пересчитать очки турнира
-router.post("/tournaments/:id/recalculate-points", async (req, res) => {
+// POST /api/admin/tournaments/recalculate-all-points - пересчитать очки всех турниров
+router.post("/tournaments/recalculate-all-points", async (req, res) => {
   try {
-    const tournamentId = parseInt(req.params.id);
-    if (isNaN(tournamentId)) {
-      res.status(400).json({
-        success: false,
-        message: "Неверный ID турнира",
-      });
-      return;
-    }
-
     const { TournamentModel } = await import("../models/TournamentModel");
-    await TournamentModel.recalculatePoints(tournamentId);
+    await TournamentModel.recalculatePoints();
 
     res.json({
       success: true,
-      message: "Очки турнира успешно пересчитаны",
+      message: "Очки всех турниров успешно пересчитаны",
     });
   } catch (error) {
     console.error("Ошибка пересчета очков:", error);

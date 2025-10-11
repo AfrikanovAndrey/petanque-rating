@@ -35,33 +35,7 @@ export interface Tournament {
   updated_at: string;
 }
 
-// Команда
-export interface Team {
-  id: number;
-  name: string;
-  tournament_id: number;
-  created_at: string;
-  updated_at: string;
-}
-
-// Участник команды
-export interface TeamMember {
-  player_id: number;
-  player_name: string;
-  sort_order: number;
-}
-
-// Команда с участниками
-export interface TeamWithMembers extends Team {
-  members: TeamMember[];
-}
-
 export type TournamentCategory = "FEDERAL" | "REGIONAL";
-
-export enum TournamentCategoryEnum {
-  FEDERAL,
-  REGIONAL,
-}
 
 // Enum для причин получения очков
 export enum CupPosition {
@@ -186,28 +160,6 @@ export interface RatingTableRow {
   total_points: number;
 }
 
-// Рейтинги разделенные по полу
-export interface RatingsByGender {
-  male: PlayerRating[];
-  female: PlayerRating[];
-  unknown: PlayerRating[];
-}
-
-// Рейтинги для конкретного пола
-export interface GenderRatingResponse {
-  data: PlayerRating[];
-  gender: string;
-  count: number;
-}
-
-// Статистика рейтингов по полу
-export interface GenderRatingCounts {
-  male: number;
-  female: number;
-  unknown: number;
-  total: number;
-}
-
 // Настройка рейтинга
 export interface RatingSetting {
   id: number;
@@ -263,47 +215,8 @@ export interface UpdateUserRequest {
   role?: UserRole;
 }
 
-// Данные для загрузки турнира
-export interface TournamentUpload {
-  tournament_name: string;
-  tournament_date: string;
-  tournament_type: TournamentType;
-  tournament_file: File;
-}
-
 // Турнир с результатами
 export interface TournamentWithResults {
   tournament: Tournament;
   results: TournamentResult[];
-}
-
-// Состояния загрузки
-export interface LoadingState {
-  isLoading: boolean;
-  error?: string;
-}
-
-// Пропсы для модальных окон
-export interface ModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-// Пропсы для форм
-export interface FormProps<T = any> {
-  initialData?: T;
-  onSubmit: (data: T) => Promise<void> | void;
-  onCancel?: () => void;
-  isLoading?: boolean;
-}
-
-// Статистика
-export interface Statistics {
-  totalPlayers: number;
-  totalTournaments: number;
-  averageRating: number;
-  topPlayer: {
-    name: string;
-    points: number;
-  };
 }

@@ -487,7 +487,7 @@ export class TournamentController {
         let points = 0;
         if (results.cup) {
           points = getCupPoints(
-            this.convertCategoryEnumToString(tournamentCategory),
+            tournamentCategory,
             results.cup!,
             results.cupPosition!,
             teams.length
