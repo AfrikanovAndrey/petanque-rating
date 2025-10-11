@@ -1,4 +1,4 @@
-import { CupPosition, PointsReason } from "../types";
+import { CupPosition } from "../types";
 
 /**
  * Рассчитывает общее количество побед на основе квалификационных побед и позиции в кубке

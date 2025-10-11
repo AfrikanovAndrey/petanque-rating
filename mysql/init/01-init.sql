@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS tournament_results (
     'QUALIFYING_LOW',
     'QUALIFYING_ONLY'
   ) NOT NULL DEFAULT 'CUP_QUARTER_FINAL',
-  cup ENUM('A', 'B') NULL,
+  cup ENUM('A', 'B', 'C') NULL,
   qualifying_wins INT DEFAULT 0,
   wins INT DEFAULT 0,
   loses INT DEFAULT 0,

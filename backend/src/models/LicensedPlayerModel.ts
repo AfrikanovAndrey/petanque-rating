@@ -228,13 +228,18 @@ export class LicensedPlayerModel {
 
   // Загрузить лицензионных игроков массово
   static async uploadLicensedPlayers(
-    playersData: LicensedPlayerUploadData[]
+    playersData: LicensedPlayerUploadData[],
+    replaceExisting: boolean = false
   ): Promise<{
     success: number;
+    created: number;
+    updated: number;
     errors: Array<{ player: LicensedPlayerUploadData; error: string }>;
   }> {
     const connection = await pool.getConnection();
     let success = 0;
+    let created = 0;
+    let updated = 0;
     const errors: Array<{ player: LicensedPlayerUploadData; error: string }> =
       [];
 
@@ -258,20 +263,6 @@ export class LicensedPlayerModel {
             continue;
           }
 
-          // Проверяем, не существует ли уже такая лицензия
-          const [existingLicense] = await connection.execute<RowDataPacket[]>(
-            "SELECT COUNT(*) as count FROM licensed_players WHERE license_number = ?",
-            [player.license_number]
-          );
-
-          if (existingLicense[0].count > 0) {
-            errors.push({
-              player,
-              error: `Лицензия ${player.license_number} уже существует`,
-            });
-            continue;
-          }
-
           // Создаем или находим игрока
           let playerId: number;
 
@@ -290,20 +281,52 @@ export class LicensedPlayerModel {
             playerId = insertResult.insertId;
           }
 
-          // Добавляем лицензионного игрока
-          await connection.execute(
-            `INSERT INTO licensed_players (player_id, license_number, city, license_date, year, is_active) 
-             VALUES (?, ?, ?, ?, ?, TRUE)`,
-            [
-              playerId,
-              player.license_number,
-              player.city,
-              player.license_date,
-              player.year,
-            ]
+          // Проверяем, не существует ли уже такая лицензия
+          const [existingLicense] = await connection.execute<RowDataPacket[]>(
+            "SELECT id FROM licensed_players WHERE license_number = ?",
+            [player.license_number]
           );
 
-          success++;
+          if (existingLicense.length > 0) {
+            if (replaceExisting) {
+              // Обновляем существующую лицензию
+              await connection.execute(
+                `UPDATE licensed_players 
+                 SET player_id = ?, city = ?, license_date = ?, year = ?, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                 WHERE license_number = ?`,
+                [
+                  playerId,
+                  player.city,
+                  player.license_date,
+                  player.year,
+                  player.license_number,
+                ]
+              );
+              updated++;
+              success++;
+            } else {
+              errors.push({
+                player,
+                error: `Лицензия ${player.license_number} уже существует`,
+              });
+              continue;
+            }
+          } else {
+            // Добавляем нового лицензионного игрока
+            await connection.execute(
+              `INSERT INTO licensed_players (player_id, license_number, city, license_date, year, is_active) 
+               VALUES (?, ?, ?, ?, ?, TRUE)`,
+              [
+                playerId,
+                player.license_number,
+                player.city,
+                player.license_date,
+                player.year,
+              ]
+            );
+            created++;
+            success++;
+          }
         } catch (error: any) {
           console.error(
             `Ошибка при обработке игрока "${player.player_name}" (строка ${
@@ -319,9 +342,11 @@ export class LicensedPlayerModel {
       }
 
       await connection.commit();
-      console.log(`✅ Загружено ${success} игроков, ошибок: ${errors.length}`);
+      console.log(
+        `✅ Загружено ${success} игроков (создано: ${created}, обновлено: ${updated}), ошибок: ${errors.length}`
+      );
 
-      return { success, errors };
+      return { success, created, updated, errors };
     } catch (error) {
       await connection.rollback();
       console.error("❌ Ошибка при загрузке лицензионных игроков:", error);
