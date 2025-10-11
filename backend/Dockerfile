@@ -13,10 +13,8 @@ RUN npm ci && npm cache clean --force
 # Копируем исходный код
 COPY . .
 
-# Компилируем TypeScript с ограничением памяти
-ENV NODE_OPTIONS="--max-old-space-size=1024"
+# Компилируем TypeScript
 RUN npm run build
-ENV NODE_OPTIONS=""
 
 # Production stage
 FROM node:18-alpine AS production
@@ -27,10 +25,8 @@ WORKDIR /app
 # Копируем package.json и package-lock.json
 COPY package*.json ./
 
-# Устанавливаем только production зависимости + необходимые для миграций
-RUN npm ci --omit=dev && \
-    npm install typescript ts-node && \
-    npm cache clean --force
+# Устанавливаем только production зависимости
+RUN npm ci --only=production && npm cache clean --force
 
 # Копируем скомпилированный код из builder stage
 COPY --from=builder /app/dist ./dist
