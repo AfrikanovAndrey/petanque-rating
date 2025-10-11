@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
 import {
@@ -9,13 +9,57 @@ import {
   ArrowUpIcon,
   CogIcon,
   TrashIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { ratingApi, adminApi } from "../../services/api";
 import { formatNumber, handleApiError } from "../../utils";
+import { User, UserRole } from "../../types";
 
 const AdminDashboard: React.FC = () => {
   const queryClient = useQueryClient();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    loadCurrentUser();
+  }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      // Сначала пробуем загрузить из localStorage
+      const cachedUser = localStorage.getItem("current_user");
+      if (cachedUser) {
+        try {
+          const user = JSON.parse(cachedUser);
+          setCurrentUser(user);
+        } catch (e) {
+          console.error("Ошибка парсинга cached user:", e);
+        }
+      }
+
+      // Затем загружаем свежие данные с сервера
+      const response = await adminApi.getCurrentUser();
+      if (response.data.success && response.data.data) {
+        setCurrentUser(response.data.data);
+        localStorage.setItem(
+          "current_user",
+          JSON.stringify(response.data.data)
+        );
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки текущего пользователя:", error);
+    }
+  };
+
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
+
+  // Debug информация
+  useEffect(() => {
+    if (currentUser) {
+      console.log("Dashboard - Текущий пользователь:", currentUser);
+      console.log("Dashboard - isAdmin:", isAdmin);
+    }
+  }, [currentUser, isAdmin]);
 
   // Загружаем данные для статистики
   const { data: ratingData } = useQuery("dashboardRating", async () => {
@@ -260,13 +304,17 @@ const AdminDashboard: React.FC = () => {
             <span className="text-gray-600 font-medium">Загрузить турнир</span>
           </Link>
 
-          <Link
-            to="/admin/settings"
-            className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors duration-200"
-          >
-            <CogIcon className="h-5 w-5 text-gray-400 mr-3" />
-            <span className="text-gray-600 font-medium">Настроить рейтинг</span>
-          </Link>
+          {isAdmin && (
+            <Link
+              to="/admin/settings"
+              className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors duration-200"
+            >
+              <CogIcon className="h-5 w-5 text-gray-400 mr-3" />
+              <span className="text-gray-600 font-medium">
+                Настроить рейтинг
+              </span>
+            </Link>
+          )}
 
           <Link
             to="/admin/players"
@@ -278,18 +326,32 @@ const AdminDashboard: React.FC = () => {
             </span>
           </Link>
 
-          <button
-            onClick={handleDeleteAllTeams}
-            disabled={deleteAllTeamsMutation.isLoading}
-            className="flex items-center p-4 border-2 border-dashed border-red-300 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <TrashIcon className="h-5 w-5 text-red-500 mr-3" />
-            <span className="text-red-600 font-medium">
-              {deleteAllTeamsMutation.isLoading
-                ? "Удаление..."
-                : "Удалить все команды"}
-            </span>
-          </button>
+          {isAdmin && (
+            <>
+              <Link
+                to="/admin/users"
+                className="flex items-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors duration-200"
+              >
+                <UserGroupIcon className="h-5 w-5 text-gray-400 mr-3" />
+                <span className="text-gray-600 font-medium">
+                  Управление пользователями
+                </span>
+              </Link>
+
+              <button
+                onClick={handleDeleteAllTeams}
+                disabled={deleteAllTeamsMutation.isLoading}
+                className="flex items-center p-4 border-2 border-dashed border-red-300 rounded-lg hover:border-red-400 hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <TrashIcon className="h-5 w-5 text-red-500 mr-3" />
+                <span className="text-red-600 font-medium">
+                  {deleteAllTeamsMutation.isLoading
+                    ? "Удаление..."
+                    : "Удалить все команды"}
+                </span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

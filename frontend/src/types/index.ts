@@ -14,10 +14,20 @@ export interface Player {
   updated_at: string;
 }
 
+// Тип турнира
+export enum TournamentType {
+  TRIPLETTE = "TRIPLETTE",
+  DOUBLETTE_MALE = "DOUBLETTE_MALE",
+  DOUBLETTE_FEMALE = "DOUBLETTE_FEMALE",
+  DOUBLETTE_MIXT = "DOUBLETTE_MIXT",
+  TET_A_TET = "TET-A-TET",
+}
+
 // Турнир
 export interface Tournament {
   id: number;
   name: string;
+  type: TournamentType;
   category: TournamentCategory;
   teams_count: number;
   date: string;
@@ -208,6 +218,22 @@ export interface RatingSetting {
   updated_at: string;
 }
 
+// Роли пользователей
+export enum UserRole {
+  ADMIN = "ADMIN",
+  MANAGER = "MANAGER",
+}
+
+// Пользователь
+export interface User {
+  id: number;
+  name: string;
+  username: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
 // Авторизация
 export interface LoginCredentials {
   username: string;
@@ -218,16 +244,30 @@ export interface AuthResponse {
   success: boolean;
   token?: string;
   message?: string;
-  admin?: {
-    id: number;
-    username: string;
-  };
+  user?: User;
+}
+
+// Создание пользователя
+export interface CreateUserRequest {
+  name: string;
+  username: string;
+  password: string;
+  role: UserRole;
+}
+
+// Обновление пользователя
+export interface UpdateUserRequest {
+  name?: string;
+  username?: string;
+  password?: string;
+  role?: UserRole;
 }
 
 // Данные для загрузки турнира
 export interface TournamentUpload {
   tournament_name: string;
   tournament_date: string;
+  tournament_type: TournamentType;
   tournament_file: File;
 }
 

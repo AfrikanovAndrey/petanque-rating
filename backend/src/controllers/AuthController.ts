@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { AuthModel } from "../models/AuthModel";
+import { UserModel } from "../models/UserModel";
 import { AuthRequest, AuthResponse } from "../types";
 
 export class AuthController {
@@ -16,9 +17,23 @@ export class AuthController {
         return;
       }
 
-      // Проверяем пользователя
-      const admin = await AuthModel.getAdminByUsername(username);
-      if (!admin) {
+      // Проверяем пользователя в новой таблице users
+      let user = await UserModel.getUserByUsername(username);
+
+      // Для обратной совместимости проверяем старую таблицу admins
+      if (!user) {
+        const admin = await AuthModel.getAdminByUsername(username);
+        if (admin) {
+          res.status(401).json({
+            success: false,
+            message:
+              "Используйте новую систему аутентификации. Свяжитесь с администратором.",
+          });
+          return;
+        }
+      }
+
+      if (!user) {
         res.status(401).json({
           success: false,
           message: "Неверные учетные данные",
@@ -27,9 +42,9 @@ export class AuthController {
       }
 
       // Проверяем пароль
-      const isPasswordValid = await AuthModel.verifyPassword(
+      const isPasswordValid = await UserModel.verifyPassword(
         password,
-        admin.password_hash
+        user.password_hash
       );
 
       if (!isPasswordValid) {
@@ -40,12 +55,13 @@ export class AuthController {
         return;
       }
 
-      // Создаем JWT токен
+      // Создаем JWT токен с новыми полями
       const jwtSecret = process.env.JWT_SECRET || "your-super-secret-jwt-key";
       const token = jwt.sign(
         {
-          adminId: admin.id,
-          username: admin.username,
+          userId: user.id,
+          username: user.username,
+          role: user.role,
         },
         jwtSecret,
         {
@@ -57,6 +73,12 @@ export class AuthController {
         success: true,
         token,
         message: "Успешная авторизация",
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          role: user.role,
+        },
       };
 
       res.json(response);
@@ -83,15 +105,28 @@ export class AuthController {
 
       const jwtSecret = process.env.JWT_SECRET || "your-super-secret-jwt-key";
       const decoded = jwt.verify(token, jwtSecret) as {
-        adminId: number;
+        userId: number;
         username: string;
+        role: string;
       };
+
+      // Получаем актуальные данные пользователя из БД
+      const user = await UserModel.getUserById(decoded.userId);
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          message: "Пользователь не найден",
+        });
+        return;
+      }
 
       res.json({
         success: true,
-        admin: {
-          id: decoded.adminId,
-          username: decoded.username,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          role: user.role,
         },
       });
     } catch (error) {
@@ -117,23 +152,24 @@ export class AuthController {
 
       const jwtSecret = process.env.JWT_SECRET || "your-super-secret-jwt-key";
       const decoded = jwt.verify(token, jwtSecret) as {
-        adminId: number;
+        userId: number;
         username: string;
+        role: string;
       };
 
       // Проверяем текущий пароль
-      const admin = await AuthModel.getAdminByUsername(decoded.username);
-      if (!admin) {
+      const user = await UserModel.getUserById(decoded.userId);
+      if (!user) {
         res.status(404).json({
           success: false,
-          message: "Администратор не найден",
+          message: "Пользователь не найден",
         });
         return;
       }
 
-      const isCurrentPasswordValid = await AuthModel.verifyPassword(
+      const isCurrentPasswordValid = await UserModel.verifyPassword(
         currentPassword,
-        admin.password_hash
+        user.password_hash
       );
 
       if (!isCurrentPasswordValid) {
@@ -144,9 +180,18 @@ export class AuthController {
         return;
       }
 
+      // Проверка длины нового пароля
+      if (newPassword.length < 6) {
+        res.status(400).json({
+          success: false,
+          message: "Пароль должен содержать минимум 6 символов",
+        });
+        return;
+      }
+
       // Обновляем пароль
-      const success = await AuthModel.updateAdminPassword(
-        decoded.username,
+      const success = await UserModel.updateUserPassword(
+        decoded.userId,
         newPassword
       );
 

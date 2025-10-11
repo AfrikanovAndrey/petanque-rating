@@ -9,6 +9,10 @@ import {
   TournamentWithResults,
   Player,
   RatingSetting,
+  User,
+  CreateUserRequest,
+  UpdateUserRequest,
+  TournamentType,
 } from "../types";
 
 // Создаем экземпляр axios
@@ -119,6 +123,40 @@ export const authApi = {
 
 // === АДМИНСКИЕ API ===
 export const adminApi = {
+  // === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для ADMIN) ===
+  // Получить всех пользователей
+  getUsers: (): Promise<
+    AxiosResponse<{
+      success: boolean;
+      users: User[];
+      message?: string;
+    }>
+  > => api.get("/admin/users"),
+
+  // Получить текущего пользователя
+  getCurrentUser: (): Promise<
+    AxiosResponse<{
+      success: boolean;
+      data: User;
+      message?: string;
+    }>
+  > => api.get("/admin/users/current"),
+
+  // Создать пользователя
+  createUser: (data: CreateUserRequest): Promise<AxiosResponse<ApiResponse>> =>
+    api.post("/admin/users", data),
+
+  // Обновить пользователя
+  updateUser: (
+    userId: number,
+    data: UpdateUserRequest
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.put(`/admin/users/${userId}`, data),
+
+  // Удалить пользователя
+  deleteUser: (userId: number): Promise<AxiosResponse<ApiResponse>> =>
+    api.delete(`/admin/users/${userId}`),
+
   // === УПРАВЛЕНИЕ ТУРНИРАМИ ===
   // Загрузка турнира из Excel
   uploadTournament: (
@@ -136,6 +174,7 @@ export const adminApi = {
   uploadTournamentFromGoogleSheets: (data: {
     tournament_name: string;
     tournament_date: string;
+    tournament_type: TournamentType;
     tournament_category: string;
     google_sheets_url: string;
   }): Promise<AxiosResponse<ApiResponse>> => {

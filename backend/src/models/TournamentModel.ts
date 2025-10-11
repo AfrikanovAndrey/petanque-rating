@@ -8,6 +8,7 @@ import {
   Tournament,
   TournamentCategoryEnum,
   TournamentResult,
+  TournamentType,
   TournamentUploadData,
 } from "../types";
 import { PlayerModel } from "./PlayerModel";
@@ -31,13 +32,14 @@ export class TournamentModel {
 
   static async createTournament(
     name: string,
+    type: TournamentType,
     category: TournamentCategoryEnum,
     teamsCount: number,
     date: string
   ): Promise<number> {
     const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, category, teams_count, date) VALUES (?, ?, ?, ?)",
-      [name, TournamentCategoryEnum[category], teamsCount, date]
+      "INSERT INTO tournaments (name, type, category, teams_count, date) VALUES (?, ?, ?, ?, ?)",
+      [name, type, TournamentCategoryEnum[category], teamsCount, date]
     );
     return result.insertId;
   }

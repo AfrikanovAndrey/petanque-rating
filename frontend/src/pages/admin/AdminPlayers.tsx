@@ -391,23 +391,35 @@ const AdminPlayers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
                   Пол
                 </label>
-                <select
-                  className={`input-field ${
-                    errors.gender ? "border-red-300" : ""
-                  }`}
-                  {...register("gender", {
-                    required: "Пол обязателен",
-                  })}
-                >
-                  <option value="">Выберите пол</option>
-                  <option value="male">Мужской</option>
-                  <option value="female">Женский</option>
-                </select>
+                <div className="flex gap-6">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="male"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Мужской</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="female"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Женский</span>
+                  </label>
+                </div>
                 {errors.gender && (
-                  <p className="mt-1 text-sm text-red-600">
+                  <p className="mt-2 text-sm text-red-600">
                     {errors.gender.message}
                   </p>
                 )}
@@ -492,26 +504,35 @@ const AdminPlayers: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
                   Пол
                 </label>
-                <select
-                  className={`input-field ${
-                    errors.gender ? "border-red-300" : ""
-                  }`}
-                  {...register("gender", {
-                    required: "Пол обязателен",
-                  })}
-                  defaultValue=""
-                >
-                  <option value="" disabled>
-                    Выберите пол
-                  </option>
-                  <option value="male">Мужской</option>
-                  <option value="female">Женский</option>
-                </select>
+                <div className="flex gap-6">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="male"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Мужской</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      value="female"
+                      className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      {...register("gender", {
+                        required: "Пол обязателен",
+                      })}
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Женский</span>
+                  </label>
+                </div>
                 {errors.gender && (
-                  <p className="mt-1 text-sm text-red-600">
+                  <p className="mt-2 text-sm text-red-600">
                     {errors.gender.message}
                   </p>
                 )}

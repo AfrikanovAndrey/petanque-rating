@@ -44,15 +44,21 @@ export class AdminController {
       const {
         tournament_name,
         tournament_date,
+        tournament_type,
         tournament_category,
         google_sheets_url,
       } = req.body;
 
-      if (!tournament_name || !tournament_date || !google_sheets_url) {
+      if (
+        !tournament_name ||
+        !tournament_date ||
+        !tournament_type ||
+        !google_sheets_url
+      ) {
         res.status(400).json({
           success: false,
           message:
-            "Название, дата турнира и ссылка на Google таблицу обязательны",
+            "Название, дата, тип турнира и ссылка на Google таблицу обязательны",
         });
         return;
       }
@@ -72,6 +78,7 @@ export class AdminController {
         google_sheets_url,
         tournament_name,
         tournament_date,
+        tournament_type,
         tournament_category
       );
 
@@ -145,13 +152,17 @@ export class AdminController {
         return;
       }
 
-      const { tournament_name, tournament_date, tournament_category } =
-        req.body;
+      const {
+        tournament_name,
+        tournament_date,
+        tournament_type,
+        tournament_category,
+      } = req.body;
 
-      if (!tournament_name || !tournament_date) {
+      if (!tournament_name || !tournament_date || !tournament_type) {
         res.status(400).json({
           success: false,
-          message: "Название и дата турнира обязательны",
+          message: "Название, дата и тип турнира обязательны",
         });
         return;
       }
@@ -166,6 +177,7 @@ export class AdminController {
         req.file.originalname,
         tournament_name,
         tournament_date,
+        tournament_type,
         requestedCategory
       );
 
