@@ -14,7 +14,8 @@ RUN npm ci && npm cache clean --force
 COPY . .
 
 # Компилируем TypeScript
-RUN npm run build
+#RUN npm run build
+RUN node --max-old-space-size=500 ./node_modules/.bin/tsc
 
 # Production stage
 FROM node:18-alpine AS production

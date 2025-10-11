@@ -19,8 +19,6 @@ services:
       --max-connections=20
       --performance-schema=OFF
       --table-open-cache=64
-      --query-cache-size=0
-      --query-cache-type=0
     ports:
       - "3306:3306"
     volumes:
