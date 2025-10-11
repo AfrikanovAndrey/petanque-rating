@@ -79,11 +79,11 @@ dev() {
     # Создаем директории если их нет
     mkdir -p uploads mysql/data
     
-    # Запускаем контейнеры с override файлом (автоматически применяется)
+    # Запускаем контейнеры с dev файлом для hot reload
     if command -v docker-compose &> /dev/null; then
-        docker-compose up
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
     else
-        docker compose up
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up
     fi
     
     log "Dev режим завершен!"
@@ -104,9 +104,9 @@ dev_service() {
     mkdir -p uploads mysql/data
     
     if command -v docker-compose &> /dev/null; then
-        docker-compose up "$service"
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up "$service"
     else
-        docker compose up "$service"
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up "$service"
     fi
 }
 
@@ -114,10 +114,11 @@ dev_service() {
 stop() {
     log "Остановка приложения..."
     
+    # Останавливаем контейнеры (работает для любого режима)
     if command -v docker-compose &> /dev/null; then
-        docker-compose down
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || docker-compose -f docker-compose.yml down
     else
-        docker compose down
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || docker compose -f docker-compose.yml down
     fi
     
     log "Приложение остановлено!"
@@ -139,9 +140,9 @@ build() {
         log "Сборка dev образов..."
         
         if command -v docker-compose &> /dev/null; then
-            docker-compose build --no-cache
+            docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache
         else
-            docker compose build --no-cache
+            docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache
         fi
     else
         log "Сборка production образов..."
