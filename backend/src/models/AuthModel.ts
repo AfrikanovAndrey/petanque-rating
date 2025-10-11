@@ -33,35 +33,6 @@ export class AuthModel {
     return await bcrypt.compare(password, passwordHash);
   }
 
-  static async updateAdminPassword(
-    username: string,
-    newPassword: string
-  ): Promise<boolean> {
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
-
-    const [result] = await pool.execute<ResultSetHeader>(
-      "UPDATE admins SET password_hash = ? WHERE username = ?",
-      [passwordHash, username]
-    );
-    return result.affectedRows > 0;
-  }
-
-  static async getAllAdmins(): Promise<Omit<Admin, "password_hash">[]> {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT id, username, created_at, updated_at FROM admins ORDER BY username"
-    );
-    return rows as Omit<Admin, "password_hash">[];
-  }
-
-  static async deleteAdmin(id: number): Promise<boolean> {
-    const [result] = await pool.execute<ResultSetHeader>(
-      "DELETE FROM admins WHERE id = ?",
-      [id]
-    );
-    return result.affectedRows > 0;
-  }
-
   static async ensureDefaultAdmin(): Promise<void> {
     // Проверяем, есть ли администраторы в системе
     const [rows] = await pool.execute<RowDataPacket[]>(

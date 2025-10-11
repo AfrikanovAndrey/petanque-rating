@@ -177,20 +177,6 @@ export class TeamModel {
   }
 
   /**
-   * Найти команду по игроку
-   */
-  static async findTeamByPlayerId(playerId: number): Promise<Team | null> {
-    const [rows] = await pool.execute<Team[] & RowDataPacket[]>(
-      `SELECT t.* FROM teams t
-       JOIN team_players tp ON t.id = tp.team_id
-       WHERE tp.player_id = ?
-       LIMIT 1`,
-      [playerId]
-    );
-    return rows[0] || null;
-  }
-
-  /**
    * Получить все ID игроков команды
    */
   static async getPlayerIds(team: Team): Promise<number[]> {
@@ -199,55 +185,6 @@ export class TeamModel {
       [team.id]
     );
     return rows.map((row: any) => row.player_id);
-  }
-
-  /**
-   * Найти команду по имени игрока (с поддержкой частичного совпадения)
-   */
-  static async findTeamByPlayerName(playerName: string): Promise<Team | null> {
-    // Сначала попробуем точное совпадение
-    const [exactRows] = await pool.execute<Team[] & RowDataPacket[]>(
-      `SELECT t.* FROM teams t
-       JOIN team_players tp ON t.id = tp.team_id
-       JOIN players p ON tp.player_id = p.id
-       WHERE p.name = ?
-       LIMIT 1`,
-      [playerName]
-    );
-
-    if (exactRows[0]) {
-      return exactRows[0];
-    }
-
-    // Если точного совпадения нет, ищем частичное совпадение
-    const [partialRows] = await pool.execute<Team[] & RowDataPacket[]>(
-      `SELECT t.* FROM teams t
-       JOIN team_players tp ON t.id = tp.team_id
-       JOIN players p ON tp.player_id = p.id
-       WHERE p.name LIKE ? OR p.name LIKE ?
-       LIMIT 1`,
-      [`%${playerName}%`, `${playerName}%`]
-    );
-
-    if (partialRows[0]) {
-      const [playerInfo] = await pool.execute<RowDataPacket[]>(
-        `SELECT p.id, p.name FROM players p 
-         JOIN team_players tp ON p.id = tp.player_id 
-         WHERE tp.team_id = ? AND (p.name LIKE ? OR p.name LIKE ?) 
-         LIMIT 1`,
-        [partialRows[0].id, `%${playerName}%`, `${playerName}%`]
-      );
-
-      if (playerInfo[0]) {
-        console.log(
-          `✓ Найдена команда по частичному совпадению: "${playerName}" -> игрок "${
-            (playerInfo[0] as any).name
-          }" с ID ${(playerInfo[0] as any).id}`
-        );
-      }
-    }
-
-    return partialRows[0] || null;
   }
 
   /**
