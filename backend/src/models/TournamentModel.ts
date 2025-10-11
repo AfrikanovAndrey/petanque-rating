@@ -41,6 +41,51 @@ export class TournamentModel {
     return result.insertId;
   }
 
+  static async updateTournament(
+    id: number,
+    name?: string,
+    type?: TournamentType,
+    category?: TournamentCategoryEnum,
+    teamsCount?: number,
+    date?: string
+  ): Promise<boolean> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (name !== undefined) {
+      updates.push("name = ?");
+      values.push(name);
+    }
+    if (type !== undefined) {
+      updates.push("type = ?");
+      values.push(type);
+    }
+    if (category !== undefined) {
+      updates.push("category = ?");
+      values.push(TournamentCategoryEnum[category]);
+    }
+    if (teamsCount !== undefined) {
+      updates.push("teams_count = ?");
+      values.push(teamsCount);
+    }
+    if (date !== undefined) {
+      updates.push("date = ?");
+      values.push(date);
+    }
+
+    if (updates.length === 0) {
+      return false; // Нет данных для обновления
+    }
+
+    values.push(id);
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE tournaments SET ${updates.join(", ")} WHERE id = ?`,
+      values
+    );
+
+    return result.affectedRows > 0;
+  }
+
   static async deleteTournament(id: number): Promise<boolean> {
     const connection = await pool.getConnection();
     try {

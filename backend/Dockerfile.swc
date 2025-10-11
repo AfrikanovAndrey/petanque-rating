@@ -1,4 +1,7 @@
-# Используем официальный образ Node.js LTS
+# Dockerfile с использованием SWC (очень быстрый и легкий компилятор)
+# Требует намного меньше памяти чем TypeScript (< 256 MB)
+# Использование: docker build -f Dockerfile.swc .
+
 FROM node:18-alpine AS builder
 
 # Устанавливаем рабочую директорию
@@ -10,13 +13,11 @@ COPY package*.json ./
 # Устанавливаем все зависимости (включая dev для сборки)
 RUN npm ci && npm cache clean --force
 
-# Копируем исходный код
+# Копируем исходный код и конфигурацию SWC
 COPY . .
 
-# Компилируем TypeScript с ограничением памяти
-ENV NODE_OPTIONS="--max-old-space-size=1024"
-RUN npm run build
-ENV NODE_OPTIONS=""
+# Компилируем TypeScript с использованием SWC (быстро и мало памяти)
+RUN npm run build:swc
 
 # Production stage
 FROM node:18-alpine AS production
@@ -55,3 +56,4 @@ EXPOSE 3001
 
 # Команда запуска
 CMD ["npm", "start"]
+

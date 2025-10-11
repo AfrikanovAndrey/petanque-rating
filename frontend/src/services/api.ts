@@ -173,6 +173,19 @@ export const adminApi = {
   ): Promise<AxiosResponse<ApiResponse<TournamentWithResults>>> =>
     api.get(`/admin/tournaments/${tournamentId}`),
 
+  // Обновить турнир
+  updateTournament: (
+    tournamentId: number,
+    data: {
+      name?: string;
+      type?: TournamentType;
+      category?: string;
+      teams_count?: number;
+      date?: string;
+    }
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.put(`/admin/tournaments/${tournamentId}`, data),
+
   // Удалить турнир
   deleteTournament: (
     tournamentId: number

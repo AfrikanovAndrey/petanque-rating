@@ -283,6 +283,71 @@ export class AdminController {
     }
   }
 
+  // Обновить турнир (админ и менеджер)
+  static async updateTournament(req: Request, res: Response): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId);
+
+      if (isNaN(tournamentId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const { name, type, category, teams_count, date } = req.body;
+
+      // Проверяем, что передан хотя бы один параметр для обновления
+      if (!name && !type && !category && !teams_count && !date) {
+        res.status(400).json({
+          success: false,
+          message: "Необходимо указать хотя бы один параметр для обновления",
+        });
+        return;
+      }
+
+      // Проверяем, существует ли турнир
+      const existingTournament = await TournamentModel.getTournamentById(
+        tournamentId
+      );
+      if (!existingTournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      const success = await TournamentModel.updateTournament(
+        tournamentId,
+        name,
+        type,
+        category,
+        teams_count,
+        date
+      );
+
+      if (success) {
+        res.json({
+          success: true,
+          message: "Турнир успешно обновлен",
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "Не удалось обновить турнир",
+        });
+      }
+    } catch (error) {
+      console.error("Ошибка при обновлении турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
   // Удалить турнир (админ)
   static async deleteTournament(req: Request, res: Response): Promise<void> {
     try {

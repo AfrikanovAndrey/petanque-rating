@@ -1,4 +1,6 @@
-# Используем официальный образ Node.js LTS
+# Dockerfile для серверов с очень ограниченной памятью (< 768 MB)
+# Использование: docker build -f Dockerfile.lowmem .
+
 FROM node:18-alpine AS builder
 
 # Устанавливаем рабочую директорию
@@ -13,9 +15,9 @@ RUN npm ci && npm cache clean --force
 # Копируем исходный код
 COPY . .
 
-# Компилируем TypeScript с ограничением памяти
-ENV NODE_OPTIONS="--max-old-space-size=1024"
-RUN npm run build
+# Компилируем TypeScript с минимальным использованием памяти
+ENV NODE_OPTIONS="--max-old-space-size=384"
+RUN npm run build:low-memory || npm run build
 ENV NODE_OPTIONS=""
 
 # Production stage
@@ -55,3 +57,4 @@ EXPOSE 3001
 
 # Команда запуска
 CMD ["npm", "start"]
+
