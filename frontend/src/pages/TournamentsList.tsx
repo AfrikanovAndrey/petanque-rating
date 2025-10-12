@@ -3,6 +3,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   TrophyIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 import React, { useState } from "react";
 import { useQuery } from "react-query";
@@ -167,6 +168,10 @@ const TournamentsList: React.FC = () => {
                           </div>
                           <div className="flex items-center">
                             {getTornamentCategoryText(tournament.category)}
+                          </div>
+                          <div className="flex items-center">
+                            <UsersIcon className="h-4 w-4 mr-1" />
+                            Команд: {tournament.teams_count ?? 0}
                           </div>
                         </div>
                       </div>
