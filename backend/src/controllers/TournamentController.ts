@@ -457,7 +457,6 @@ export class TournamentController {
         tournamentName,
         tournamentType,
         tournamentCategory,
-        teams.length,
         tournamentDate
       );
 

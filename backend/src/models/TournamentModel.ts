@@ -14,7 +14,13 @@ import {
 export class TournamentModel {
   static async getAllTournaments(): Promise<Tournament[]> {
     const [rows] = await pool.execute<Tournament[] & RowDataPacket[]>(
-      "SELECT * FROM tournaments ORDER BY date DESC"
+      `SELECT 
+        t.*,
+        COALESCE(COUNT(DISTINCT tr.team_id), 0) as teams_count
+      FROM tournaments t
+      LEFT JOIN tournament_results tr ON t.id = tr.tournament_id
+      GROUP BY t.id
+      ORDER BY t.date DESC`
     );
     return rows;
   }
@@ -27,16 +33,23 @@ export class TournamentModel {
     return rows[0] || null;
   }
 
+  static async getTournamentTeamsCount(tournamentId: number): Promise<number> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      "SELECT COUNT(DISTINCT team_id) as teams_count FROM tournament_results WHERE tournament_id = ?",
+      [tournamentId]
+    );
+    return (rows[0]?.teams_count as number) || 0;
+  }
+
   static async createTournament(
     name: string,
     type: TournamentType,
     category: TournamentCategoryEnum,
-    teamsCount: number,
     date: string
   ): Promise<number> {
     const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, type, category, teams_count, date) VALUES (?, ?, ?, ?, ?)",
-      [name, type, TournamentCategoryEnum[category], teamsCount, date]
+      "INSERT INTO tournaments (name, type, category, date) VALUES (?, ?, ?, ?)",
+      [name, type, TournamentCategoryEnum[category], date]
     );
     return result.insertId;
   }
@@ -46,7 +59,6 @@ export class TournamentModel {
     name?: string,
     type?: TournamentType,
     category?: TournamentCategoryEnum,
-    teamsCount?: number,
     date?: string
   ): Promise<boolean> {
     const updates: string[] = [];
@@ -63,10 +75,6 @@ export class TournamentModel {
     if (category !== undefined) {
       updates.push("category = ?");
       values.push(TournamentCategoryEnum[category]);
-    }
-    if (teamsCount !== undefined) {
-      updates.push("teams_count = ?");
-      values.push(teamsCount);
     }
     if (date !== undefined) {
       updates.push("date = ?");
@@ -225,7 +233,10 @@ export class TournamentModel {
           `   🔍 Обрабатываем команду ID ${result.team_id}: "${result.team_players}"`
         );
 
-        const totalTeams = tournament.teamsCount;
+        // Получаем количество команд из результатов турнира
+        const totalTeams = await TournamentModel.getTournamentTeamsCount(
+          tournamentId
+        );
         const categoryEnum =
           tournament.category === "FEDERAL"
             ? TournamentCategoryEnum.FEDERAL

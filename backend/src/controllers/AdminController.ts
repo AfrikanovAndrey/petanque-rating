@@ -86,7 +86,6 @@ export class AdminController {
         success: true,
         message: `Турнир "${tournament_name}" успешно загружен из Google таблицы. Обработано команд: ${result.teamsCount}, результатов кубков: ${result.resultsCount}.`,
         tournament_id: result.tournamentId,
-        teams_count: result.teamsCount,
         results_count: result.resultsCount,
       });
     } catch (error) {
@@ -185,7 +184,6 @@ export class AdminController {
         success: true,
         message: `Турнир "${tournament_name}" успешно загружен. Обработано команд: ${result.teamsCount}, результатов кубков: ${result.resultsCount}.`,
         tournament_id: result.tournamentId,
-        teams_count: result.teamsCount,
         results_count: result.resultsCount,
       });
     } catch (error) {
@@ -296,10 +294,10 @@ export class AdminController {
         return;
       }
 
-      const { name, type, category, teams_count, date } = req.body;
+      const { name, type, category, date } = req.body;
 
       // Проверяем, что передан хотя бы один параметр для обновления
-      if (!name && !type && !category && !teams_count && !date) {
+      if (!name && !type && !category && !date) {
         res.status(400).json({
           success: false,
           message: "Необходимо указать хотя бы один параметр для обновления",
@@ -324,7 +322,6 @@ export class AdminController {
         name,
         type,
         category,
-        teams_count,
         date
       );
 
