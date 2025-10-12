@@ -17,7 +17,7 @@ import {
   formatDateForInput,
   formatDateTime,
   getTornamentCategoryText,
-  getTournamentTypeText,
+  getTournamentTypeIcons,
   handleApiError,
 } from "../../utils";
 
@@ -150,7 +150,11 @@ const AdminTournaments: React.FC = () => {
     error,
   } = useQuery("tournaments", async () => {
     const response = await adminApi.getTournaments();
-    return response.data.data || [];
+    const data = response.data.data || [];
+    // Сортируем по дате проведения, самые свежие вверху
+    return data.sort((a: any, b: any) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
   });
 
   // Мутация для загрузки турнира
@@ -390,12 +394,9 @@ const AdminTournaments: React.FC = () => {
                     Дата проведения
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Тип
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Категория
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Количество команд
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -412,10 +413,11 @@ const AdminTournaments: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <TrophyIcon className="h-6 w-6 text-gray-400 mr-3" />
-                        <div>
+                        <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900">
                             {tournament.name}
                           </div>
+                          {getTournamentTypeIcons(tournament.type)}
                         </div>
                       </div>
                     </td>
@@ -427,16 +429,11 @@ const AdminTournaments: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
-                        {getTournamentTypeText(tournament.type)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
                         {getTornamentCategoryText(tournament.category)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
+                      <div className="flex items-center justify-center">
                         {tournament.teams_count ?? 0}
                       </div>
                     </td>
@@ -574,7 +571,12 @@ const AdminTournaments: React.FC = () => {
                   <option value={TournamentType.DOUBLETTE_MIXT}>
                     Дуплеты микст
                   </option>
-                  <option value={TournamentType.TET_A_TET}>Теты</option>
+                  <option value={TournamentType.TET_A_TET_MALE}>
+                    Тет-а-тет мужской
+                  </option>
+                  <option value={TournamentType.TET_A_TET_FEMALE}>
+                    Тет-а-тет женский
+                  </option>
                 </select>
                 {errors.tournament_type && (
                   <p className="mt-1 text-sm text-red-600">
@@ -974,7 +976,12 @@ const AdminTournaments: React.FC = () => {
                   <option value={TournamentType.DOUBLETTE_MIXT}>
                     Дуплеты микст
                   </option>
-                  <option value={TournamentType.TET_A_TET}>Теты</option>
+                  <option value={TournamentType.TET_A_TET_MALE}>
+                    Тет-а-тет мужской
+                  </option>
+                  <option value={TournamentType.TET_A_TET_FEMALE}>
+                    Тет-а-тет женский
+                  </option>
                 </select>
                 {errorsEdit.type && (
                   <p className="mt-1 text-sm text-red-600">

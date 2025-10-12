@@ -2,6 +2,9 @@ import { TournamentCategory, TournamentType } from "@/types";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+// Реэкспорт функции для получения иконок типа турнира
+export { getTournamentTypeIcons } from "./tournamentIcons";
+
 // Утилита для объединения классов Tailwind
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -52,8 +55,10 @@ export function getTournamentTypeText(type: TournamentType) {
       return "Дуплеты женские";
     case "DOUBLETTE_MIXT":
       return "Дуплеты микст";
-    case "TET-A-TET":
-      return "Теты";
+    case "TET_A_TET_MALE":
+      return "Тет-а-тет мужской";
+    case "TET_A_TET_FEMALE":
+      return "Тет-а-тет женский";
   }
 }
 

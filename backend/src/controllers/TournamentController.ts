@@ -41,6 +41,54 @@ export class TournamentController {
   }
 
   /**
+   * Получить эффективное количество команд для расчёта очков при загрузке турнира
+   * Если в этот день уже есть парный турнир (DOUBLETTE_MALE/FEMALE), суммируем команды
+   */
+  private static async getEffectiveTeamsCountForNewTournament(
+    tournamentDate: string,
+    tournamentType: TournamentType,
+    currentTeamsCount: number
+  ): Promise<number> {
+    // Проверяем, является ли турнир DOUBLETTE_MALE или DOUBLETTE_FEMALE
+    if (
+      tournamentType !== TournamentType.DOUBLETTE_MALE &&
+      tournamentType !== TournamentType.DOUBLETTE_FEMALE
+    ) {
+      // Для других типов турниров просто возвращаем количество команд
+      return currentTeamsCount;
+    }
+
+    // Ищем парный турнир в тот же день
+    const pairType =
+      tournamentType === TournamentType.DOUBLETTE_MALE
+        ? TournamentType.DOUBLETTE_FEMALE
+        : TournamentType.DOUBLETTE_MALE;
+
+    const [pairTournaments] = await pool.execute<any[]>(
+      `SELECT id FROM tournaments WHERE date = ? AND type = ?`,
+      [tournamentDate, pairType]
+    );
+
+    if (pairTournaments.length > 0) {
+      // Найден парный турнир, суммируем команды
+      const pairTournamentId = pairTournaments[0].id;
+      const pairTournamentTeams = await TournamentModel.getTournamentTeamsCount(
+        pairTournamentId
+      );
+      const totalTeams = currentTeamsCount + pairTournamentTeams;
+
+      console.log(
+        `   🔗 Найден парный турнир (${pairType}) в тот же день. Суммируем команды: ${currentTeamsCount} + ${pairTournamentTeams} = ${totalTeams}`
+      );
+
+      return totalTeams;
+    }
+
+    // Парный турнир не найден, возвращаем количество команд текущего турнира
+    return currentTeamsCount;
+  }
+
+  /**
    * Обновить результаты команд данными с кубков
    * @param cup
    * @param cupTeamResults
@@ -469,6 +517,18 @@ export class TournamentController {
           connection
         );
 
+        // Рассчитываем эффективное количество команд (с учётом парных турниров в один день)
+        const effectiveTeamsCount =
+          await TournamentController.getEffectiveTeamsCountForNewTournament(
+            tournamentDate,
+            tournamentType,
+            teams.length
+          );
+
+        console.log(
+          `📊 Эффективное количество команд для расчёта очков: ${effectiveTeamsCount}`
+        );
+
         for (const team of teams) {
           const teamPlayers: number[] = [];
           const teamPlayerNames: string[] = [];
@@ -501,7 +561,7 @@ export class TournamentController {
               tournamentCategory,
               results.cup!,
               results.cupPosition!,
-              teams.length
+              effectiveTeamsCount
             );
           } else {
             points = getPointsByQualifyingStage(
@@ -526,6 +586,34 @@ export class TournamentController {
 
         await connection.commit();
         console.log("✅ Транзакция успешно завершена");
+
+        // Если это DOUBLETTE турнир и найден парный турнир, нужно пересчитать его очки
+        if (
+          (tournamentType === TournamentType.DOUBLETTE_MALE ||
+            tournamentType === TournamentType.DOUBLETTE_FEMALE) &&
+          effectiveTeamsCount > teams.length
+        ) {
+          console.log(
+            "🔄 Пересчитываем очки для парного турнира с учётом нового турнира..."
+          );
+
+          // Находим парный турнир
+          const pairType =
+            tournamentType === TournamentType.DOUBLETTE_MALE
+              ? TournamentType.DOUBLETTE_FEMALE
+              : TournamentType.DOUBLETTE_MALE;
+
+          const [pairTournaments] = await pool.execute<any[]>(
+            `SELECT id FROM tournaments WHERE date = ? AND type = ? AND id != ?`,
+            [tournamentDate, pairType, tournamentId]
+          );
+
+          if (pairTournaments.length > 0) {
+            const pairTournamentId = pairTournaments[0].id;
+            // Используем централизованную функцию пересчёта
+            await TournamentModel.recalculateTournamentPoints(pairTournamentId);
+          }
+        }
       } catch (error) {
         await connection.rollback();
         console.error(

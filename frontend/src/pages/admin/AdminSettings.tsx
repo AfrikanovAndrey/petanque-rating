@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
-import { CogIcon } from "@heroicons/react/24/outline";
+import { CogIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import { adminApi } from "../../services/api";
 import { handleApiError } from "../../utils";
 
@@ -12,6 +12,7 @@ interface BestResultsForm {
 
 const AdminSettings: React.FC = () => {
   const queryClient = useQueryClient();
+  const [showRecalculateConfirm, setShowRecalculateConfirm] = useState(false);
 
   // Формы
   const bestResultsForm = useForm<BestResultsForm>();
@@ -51,8 +52,30 @@ const AdminSettings: React.FC = () => {
     }
   );
 
+  const recalculatePointsMutation = useMutation(
+    async () => {
+      return await adminApi.recalculateTournamentPoints();
+    },
+    {
+      onSuccess: () => {
+        toast.success("Очки успешно пересчитаны!");
+        queryClient.invalidateQueries("tournaments");
+        queryClient.invalidateQueries("fullRating");
+        queryClient.invalidateQueries("dashboardRating");
+        setShowRecalculateConfirm(false);
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
   const onSubmitBestResults = (data: BestResultsForm) => {
     updateBestResultsMutation.mutate(data);
+  };
+
+  const handleRecalculatePoints = () => {
+    recalculatePointsMutation.mutate();
   };
 
   if (isLoadingCount) {
@@ -124,8 +147,57 @@ const AdminSettings: React.FC = () => {
           </form>
         </div>
 
+        {/* Пересчёт рейтинга */}
+        <div className="card p-6">
+          <div className="flex items-center mb-4">
+            <ArrowPathIcon className="h-5 w-5 text-amber-600 mr-2" />
+            <h2 className="text-xl font-semibold text-gray-900">
+              Пересчёт рейтинга
+            </h2>
+          </div>
+          <p className="text-gray-600 mb-6">
+            Пересчитать очки для всех турниров на основе текущей логики расчёта.
+            Используйте эту функцию, если изменилась формула расчёта очков.
+          </p>
+
+          {!showRecalculateConfirm ? (
+            <button
+              onClick={() => setShowRecalculateConfirm(true)}
+              className="btn-warning"
+            >
+              <ArrowPathIcon className="h-5 w-5 mr-2" />
+              Пересчитать очки
+            </button>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-amber-900 font-medium mb-4">
+                Вы уверены? Это действие пересчитает очки для всех результатов
+                всех турниров.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleRecalculatePoints}
+                  disabled={recalculatePointsMutation.isLoading}
+                  className="btn-danger"
+                >
+                  {recalculatePointsMutation.isLoading
+                    ? "Пересчёт..."
+                    : "Да, пересчитать"}
+                </button>
+                <button
+                  onClick={() => setShowRecalculateConfirm(false)}
+                  disabled={recalculatePointsMutation.isLoading}
+                  className="btn-secondary"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Информация */}
-        <div className="card p-6 bg-blue-50 border-blue-200">
+        <div className="card p-6 bg-blue-50 border-blue-200 lg:col-span-2">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">
             Как работает рейтинг?
           </h3>
@@ -137,6 +209,10 @@ const AdminSettings: React.FC = () => {
             <p>• Очки за место в турнире рассчитываются автоматически</p>
             <p>
               • При изменении настроек рейтинг пересчитывается автоматически
+            </p>
+            <p className="font-semibold mt-3">
+              • Пересчёт рейтинга обновляет очки на основе текущей логики
+              расчёта
             </p>
           </div>
         </div>

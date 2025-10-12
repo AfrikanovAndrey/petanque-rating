@@ -908,4 +908,29 @@ export class AdminController {
       });
     }
   }
+
+  // ==== ПЕРЕСЧЁТ РЕЙТИНГА ====
+
+  // Пересчитать очки для всех турниров
+  static async recalculateTournamentPoints(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      console.log("🔄 Начинается пересчёт очков для всех турниров...");
+
+      await TournamentModel.recalculatePoints();
+
+      res.json({
+        success: true,
+        message: "Очки для всех турниров успешно пересчитаны",
+      });
+    } catch (error) {
+      console.error("Ошибка при пересчёте очков турниров:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка при пересчёте очков турниров",
+      });
+    }
+  }
 }

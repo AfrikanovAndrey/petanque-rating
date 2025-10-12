@@ -161,23 +161,44 @@ router.post(
   AdminController.uploadLicensedPlayers
 );
 
-// POST /api/admin/tournaments/recalculate-all-points - пересчитать очки всех турниров
-router.post("/tournaments/recalculate-all-points", async (req, res) => {
-  try {
-    const { TournamentModel } = await import("../models/TournamentModel");
-    await TournamentModel.recalculatePoints();
+// === ПЕРЕСЧЁТ РЕЙТИНГА ===
+// POST /api/admin/tournaments/recalculate-points - пересчитать очки всех турниров (только ADMIN)
+router.post(
+  "/tournaments/recalculate-points",
+  requireAdmin,
+  AdminController.recalculateTournamentPoints
+);
 
-    res.json({
-      success: true,
-      message: "Очки всех турниров успешно пересчитаны",
-    });
-  } catch (error) {
-    console.error("Ошибка пересчета очков:", error);
-    res.status(500).json({
-      success: false,
-      message: "Ошибка пересчета очков: " + (error as Error).message,
-    });
+// POST /api/admin/tournaments/:tournamentId/recalculate-points - пересчитать очки конкретного турнира (только ADMIN)
+router.post(
+  "/tournaments/:tournamentId/recalculate-points",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId);
+      if (isNaN(tournamentId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const { TournamentModel } = await import("../models/TournamentModel");
+      await TournamentModel.recalculateTournamentPoints(tournamentId);
+
+      res.json({
+        success: true,
+        message: `Очки турнира ${tournamentId} успешно пересчитаны`,
+      });
+    } catch (error) {
+      console.error("Ошибка пересчёта очков турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка пересчёта очков: " + (error as Error).message,
+      });
+    }
   }
-});
+);
 
 export default router;

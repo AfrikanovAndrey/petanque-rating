@@ -77,40 +77,8 @@ cd petanque-rating
 #### Управление Docker окружением
 
 ```bash
-# Запуск приложения
-./docker-dev.sh start
-
-# Остановка приложения
-./docker-dev.sh stop
-
-# Перезапуск
-./docker-dev.sh restart
-
-# Просмотр логов
-./docker-dev.sh logs
-
-# Просмотр логов конкретного сервиса
-./docker-dev.sh logs backend
-./docker-dev.sh logs frontend
-./docker-dev.sh logs mysql
-
-# Проверка статуса контейнеров
-./docker-dev.sh status
-
-# Пересборка образов
-./docker-dev.sh build
-
-# Создание бэкапа базы данных
-./docker-dev.sh backup
-
-# Восстановление из бэкапа
-./docker-dev.sh restore backups/backup_file.sql
-
-# Полная очистка (удалит все данные!)
-./docker-dev.sh clean
-
-# Справка по командам
-./docker-dev.sh help
+# Утилита для управления docker окружением (детали - при её вызове без параметров)
+./docker-dev.sh
 ```
 
 #### Production режим с Nginx
@@ -198,11 +166,8 @@ npm run dev
 ##### Производственный режим
 
 ```bash
-# Сборка фронтенда
-npm run build
-
-# Запуск сервера
-npm start
+# Пересборка образов и старт docker- контейнеров
+./docker-dev.sh prod
 ```
 
 ## Использование
