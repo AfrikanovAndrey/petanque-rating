@@ -1,4 +1,4 @@
-import { ResultSetHeader, RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket, PoolConnection } from "mysql2/promise";
 import { getCupPoints, getPointsByQualifyingStage } from "../config/cupPoints";
 import { pool } from "../config/database";
 
@@ -45,9 +45,11 @@ export class TournamentModel {
     name: string,
     type: TournamentType,
     category: TournamentCategoryEnum,
-    date: string
+    date: string,
+    connection?: PoolConnection
   ): Promise<number> {
-    const [result] = await pool.execute<ResultSetHeader>(
+    const executor = connection || pool;
+    const [result] = await executor.execute<ResultSetHeader>(
       "INSERT INTO tournaments (name, type, category, date) VALUES (?, ?, ?, ?)",
       [name, type, TournamentCategoryEnum[category], date]
     );
@@ -158,9 +160,11 @@ export class TournamentModel {
     cupPosition?: CupPosition,
     cup?: Cup,
     qualifying_wins?: number,
-    points?: number
+    points?: number,
+    connection?: PoolConnection
   ): Promise<number> {
-    const [result] = await pool.execute<ResultSetHeader>(
+    const executor = connection || pool;
+    const [result] = await executor.execute<ResultSetHeader>(
       "INSERT INTO tournament_results (tournament_id, team_id, cup, cup_position, qualifying_wins, wins, loses, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         TournamentModel.ensureValue(tournamentId, 0),
