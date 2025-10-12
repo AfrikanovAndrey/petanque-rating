@@ -231,3 +231,55 @@ help() {
     echo "  $0 build production       # Сборка production образов"
     echo "  $0 restore backups/backup_20231120_143000.sql"
 }
+
+# Основная логика
+main() {    
+    case "${1:-}" in
+        start)
+            start
+            ;;
+        dev)
+            dev
+            ;;
+        dev-service)
+            dev_service "$2"
+            ;;
+        stop)
+            stop
+            ;;
+        restart)
+            restart
+            ;;
+        build)
+            build "$2"
+            ;;
+        logs)
+            logs "$2"
+            ;;
+        status)
+            check_status
+            ;;
+        clean)
+            clean
+            ;;
+        backup)
+            mkdir -p backups
+            backup
+            ;;
+        restore)
+            restore "$2"
+            ;;
+        help|--help|-h)
+            help
+            ;;
+        *)
+            error "Неизвестная команда: ${1:-}"
+            echo ""
+            help
+            exit 1
+            ;;
+    esac
+}
+
+# Запуск скрипта
+main "$@"
