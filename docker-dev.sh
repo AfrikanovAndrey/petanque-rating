@@ -33,12 +33,12 @@ prod() {
     
     # Информируем о сборке
     info "Backend будет собран с использованием SWC компилятора (быстро и мало памяти)"
-    
-    # Запускаем контейнеры без override файла (docker-compose соберет backend автоматически)
+
+    # Запускаем контейнеры
     if command -v docker-compose &> /dev/null; then
-        docker-compose -f docker-compose.yml up -d --build
+        docker-compose --profile production up -d --build
     else
-        docker compose -f docker-compose.yml up -d --build
+        docker compose --profile production up -d --build
     fi
     
     if [ $? -ne 0 ]; then
@@ -49,9 +49,6 @@ prod() {
     # Ждем пока база данных запустится
     log "Ожидание запуска базы данных..."
     sleep 10
-    
-    # Проверяем статус
-    check_status
     
     log "Приложение запущено!"
     info "Frontend: http://localhost:3000"
@@ -95,7 +92,7 @@ restart() {
     log "Перезапуск приложения..."
     stop
     sleep 2
-    start
+    prod
 }
 
 # Функция для сборки образов
@@ -200,16 +197,13 @@ help() {
     echo "Использование: $0 <команда> [опции]"
     echo ""
     echo "🚀 Основные команды:"
-    echo "  start        Запуск приложения в production режиме"
+    echo "  prod         Запуск приложения в production режиме"
     echo "  dev          Запуск приложения в dev режиме с hot reload"
-    echo "  dev-service  Запуск одного сервиса в dev режиме (dev-service <service>)"
     echo "  stop         Остановка приложения"
-    echo "  restart      Перезапуск приложения"
+    echo "  restart      Перезапуск приложения в production режиме"
     echo ""
     echo "🔧 Утилиты:"
     echo "  build        Сборка образов (build [dev|production])"
-    echo "  logs         Просмотр логов (logs [service])"
-    echo "  status       Проверка статуса контейнеров"
     echo "  clean        Полная очистка (контейнеры, образы, данные)"
     echo ""
     echo "💾 Резервное копирование:"
@@ -219,30 +213,23 @@ help() {
     echo "❓ Справка:"
     echo "  help         Показать эту справку"
     echo ""
-    echo "📝 Примеры для разработки:"
-    echo "  $0 dev                    # Запуск всех сервисов в dev режиме"
-    echo "  $0 dev-service backend    # Запуск только backend в dev режиме"
-    echo "  $0 dev-service frontend   # Запуск только frontend в dev режиме"
-    echo "  $0 build dev              # Сборка dev образов"
-    echo "  $0 logs backend           # Просмотр логов backend"
-    echo ""
-    echo "📝 Примеры для production:"
-    echo "  $0 start                  # Запуск в production режиме"
-    echo "  $0 build production       # Сборка production образов"
-    echo "  $0 restore backups/backup_20231120_143000.sql"
+    echo "📝 Примеры:"
+    echo "  $0 dev                                      # Запуск в dev режиме"
+    echo "  $0 prod                                     # Запуск в production режиме"
+    echo "  $0 build dev                                # Сборка dev образов"
+    echo "  $0 build production                         # Сборка production образов"
+    echo "  $0 backup                                   # Создать бэкап базы данных"
+    echo "  $0 restore backups/petanque_rating_dump.sql # Восстановить из бэкапа"
 }
 
 # Основная логика
 main() {    
     case "${1:-}" in
-        start)
-            start
+        prod)
+            prod
             ;;
         dev)
             dev
-            ;;
-        dev-service)
-            dev_service "$2"
             ;;
         stop)
             stop
@@ -252,12 +239,6 @@ main() {
             ;;
         build)
             build "$2"
-            ;;
-        logs)
-            logs "$2"
-            ;;
-        status)
-            check_status
             ;;
         clean)
             clean
