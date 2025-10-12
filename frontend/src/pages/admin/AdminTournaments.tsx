@@ -14,6 +14,7 @@ import { adminApi } from "../../services/api";
 import { getCupPositionText, TournamentType } from "../../types";
 import {
   formatDate,
+  formatDateForInput,
   formatDateTime,
   getTornamentCategoryText,
   getTournamentTypeText,
@@ -311,7 +312,7 @@ const AdminTournaments: React.FC = () => {
       type: tournament.type,
       category: tournament.category === "FEDERAL" ? "1" : "2",
       teams_count: tournament.teams_count,
-      date: tournament.date,
+      date: formatDateForInput(tournament.date),
     });
     setIsEditModalOpen(true);
   };
