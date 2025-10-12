@@ -180,7 +180,6 @@ export const adminApi = {
       name?: string;
       type?: TournamentType;
       category?: string;
-      teams_count?: number;
       date?: string;
     }
   ): Promise<AxiosResponse<ApiResponse>> =>

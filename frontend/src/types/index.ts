@@ -29,10 +29,10 @@ export interface Tournament {
   name: string;
   type: TournamentType;
   category: TournamentCategory;
-  teams_count: number;
   date: string;
   created_at: string;
   updated_at: string;
+  teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров
 }
 
 export type TournamentCategory = "FEDERAL" | "REGIONAL";

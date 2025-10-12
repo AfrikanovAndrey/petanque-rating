@@ -35,7 +35,6 @@ interface TournamentEditForm {
   date: string;
   type: TournamentType;
   category: string;
-  teams_count: number;
 }
 
 const AdminTournaments: React.FC = () => {
@@ -214,7 +213,6 @@ const AdminTournaments: React.FC = () => {
         name: data.updateData.name,
         type: data.updateData.type,
         category: data.updateData.category,
-        teams_count: data.updateData.teams_count,
         date: data.updateData.date,
       });
     },
@@ -311,7 +309,6 @@ const AdminTournaments: React.FC = () => {
       name: tournament.name,
       type: tournament.type,
       category: tournament.category === "FEDERAL" ? "1" : "2",
-      teams_count: tournament.teams_count,
       date: formatDateForInput(tournament.date),
     });
     setIsEditModalOpen(true);
@@ -439,8 +436,8 @@ const AdminTournaments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center text-align: justify">
-                        {tournament.teams_count}
+                      <div className="flex items-center">
+                        {tournament.teams_count ?? 0}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -1004,31 +1001,6 @@ const AdminTournaments: React.FC = () => {
                 {errorsEdit.category && (
                   <p className="mt-1 text-sm text-red-600">
                     {errorsEdit.category.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Количество команд
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  className={`input-field ${
-                    errorsEdit.teams_count ? "border-red-300" : ""
-                  }`}
-                  {...registerEdit("teams_count", {
-                    required: "Количество команд обязательно",
-                    min: {
-                      value: 1,
-                      message: "Минимум 1 команда",
-                    },
-                  })}
-                />
-                {errorsEdit.teams_count && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errorsEdit.teams_count.message}
                   </p>
                 )}
               </div>
