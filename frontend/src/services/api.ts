@@ -230,6 +230,12 @@ export const adminApi = {
   // Обновить количество лучших результатов
   setBestResultsCount: (count: number): Promise<AxiosResponse<ApiResponse>> =>
     api.put("/admin/settings/best-results-count", { count }),
+
+  // === ПЕРЕСЧЁТ РЕЙТИНГА ===
+
+  // Пересчитать очки для всех турниров
+  recalculateTournamentPoints: (): Promise<AxiosResponse<ApiResponse>> =>
+    api.post("/admin/tournaments/recalculate-points"),
 };
 
 export default api;

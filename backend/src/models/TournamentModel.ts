@@ -188,124 +188,181 @@ export class TournamentModel {
     return result.affectedRows > 0;
   }
 
-  // Функция для пересчета очков существующего турнира
+  /**
+   * Пересчитать очки для конкретного турнира
+   */
+  static async recalculateTournamentPoints(
+    tournamentId: number
+  ): Promise<void> {
+    console.log(`🔄 Пересчитываю очки для турнира ID ${tournamentId}`);
+
+    // Получаем информацию о турнире
+    const tournament = await TournamentModel.getTournamentById(tournamentId);
+    if (!tournament) {
+      throw new Error(`Турнир с ID ${tournamentId} не найден`);
+    }
+
+    // Получаем все результаты турнира
+    const [resultsRows] = await pool.execute<RowDataPacket[]>(
+      `
+      SELECT 
+        tr.id, 
+        tr.cup_position, 
+        tr.cup, 
+        tr.team_id, 
+        tr.qualifying_wins,
+        tr.points as old_points
+      FROM tournament_results tr
+      WHERE tr.tournament_id = ?
+      `,
+      [tournamentId]
+    );
+
+    // Получаем эффективное количество команд
+    const totalTeams = await TournamentModel.getEffectiveTeamsCount(
+      tournamentId,
+      tournament.date,
+      tournament.type as TournamentType
+    );
+
+    const categoryEnum =
+      tournament.category === "FEDERAL"
+        ? TournamentCategoryEnum.FEDERAL
+        : TournamentCategoryEnum.REGIONAL;
+
+    for (const result of resultsRows) {
+      let newPoints = 0;
+
+      if (result.cup) {
+        // Команда в кубке - рассчитываем очки за место в кубке
+        let cupPosition: CupPosition;
+        switch (result.cup_position) {
+          case "CUP_WINNER":
+            cupPosition = CupPosition.WINNER;
+            break;
+          case "CUP_RUNNER_UP":
+            cupPosition = CupPosition.RUNNER_UP;
+            break;
+          case "CUP_THIRD_PLACE":
+            cupPosition = CupPosition.THIRD_PLACE;
+            break;
+          case "CUP_SEMI_FINAL":
+            cupPosition = CupPosition.SEMI_FINAL;
+            break;
+          case "CUP_QUARTER_FINAL":
+            cupPosition = CupPosition.QUARTER_FINAL;
+            break;
+          default:
+            cupPosition = CupPosition.QUARTER_FINAL;
+        }
+
+        // Для кубка C нужны очки из отборочного тура
+        const qualifyingRoundPoints =
+          result.cup === "C"
+            ? getPointsByQualifyingStage(
+                categoryEnum,
+                result.qualifying_wins || 0
+              )
+            : 0;
+
+        newPoints = getCupPoints(
+          categoryEnum,
+          result.cup,
+          cupPosition,
+          totalTeams,
+          qualifyingRoundPoints
+        );
+      } else {
+        // Команда НЕ в кубке - рассчитываем очки за победы в квалификации
+        newPoints = getPointsByQualifyingStage(
+          categoryEnum,
+          result.qualifying_wins || 0
+        );
+      }
+
+      // Обновляем очки в базе tournament_results
+      await pool.execute(
+        "UPDATE tournament_results SET points = ? WHERE id = ?",
+        [newPoints, result.id]
+      );
+    }
+
+    console.log(`✅ Очки для турнира ID ${tournamentId} пересчитаны`);
+  }
+
+  /**
+   * Получить эффективное количество команд для расчёта очков
+   * Если в один день прошли DOUBLETTE_MALE и DOUBLETTE_FEMALE, суммируем команды
+   */
+  static async getEffectiveTeamsCount(
+    tournamentId: number,
+    tournamentDate: string,
+    tournamentType: TournamentType
+  ): Promise<number> {
+    // Получаем количество команд текущего турнира
+    const currentTournamentTeams =
+      await TournamentModel.getTournamentTeamsCount(tournamentId);
+
+    // Проверяем, является ли турнир DOUBLETTE_MALE или DOUBLETTE_FEMALE
+    if (
+      tournamentType !== TournamentType.DOUBLETTE_MALE &&
+      tournamentType !== TournamentType.DOUBLETTE_FEMALE
+    ) {
+      // Для других типов турниров просто возвращаем количество команд
+      return currentTournamentTeams;
+    }
+
+    // Ищем парный турнир в тот же день
+    const pairType =
+      tournamentType === TournamentType.DOUBLETTE_MALE
+        ? TournamentType.DOUBLETTE_FEMALE
+        : TournamentType.DOUBLETTE_MALE;
+
+    const [pairTournaments] = await pool.execute<RowDataPacket[]>(
+      `SELECT id FROM tournaments 
+       WHERE date = ? AND type = ? AND id != ?`,
+      [tournamentDate, pairType, tournamentId]
+    );
+
+    if (pairTournaments.length > 0) {
+      // Найден парный турнир, суммируем команды
+      const pairTournamentId = pairTournaments[0].id;
+      const pairTournamentTeams = await TournamentModel.getTournamentTeamsCount(
+        pairTournamentId
+      );
+      const totalTeams = currentTournamentTeams + pairTournamentTeams;
+
+      console.log(
+        `   🔗 Найден парный турнир (${pairType}) в тот же день. Суммируем команды: ${currentTournamentTeams} + ${pairTournamentTeams} = ${totalTeams}`
+      );
+
+      return totalTeams;
+    }
+
+    // Парный турнир не найден, возвращаем количество команд текущего турнира
+    return currentTournamentTeams;
+  }
+
+  // Функция для пересчета очков всех турниров
   static async recalculatePoints(): Promise<void> {
     console.log(`🔄 Начинаю пересчет очков для всех турниров`);
 
     // Получаем все турниры
     const [tournamentRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT * FROM tournaments ORDER BY id"
+      "SELECT id, name FROM tournaments ORDER BY id"
     );
 
     console.log(`📊 Найдено ${tournamentRows.length} турниров для пересчета`);
 
     for (const tournamentRow of tournamentRows) {
-      const tournament = tournamentRow as Tournament;
-      const tournamentId = tournament.id;
+      const tournament = tournamentRow as { id: number; name: string };
 
       console.log(
-        `\n📝 Обрабатываю турнир ID ${tournamentId}: "${tournament.name}"`
+        `\n📝 Обрабатываю турнир ID ${tournament.id}: "${tournament.name}"`
       );
 
-      // Получаем все результаты команд из tournament_results
-      const [resultsRows] = await pool.execute<RowDataPacket[]>(
-        `
-        SELECT 
-          tr.id, 
-          tr.cup_position, 
-          tr.cup, 
-          tr.team_id, 
-          tr.qualifying_wins,
-          tr.points as old_points,
-          GROUP_CONCAT(p.name ORDER BY p.name SEPARATOR ', ') as team_players
-        FROM tournament_results tr
-        JOIN teams tm ON tr.team_id = tm.id
-        JOIN team_players tp ON tm.id = tp.team_id
-        JOIN players p ON tp.player_id = p.id
-        WHERE tr.tournament_id = ?
-        GROUP BY tr.id
-        `,
-        [tournamentId]
-      );
-
-      console.log(
-        `   📌 Найдено ${resultsRows.length} результатов команд для турнира ID ${tournamentId}`
-      );
-
-      for (const result of resultsRows) {
-        console.log(
-          `   🔍 Обрабатываем команду ID ${result.team_id}: "${result.team_players}"`
-        );
-
-        // Получаем количество команд из результатов турнира
-        const totalTeams = await TournamentModel.getTournamentTeamsCount(
-          tournamentId
-        );
-        const categoryEnum =
-          tournament.category === "FEDERAL"
-            ? TournamentCategoryEnum.FEDERAL
-            : TournamentCategoryEnum.REGIONAL;
-
-        let newPoints = 0;
-
-        if (result.cup) {
-          // Команда в кубке - рассчитываем очки за место в кубке
-          let cupPosition: CupPosition;
-          switch (result.cup_position) {
-            case "CUP_WINNER":
-              cupPosition = CupPosition.WINNER;
-              break;
-            case "CUP_RUNNER_UP":
-              cupPosition = CupPosition.RUNNER_UP;
-              break;
-            case "CUP_THIRD_PLACE":
-              cupPosition = CupPosition.THIRD_PLACE;
-              break;
-            case "CUP_SEMI_FINAL":
-              cupPosition = CupPosition.SEMI_FINAL;
-              break;
-            case "CUP_QUARTER_FINAL":
-              cupPosition = CupPosition.QUARTER_FINAL;
-              break;
-            default:
-              cupPosition = CupPosition.QUARTER_FINAL;
-          }
-
-          console.log(`      🎯 Команда в кубке ${result.cup}:`, {
-            position: cupPosition,
-            category: categoryEnum,
-            totalTeams,
-          });
-
-          newPoints = getCupPoints(
-            categoryEnum,
-            result.cup,
-            cupPosition,
-            totalTeams
-          );
-        } else {
-          // Команда НЕ в кубке - рассчитываем очки за победы в квалификации
-          console.log(`      🎯 Команда в квалификации:`, {
-            qualifying_wins: result.qualifying_wins || 0,
-            category: categoryEnum,
-          });
-
-          newPoints = getPointsByQualifyingStage(
-            categoryEnum,
-            result.qualifying_wins || 0
-          );
-        }
-
-        console.log(
-          `      📈 Старые очки: ${result.old_points}, новые очки: ${newPoints}`
-        );
-
-        // Обновляем очки в базе tournament_results
-        await pool.execute(
-          "UPDATE tournament_results SET points = ? WHERE id = ?",
-          [newPoints, result.id]
-        );
-      }
+      // Используем централизованную функцию пересчёта для каждого турнира
+      await TournamentModel.recalculateTournamentPoints(tournament.id);
 
       console.log(
         `   ✅ Пересчет очков для турнира "${tournament.name}" завершен`
