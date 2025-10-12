@@ -169,4 +169,36 @@ router.post(
   AdminController.recalculateTournamentPoints
 );
 
+// POST /api/admin/tournaments/:tournamentId/recalculate-points - пересчитать очки конкретного турнира (только ADMIN)
+router.post(
+  "/tournaments/:tournamentId/recalculate-points",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId);
+      if (isNaN(tournamentId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const { TournamentModel } = await import("../models/TournamentModel");
+      await TournamentModel.recalculateTournamentPoints(tournamentId);
+
+      res.json({
+        success: true,
+        message: `Очки турнира ${tournamentId} успешно пересчитаны`,
+      });
+    } catch (error) {
+      console.error("Ошибка пересчёта очков турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка пересчёта очков: " + (error as Error).message,
+      });
+    }
+  }
+);
+
 export default router;

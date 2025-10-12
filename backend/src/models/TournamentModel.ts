@@ -12,6 +12,21 @@ import {
 } from "../types";
 
 export class TournamentModel {
+  /**
+   * Нормализовать дату к формату YYYY-MM-DD для SQL запросов
+   */
+  private static normalizeDateForSQL(date: string | Date): string {
+    if (date instanceof Date) {
+      // Преобразуем Date в строку YYYY-MM-DD
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+    // Если уже строка, возвращаем как есть
+    return date;
+  }
+
   static async getAllTournaments(): Promise<Tournament[]> {
     const [rows] = await pool.execute<Tournament[] & RowDataPacket[]>(
       `SELECT 
@@ -219,9 +234,11 @@ export class TournamentModel {
     );
 
     // Получаем эффективное количество команд
+    // Нормализуем дату для корректного поиска парного турнира
+    const normalizedDate = TournamentModel.normalizeDateForSQL(tournament.date);
     const totalTeams = await TournamentModel.getEffectiveTeamsCount(
       tournamentId,
-      tournament.date,
+      normalizedDate,
       tournament.type as TournamentType
     );
 
@@ -237,23 +254,25 @@ export class TournamentModel {
         // Команда в кубке - рассчитываем очки за место в кубке
         let cupPosition: CupPosition;
         switch (result.cup_position) {
-          case "CUP_WINNER":
+          case "WINNER":
             cupPosition = CupPosition.WINNER;
             break;
-          case "CUP_RUNNER_UP":
+          case "RUNNER_UP":
             cupPosition = CupPosition.RUNNER_UP;
             break;
-          case "CUP_THIRD_PLACE":
+          case "THIRD_PLACE":
             cupPosition = CupPosition.THIRD_PLACE;
             break;
-          case "CUP_SEMI_FINAL":
+          case "SEMI_FINAL":
             cupPosition = CupPosition.SEMI_FINAL;
             break;
-          case "CUP_QUARTER_FINAL":
+          case "QUARTER_FINAL":
             cupPosition = CupPosition.QUARTER_FINAL;
             break;
           default:
-            cupPosition = CupPosition.QUARTER_FINAL;
+            throw new Error(
+              `⚠️ Неизвестная позиция в кубке: ${result.cup_position}`
+            );
         }
 
         // Для кубка C нужны очки из отборочного тура
