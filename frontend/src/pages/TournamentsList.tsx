@@ -8,7 +8,12 @@ import React, { useState } from "react";
 import { useQuery } from "react-query";
 import { tournamentsApi } from "../services/api";
 import { TournamentResult, TournamentWithResults } from "../types";
-import { formatDate, getTornamentCategoryText, handleApiError } from "../utils";
+import {
+  formatDate,
+  getTornamentCategoryText,
+  getTournamentTypeIcons,
+  handleApiError,
+} from "../utils";
 import { getCupPositionText } from "../types";
 
 const TournamentsList: React.FC = () => {
@@ -149,9 +154,12 @@ const TournamentsList: React.FC = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                          {tournament.name}
-                        </h3>
+                        <div className="flex items-center mb-1">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {tournament.name}
+                          </h3>
+                          {getTournamentTypeIcons(tournament.type)}
+                        </div>
                         <div className="flex items-center text-sm text-gray-500 space-x-4">
                           <div className="flex items-center">
                             <CalendarIcon className="h-4 w-4 mr-1" />
