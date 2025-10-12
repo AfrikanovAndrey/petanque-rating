@@ -1,0 +1,58 @@
+# Dockerfile с использованием SWC (очень быстрый и легкий компилятор)
+# Требует намного меньше памяти чем TypeScript (< 256 MB)
+# Использование: docker build -f Dockerfile.swc .
+
+FROM node:18-alpine AS builder
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем package.json и package-lock.json
+COPY package*.json ./
+
+# Устанавливаем все зависимости (используем npm install для установки новых зависимостей)
+RUN npm install && npm cache clean --force
+
+# Копируем исходный код и конфигурацию SWC
+COPY . .
+
+# Компилируем TypeScript с использованием SWC (быстро и мало памяти)
+RUN npm run build:swc
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем package.json и package-lock.json
+COPY package*.json ./
+
+# Устанавливаем только production зависимости + необходимые для миграций
+RUN npm install --omit=dev typescript ts-node && \
+    npm cache clean --force
+
+# Копируем скомпилированный код из builder stage
+COPY --from=builder /app/dist ./dist
+
+# Копируем исходники для миграций (нужны для ts-node)
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
+# Создаем пользователя для безопасности
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Создаем директорию для загрузок и назначаем права
+RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app/uploads
+RUN chown -R nodejs:nodejs /app
+
+# Переключаемся на пользователя nodejs
+USER nodejs
+
+# Открываем порт
+EXPOSE 3001
+
+# Команда запуска
+CMD ["npm", "start"]
+

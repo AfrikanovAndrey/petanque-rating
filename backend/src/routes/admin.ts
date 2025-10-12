@@ -71,6 +71,9 @@ router.get("/tournaments", AdminController.getTournaments);
 // GET /api/admin/tournaments/:tournamentId - получить турнир с результатами
 router.get("/tournaments/:tournamentId", AdminController.getTournamentDetails);
 
+// PUT /api/admin/tournaments/:tournamentId - обновить турнир (ADMIN и MANAGER)
+router.put("/tournaments/:tournamentId", AdminController.updateTournament);
+
 // DELETE /api/admin/tournaments/:tournamentId - удалить турнир (только ADMIN)
 router.delete(
   "/tournaments/:tournamentId",

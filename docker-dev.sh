@@ -24,31 +24,26 @@ info() {
     echo -e "${BLUE}[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $1${NC}"
 }
 
-# Проверка наличия Docker и Docker Compose
-check_dependencies() {
-    if ! command -v docker &> /dev/null; then
-        error "Docker не установлен. Пожалуйста, установите Docker."
-        exit 1
-    fi
-
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-        error "Docker Compose не установлен. Пожалуйста, установите Docker Compose."
-        exit 1
-    fi
-}
-
 # Функция для запуска приложения в production режиме
-start() {
+prod() {
     log "Запуск приложения в production режиме..."
     
     # Создаем директории если их нет
     mkdir -p uploads mysql/data
     
-    # Запускаем контейнеры без override файла
+    # Информируем о сборке
+    info "Backend будет собран с использованием SWC компилятора (быстро и мало памяти)"
+    
+    # Запускаем контейнеры без override файла (docker-compose соберет backend автоматически)
     if command -v docker-compose &> /dev/null; then
-        docker-compose -f docker-compose.yml up -d
+        docker-compose -f docker-compose.yml up -d --build
     else
-        docker compose -f docker-compose.yml up -d
+        docker compose -f docker-compose.yml up -d --build
+    fi
+    
+    if [ $? -ne 0 ]; then
+        error "Ошибка при сборке или запуске контейнеров"
+        exit 1
     fi
     
     # Ждем пока база данных запустится
@@ -71,45 +66,25 @@ dev() {
     # Создаем директории если их нет
     mkdir -p uploads mysql/data
     
-    # Запускаем контейнеры с override файлом (автоматически применяется)
+    # Запускаем контейнеры с dev файлом для hot reload
     if command -v docker-compose &> /dev/null; then
-        docker-compose up
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
     else
-        docker compose up
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml up
     fi
     
     log "Dev режим завершен!"
-}
-
-# Функция для запуска только определенных сервисов в dev режиме
-dev_service() {
-    local service=${1:-}
-    
-    if [ -z "$service" ]; then
-        error "Укажите сервис: $0 dev-service <backend|frontend|mysql>"
-        exit 1
-    fi
-    
-    log "Запуск сервиса '$service' в dev режиме..."
-    
-    # Создаем директории если их нет
-    mkdir -p uploads mysql/data
-    
-    if command -v docker-compose &> /dev/null; then
-        docker-compose up "$service"
-    else
-        docker compose up "$service"
-    fi
 }
 
 # Функция для остановки приложения
 stop() {
     log "Остановка приложения..."
     
+    # Останавливаем контейнеры (работает для любого режима)
     if command -v docker-compose &> /dev/null; then
-        docker-compose down
+        docker-compose -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || docker-compose -f docker-compose.yml down
     else
-        docker compose down
+        docker compose -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || docker compose -f docker-compose.yml down
     fi
     
     log "Приложение остановлено!"
@@ -131,12 +106,13 @@ build() {
         log "Сборка dev образов..."
         
         if command -v docker-compose &> /dev/null; then
-            docker-compose build --no-cache
+            docker-compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache
         else
-            docker compose build --no-cache
+            docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache
         fi
     else
         log "Сборка production образов..."
+        info "Backend будет собран с использованием SWC компилятора (быстро и мало памяти)"
         
         if command -v docker-compose &> /dev/null; then
             docker-compose -f docker-compose.yml build --no-cache
@@ -146,36 +122,6 @@ build() {
     fi
     
     log "Образы собраны!"
-}
-
-# Функция для просмотра логов
-logs() {
-    local service=${1:-}
-    
-    if [ -n "$service" ]; then
-        if command -v docker-compose &> /dev/null; then
-            docker-compose logs -f "$service"
-        else
-            docker compose logs -f "$service"
-        fi
-    else
-        if command -v docker-compose &> /dev/null; then
-            docker-compose logs -f
-        else
-            docker compose logs -f
-        fi
-    fi
-}
-
-# Функция для проверки статуса
-check_status() {
-    info "Статус контейнеров:"
-    
-    if command -v docker-compose &> /dev/null; then
-        docker-compose ps
-    else
-        docker compose ps
-    fi
 }
 
 # Функция для очистки
@@ -204,7 +150,7 @@ clean() {
 
 # Функция для создания бэкапа базы данных
 backup() {
-    local backup_name="petanque_backup_$(date +%Y%m%d_%H%M%S).sql"
+    local backup_name="petanque_rating_dump.sql"
     
     log "Создание бэкапа базы данных: $backup_name"
     
@@ -287,9 +233,7 @@ help() {
 }
 
 # Основная логика
-main() {
-    check_dependencies
-    
+main() {    
     case "${1:-}" in
         start)
             start

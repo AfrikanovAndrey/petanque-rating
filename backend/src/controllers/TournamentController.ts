@@ -5,6 +5,7 @@ import {
   getCupPoints,
   getPointsByQualifyingStage,
 } from "../config/cupPoints";
+import { pool } from "../config/database";
 // import removed: PlayerTournamentPointsModel больше не используется
 import {
   normalizeName,
@@ -452,64 +453,88 @@ export class TournamentController {
         );
       }
 
-      // 5. Сохраняем данные в БД
-      const tournamentId = await TournamentModel.createTournament(
-        tournamentName,
-        tournamentType,
-        tournamentCategory,
-        teams.length,
-        tournamentDate
-      );
+      // 5. Сохраняем данные в БД (в транзакции)
+      const connection = await pool.getConnection();
+      let tournamentId: number;
 
-      for (const team of teams) {
-        const teamPlayers: number[] = [];
-        const teamPlayerNames: string[] = [];
-        for (const player of team.players) {
-          teamPlayers.push(player.id);
-          teamPlayerNames.push(player.name);
-        }
+      try {
+        await connection.beginTransaction();
+        console.log("🔄 Начата транзакция сохранения турнира");
 
-        // Находим существующую команду, или создаём новую
-        let teamId;
-        const foundedTeam = await TeamModel.findExistingTeam(teamPlayers);
-        if (!foundedTeam) {
-          teamId = await TeamModel.createTeam(teamPlayers);
-        } else {
-          teamId = foundedTeam?.id;
-        }
-
-        const results = orderedTeamResults.get(team.orderNum);
-        if (!results) {
-          throw new Error("Не может такого быть ))");
-        }
-
-        // Рассчитываем количество рейтинговых очков
-        let points = 0;
-        if (results.cup) {
-          points = getCupPoints(
-            tournamentCategory,
-            results.cup!,
-            results.cupPosition!,
-            teams.length
-          );
-        } else {
-          points = getPointsByQualifyingStage(
-            tournamentCategory,
-            results.qualifyingWins!
-          );
-        }
-
-        // Записываем результат команды в БД
-        TournamentModel.addTournamentResult(
-          tournamentId,
-          teamId,
-          results.wins,
-          results.loses,
-          results.cupPosition,
-          results.cup,
-          results.qualifyingWins!,
-          points
+        tournamentId = await TournamentModel.createTournament(
+          tournamentName,
+          tournamentType,
+          tournamentCategory,
+          tournamentDate,
+          connection
         );
+
+        for (const team of teams) {
+          const teamPlayers: number[] = [];
+          const teamPlayerNames: string[] = [];
+          for (const player of team.players) {
+            teamPlayers.push(player.id);
+            teamPlayerNames.push(player.name);
+          }
+
+          // Находим существующую команду, или создаём новую
+          let teamId;
+          const foundedTeam = await TeamModel.findExistingTeam(
+            teamPlayers,
+            connection
+          );
+          if (!foundedTeam) {
+            teamId = await TeamModel.createTeam(teamPlayers, connection);
+          } else {
+            teamId = foundedTeam?.id;
+          }
+
+          const results = orderedTeamResults.get(team.orderNum);
+          if (!results) {
+            throw new Error("Не может такого быть ))");
+          }
+
+          // Рассчитываем количество рейтинговых очков
+          let points = 0;
+          if (results.cup) {
+            points = getCupPoints(
+              tournamentCategory,
+              results.cup!,
+              results.cupPosition!,
+              teams.length
+            );
+          } else {
+            points = getPointsByQualifyingStage(
+              tournamentCategory,
+              results.qualifyingWins!
+            );
+          }
+
+          // Записываем результат команды в БД
+          await TournamentModel.addTournamentResult(
+            tournamentId,
+            teamId,
+            results.wins,
+            results.loses,
+            results.cupPosition,
+            results.cup,
+            results.qualifyingWins!,
+            points,
+            connection
+          );
+        }
+
+        await connection.commit();
+        console.log("✅ Транзакция успешно завершена");
+      } catch (error) {
+        await connection.rollback();
+        console.error(
+          "❌ Ошибка при сохранении турнира, транзакция отменена:",
+          error
+        );
+        throw error;
+      } finally {
+        connection.release();
       }
 
       console.log(

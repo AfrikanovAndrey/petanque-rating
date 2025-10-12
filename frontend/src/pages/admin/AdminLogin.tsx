@@ -178,19 +178,6 @@ const AdminLogin: React.FC = () => {
           </a>
         </div>
 
-        {/* Информация для разработчика */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="text-center text-sm text-yellow-800">
-            <p className="font-medium mb-1">Данные для входа по умолчанию:</p>
-            <p>
-              Логин: <span className="font-mono">admin</span>
-            </p>
-            <p>
-              Пароль: <span className="font-mono">admin123</span>
-            </p>
-          </div>
-        </div>
-
         {/* Кнопка очистки старых данных */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="text-center text-sm">

@@ -1,5 +1,5 @@
 import { pool } from "../config/database";
-import { ResultSetHeader, RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket, PoolConnection } from "mysql2/promise";
 
 export interface Team {
   id: number;
@@ -89,24 +89,31 @@ export class TeamModel {
   /**
    * Создать команду из отсортированных по фамилиям игроков
    */
-  static async createTeam(playerIds: number[]): Promise<number> {
+  static async createTeam(
+    playerIds: number[],
+    connection?: PoolConnection
+  ): Promise<number> {
     if (playerIds.length < 1 || playerIds.length > 4) {
       throw new Error("В команде должно быть от 1 до 4 игроков");
     }
 
-    const connection = await pool.getConnection();
+    const useExternalConnection = !!connection;
+    const conn = connection || (await pool.getConnection());
+
     try {
-      await connection.beginTransaction();
+      if (!useExternalConnection) {
+        await conn.beginTransaction();
+      }
 
       // Создаем команду
-      const [teamResult] = await connection.execute<ResultSetHeader>(
+      const [teamResult] = await conn.execute<ResultSetHeader>(
         `INSERT INTO teams (created_at, updated_at) VALUES (NOW(), NOW())`
       );
 
       const teamId = teamResult.insertId;
 
       // Получаем имена игроков и сортируем их по фамилиям
-      const [playerRows] = await connection.execute<RowDataPacket[]>(
+      const [playerRows] = await conn.execute<RowDataPacket[]>(
         `SELECT id, name FROM players WHERE id IN (${playerIds
           .map(() => "?")
           .join(",")}) ORDER BY name ASC`,
@@ -116,32 +123,43 @@ export class TeamModel {
       // Добавляем игроков в team_players
       for (let i = 0; i < playerRows.length; i++) {
         const player = playerRows[i] as any;
-        await connection.execute(
+        await conn.execute(
           `INSERT INTO team_players (team_id, player_id, position) VALUES (?, ?, ?)`,
           [teamId, player.id, i + 1]
         );
       }
 
-      await connection.commit();
+      if (!useExternalConnection) {
+        await conn.commit();
+      }
       return teamId;
     } catch (error) {
-      await connection.rollback();
+      if (!useExternalConnection) {
+        await conn.rollback();
+      }
       throw error;
     } finally {
-      connection.release();
+      if (!useExternalConnection) {
+        conn.release();
+      }
     }
   }
 
   /**
    * Найти существующую команду по составу игроков
    */
-  static async findExistingTeam(playerIds: number[]): Promise<Team | null> {
+  static async findExistingTeam(
+    playerIds: number[],
+    connection?: PoolConnection
+  ): Promise<Team | null> {
     if (playerIds.length < 1 || playerIds.length > 4) {
       return null;
     }
 
+    const executor = connection || pool;
+
     // Получаем имена игроков и сортируем их по фамилиям
-    const [playerRows] = await pool.execute<RowDataPacket[]>(
+    const [playerRows] = await executor.execute<RowDataPacket[]>(
       `SELECT id, name FROM players WHERE id IN (${playerIds
         .map(() => "?")
         .join(",")}) ORDER BY name ASC`,
@@ -151,7 +169,7 @@ export class TeamModel {
     const sortedPlayerIds = playerRows.map((player: any) => player.id);
 
     // Ищем команду с точно таким же составом игроков
-    const [rows] = await pool.execute<Team[] & RowDataPacket[]>(
+    const [rows] = await executor.execute<Team[] & RowDataPacket[]>(
       `SELECT t.* FROM teams t
        WHERE t.id IN (
          SELECT team_id FROM team_players

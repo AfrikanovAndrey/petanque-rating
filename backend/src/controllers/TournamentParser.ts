@@ -62,7 +62,7 @@ export class TournamentParser {
     }
 
     throw new Error(
-      `Команда игрока "${player.name}" (лист "${sheetName}") не найдена на Листе регистрации`
+      `Команда игрока "${player.name}" (лист "${sheetName}") не найдена на листе регистрации`
     );
   }
 
@@ -207,6 +207,7 @@ export class TournamentParser {
     for (const stage of Object.values(stages)) {
       for (const stageInfo of stage) {
         for (const cellAddress of stageInfo.cells) {
+          console.log(`Обрабатываем ячейку: "${cellAddress}"`);
           let player: Player;
           try {
             if (ExcelUtils.isCellEmpty(worksheet[cellAddress])) {
@@ -236,7 +237,7 @@ export class TournamentParser {
               }
             }
           } catch (error) {
-            errors.push((error as Error).message);
+            errors.push(`${cellAddress}: ${(error as Error).message}`);
           }
         }
       }
@@ -307,14 +308,17 @@ export class TournamentParser {
         rowIndex < 100;
         rowIndex++
       ) {
+        console.log(
+          `Обрабатываем ячейку: "${teamNameColumnCell.column}${rowIndex}"`
+        );
         let teamCell = swissSheet[`${teamNameColumnCell.column}${rowIndex}`];
 
         const teamCellText = ExcelUtils.getCellText(teamCell);
-        console.log(`Название команды: "${teamCellText}"`);
 
         if (teamCellText === normalizeName("Свободен") || teamCellText === "") {
           break; //прекращаем разбор таблицы, когда в столбце "Команда" встречаем пустую строку или "Свободен"
         } else {
+          console.log(`Найдена команда: "${teamCellText}"`);
           let player: Player;
           try {
             const playerName = ExcelUtils.getCellText(teamCell);
@@ -460,19 +464,20 @@ export class TournamentParser {
 
   /**
    * Определить пользователя по строке поиска
-   * @param teamName : string
+   * @param playerName : string
    * @returns
    */
-  static async detectPlayer(teamName: string): Promise<Player> {
+  static async detectPlayer(playerName: string): Promise<Player> {
+    console.debug(`🔍 Ищем игрока: "${playerName}"`);
     const foundedPlayers = await PlayerModel.getPlayerByName(
-      normalizeName(teamName)
+      normalizeName(playerName)
     );
     if (!foundedPlayers || foundedPlayers.length === 0) {
-      throw new Error(`Игрок "${teamName}" не найден в базе данных`);
+      throw new Error(`Игрок "${playerName}" не найден в базе данных`);
     }
     if (foundedPlayers.length > 1) {
       throw new Error(
-        `Найдено несколько игроков по строке: "${teamName}" - ${foundedPlayers
+        `Найдено несколько игроков по строке: "${playerName}" - ${foundedPlayers
           .map((x) => x.name)
           .join(",")}`
       );

@@ -12,11 +12,13 @@ services:
       MYSQL_USER: petanque_user
       MYSQL_PASSWORD: petanque_password
     command: --default-authentication-plugin=mysql_native_password
-      --innodb-buffer-pool-size=256M
-      --innodb-log-file-size=64M
+      --innodb-buffer-pool-size=64M
+      --innodb-log-file-size=16M
       --innodb-lock-wait-timeout=50
       --innodb-rollback-on-timeout=OFF
-      --max-connections=100
+      --max-connections=20
+      --performance-schema=OFF
+      --table-open-cache=64
     ports:
       - "3306:3306"
     volumes:
@@ -33,7 +35,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.swc
     container_name: petanque-backend
     restart: unless-stopped
     environment:

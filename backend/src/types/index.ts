@@ -19,10 +19,10 @@ export interface Tournament {
   name: string;
   type: TournamentType;
   category: string;
-  teamsCount: number;
   date: string;
   created_at: Date;
   updated_at: Date;
+  teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров
 }
 
 export interface TournamentResult {
@@ -42,7 +42,6 @@ export interface TournamentResult {
   team_name?: string;
   tournament_name?: string;
   tournament_category: TournamentCategory;
-  tournament_teams_count: number;
   tournament_date?: string;
   team_players?: string; // Строка с именами игроков через запятую
 }

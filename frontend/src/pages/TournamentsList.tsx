@@ -160,9 +160,6 @@ const TournamentsList: React.FC = () => {
                           <div className="flex items-center">
                             {getTornamentCategoryText(tournament.category)}
                           </div>
-                          <div className="flex items-center">
-                            {tournament.teams_count} команд
-                          </div>
                         </div>
                       </div>
                       <div className="ml-4">

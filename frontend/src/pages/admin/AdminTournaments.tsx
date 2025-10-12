@@ -1,6 +1,7 @@
 import {
   CalendarIcon,
   DocumentArrowUpIcon,
+  PencilIcon,
   PlusIcon,
   TrashIcon,
   TrophyIcon,
@@ -13,6 +14,7 @@ import { adminApi } from "../../services/api";
 import { getCupPositionText, TournamentType } from "../../types";
 import {
   formatDate,
+  formatDateForInput,
   formatDateTime,
   getTornamentCategoryText,
   getTournamentTypeText,
@@ -28,9 +30,18 @@ interface TournamentUploadForm {
   google_sheets_url: string;
 }
 
+interface TournamentEditForm {
+  name: string;
+  date: string;
+  type: TournamentType;
+  category: string;
+}
+
 const AdminTournaments: React.FC = () => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState<any>(null);
+  const [editingTournament, setEditingTournament] = useState<any>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [fileError, setFileError] = useState<string>("");
   const [criticalErrors, setCriticalErrors] = useState<string[]>([]);
@@ -59,6 +70,13 @@ const AdminTournaments: React.FC = () => {
     watch,
     setValue,
   } = useForm<TournamentUploadForm>();
+
+  const {
+    register: registerEdit,
+    handleSubmit: handleSubmitEdit,
+    formState: { errors: errorsEdit },
+    reset: resetEdit,
+  } = useForm<TournamentEditForm>();
 
   // Отслеживаем выбранный файл и URL Google Sheets
   const selectedFile = watch("tournament_file");
@@ -188,6 +206,31 @@ const AdminTournaments: React.FC = () => {
     }
   );
 
+  // Мутация для обновления турнира
+  const updateMutation = useMutation(
+    async (data: { id: number; updateData: TournamentEditForm }) => {
+      return await adminApi.updateTournament(data.id, {
+        name: data.updateData.name,
+        type: data.updateData.type,
+        category: data.updateData.category,
+        date: data.updateData.date,
+      });
+    },
+    {
+      onSuccess: () => {
+        toast.success("Турнир успешно обновлен!");
+        queryClient.invalidateQueries("tournaments");
+        queryClient.invalidateQueries("fullRating");
+        queryClient.invalidateQueries("dashboardRating");
+        setIsEditModalOpen(false);
+        resetEdit();
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
   // Мутация для удаления турнира
   const deleteMutation = useMutation(
     async (tournamentId: number) => {
@@ -258,6 +301,25 @@ const AdminTournaments: React.FC = () => {
 
   const handleViewDetails = (tournamentId: number) => {
     detailsMutation.mutate(tournamentId);
+  };
+
+  const handleOpenEditModal = (tournament: any) => {
+    setEditingTournament(tournament);
+    resetEdit({
+      name: tournament.name,
+      type: tournament.type,
+      category: tournament.category === "FEDERAL" ? "1" : "2",
+      date: formatDateForInput(tournament.date),
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const onSubmitEdit = (data: TournamentEditForm) => {
+    if (!editingTournament) return;
+    updateMutation.mutate({
+      id: editingTournament.id,
+      updateData: data,
+    });
   };
 
   const handleOpenUploadModal = () => {
@@ -374,8 +436,8 @@ const AdminTournaments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center text-align: justify">
-                        {tournament.teams_count}
+                      <div className="flex items-center">
+                        {tournament.teams_count ?? 0}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -390,6 +452,13 @@ const AdminTournaments: React.FC = () => {
                           title="Просмотр результатов"
                         >
                           Результаты
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditModal(tournament)}
+                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                          title="Редактировать турнир"
+                        >
+                          <PencilIcon className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() =>
@@ -814,6 +883,143 @@ const AdminTournaments: React.FC = () => {
                   disabled={uploadMutation.isLoading}
                 >
                   {uploadMutation.isLoading ? "Загрузка..." : "Загрузить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно редактирования турнира */}
+      {isEditModalOpen && editingTournament && (
+        <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Редактировать турнир
+              </h2>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSubmitEdit(onSubmitEdit)}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Название турнира
+                </label>
+                <input
+                  type="text"
+                  className={`input-field ${
+                    errorsEdit.name ? "border-red-300" : ""
+                  }`}
+                  placeholder="Введите название турнира"
+                  {...registerEdit("name", {
+                    required: "Название турнира обязательно",
+                  })}
+                />
+                {errorsEdit.name && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsEdit.name.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Дата проведения
+                </label>
+                <input
+                  type="date"
+                  className={`input-field ${
+                    errorsEdit.date ? "border-red-300" : ""
+                  }`}
+                  {...registerEdit("date", {
+                    required: "Дата турнира обязательна",
+                  })}
+                />
+                {errorsEdit.date && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsEdit.date.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Тип турнира
+                </label>
+                <select
+                  className={`input-field ${
+                    errorsEdit.type ? "border-red-300" : ""
+                  }`}
+                  {...registerEdit("type", {
+                    required: "Тип турнира обязателен",
+                  })}
+                >
+                  <option value="">Выберите тип турнира</option>
+                  <option value={TournamentType.TRIPLETTE}>Триплеты</option>
+                  <option value={TournamentType.DOUBLETTE_MALE}>
+                    Дуплеты мужские
+                  </option>
+                  <option value={TournamentType.DOUBLETTE_FEMALE}>
+                    Дуплеты женские
+                  </option>
+                  <option value={TournamentType.DOUBLETTE_MIXT}>
+                    Дуплеты микст
+                  </option>
+                  <option value={TournamentType.TET_A_TET}>Теты</option>
+                </select>
+                {errorsEdit.type && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsEdit.type.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Категория турнира
+                </label>
+                <select
+                  className={`input-field ${
+                    errorsEdit.category ? "border-red-300" : ""
+                  }`}
+                  {...registerEdit("category", {
+                    required: "Категория турнира обязательна",
+                  })}
+                >
+                  <option value="1">1-я категория</option>
+                  <option value="2">2-я категория</option>
+                </select>
+                {errorsEdit.category && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsEdit.category.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="btn-secondary"
+                  disabled={updateMutation.isLoading}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={updateMutation.isLoading}
+                >
+                  {updateMutation.isLoading ? "Сохранение..." : "Сохранить"}
                 </button>
               </div>
             </form>

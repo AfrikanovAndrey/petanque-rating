@@ -1,4 +1,4 @@
-import { ResultSetHeader, RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket, PoolConnection } from "mysql2/promise";
 import { getCupPoints, getPointsByQualifyingStage } from "../config/cupPoints";
 import { pool } from "../config/database";
 
@@ -14,7 +14,13 @@ import {
 export class TournamentModel {
   static async getAllTournaments(): Promise<Tournament[]> {
     const [rows] = await pool.execute<Tournament[] & RowDataPacket[]>(
-      "SELECT * FROM tournaments ORDER BY date DESC"
+      `SELECT 
+        t.*,
+        COALESCE(COUNT(DISTINCT tr.team_id), 0) as teams_count
+      FROM tournaments t
+      LEFT JOIN tournament_results tr ON t.id = tr.tournament_id
+      GROUP BY t.id
+      ORDER BY t.date DESC`
     );
     return rows;
   }
@@ -27,18 +33,67 @@ export class TournamentModel {
     return rows[0] || null;
   }
 
+  static async getTournamentTeamsCount(tournamentId: number): Promise<number> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      "SELECT COUNT(DISTINCT team_id) as teams_count FROM tournament_results WHERE tournament_id = ?",
+      [tournamentId]
+    );
+    return (rows[0]?.teams_count as number) || 0;
+  }
+
   static async createTournament(
     name: string,
     type: TournamentType,
     category: TournamentCategoryEnum,
-    teamsCount: number,
-    date: string
+    date: string,
+    connection?: PoolConnection
   ): Promise<number> {
-    const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, type, category, teams_count, date) VALUES (?, ?, ?, ?, ?)",
-      [name, type, TournamentCategoryEnum[category], teamsCount, date]
+    const executor = connection || pool;
+    const [result] = await executor.execute<ResultSetHeader>(
+      "INSERT INTO tournaments (name, type, category, date) VALUES (?, ?, ?, ?)",
+      [name, type, TournamentCategoryEnum[category], date]
     );
     return result.insertId;
+  }
+
+  static async updateTournament(
+    id: number,
+    name?: string,
+    type?: TournamentType,
+    category?: TournamentCategoryEnum,
+    date?: string
+  ): Promise<boolean> {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (name !== undefined) {
+      updates.push("name = ?");
+      values.push(name);
+    }
+    if (type !== undefined) {
+      updates.push("type = ?");
+      values.push(type);
+    }
+    if (category !== undefined) {
+      updates.push("category = ?");
+      values.push(TournamentCategoryEnum[category]);
+    }
+    if (date !== undefined) {
+      updates.push("date = ?");
+      values.push(date);
+    }
+
+    if (updates.length === 0) {
+      return false; // Нет данных для обновления
+    }
+
+    values.push(id);
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE tournaments SET ${updates.join(", ")} WHERE id = ?`,
+      values
+    );
+
+    return result.affectedRows > 0;
   }
 
   static async deleteTournament(id: number): Promise<boolean> {
@@ -105,9 +160,11 @@ export class TournamentModel {
     cupPosition?: CupPosition,
     cup?: Cup,
     qualifying_wins?: number,
-    points?: number
+    points?: number,
+    connection?: PoolConnection
   ): Promise<number> {
-    const [result] = await pool.execute<ResultSetHeader>(
+    const executor = connection || pool;
+    const [result] = await executor.execute<ResultSetHeader>(
       "INSERT INTO tournament_results (tournament_id, team_id, cup, cup_position, qualifying_wins, wins, loses, points) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         TournamentModel.ensureValue(tournamentId, 0),
@@ -180,7 +237,10 @@ export class TournamentModel {
           `   🔍 Обрабатываем команду ID ${result.team_id}: "${result.team_players}"`
         );
 
-        const totalTeams = tournament.teamsCount;
+        // Получаем количество команд из результатов турнира
+        const totalTeams = await TournamentModel.getTournamentTeamsCount(
+          tournamentId
+        );
         const categoryEnum =
           tournament.category === "FEDERAL"
             ? TournamentCategoryEnum.FEDERAL

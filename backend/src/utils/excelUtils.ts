@@ -63,7 +63,8 @@ class ExcelUtils {
     if (this.isCellEmpty(cell)) {
       return "";
     } else {
-      return normalizeName(cell.v);
+      //console.log(`Текст ячейки: "${cell.v}"`);
+      return normalizeName(String(cell.v));
     }
   }
 
