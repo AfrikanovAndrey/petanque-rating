@@ -204,6 +204,18 @@ export const adminApi = {
   }): Promise<AxiosResponse<ApiResponse<{ player_id: number }>>> =>
     api.post("/admin/players", data),
 
+  // Массовая загрузка игроков из текстового файла
+  uploadPlayersFromText: (
+    formData: FormData
+  ): Promise<AxiosResponse<ApiResponse>> => {
+    return api.post("/admin/players/upload-text", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: 30000, // 30 секунд для загрузки файла
+    });
+  },
+
   // Обновить игрока
   updatePlayer: (
     playerId: number,

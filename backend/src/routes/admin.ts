@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   AdminController,
   licensedPlayersUploadMiddleware,
+  playersTextUploadMiddleware,
   uploadMiddleware,
 } from "../controllers/AdminController";
 import { SettingsController } from "../controllers/SettingsController";
@@ -95,6 +96,13 @@ router.get("/players", AdminController.getPlayers);
 
 // POST /api/admin/players - создать игрока
 router.post("/players", AdminController.createPlayer);
+
+// POST /api/admin/players/upload-text - массовая загрузка игроков из текстового файла
+router.post(
+  "/players/upload-text",
+  playersTextUploadMiddleware,
+  AdminController.uploadPlayersFromText
+);
 
 // PUT /api/admin/players/:playerId - обновить игрока
 router.put("/players/:playerId", AdminController.updatePlayer);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -7,6 +7,8 @@ import {
   TrashIcon,
   UsersIcon,
   MagnifyingGlassIcon,
+  ArrowUpTrayIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "../../services/api";
 import { Player } from "../../types";
@@ -36,6 +38,9 @@ const AdminPlayers: React.FC = () => {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
 
@@ -125,6 +130,31 @@ const AdminPlayers: React.FC = () => {
     }
   );
 
+  // Мутация для массовой загрузки игроков из текстового файла
+  const bulkUploadMutation = useMutation(
+    async (file: File) => {
+      const formData = new FormData();
+      formData.append("players_file", file);
+      return await adminApi.uploadPlayersFromText(formData);
+    },
+    {
+      onSuccess: (response) => {
+        toast.success(response.data.message || "Игроки успешно загружены!");
+        queryClient.invalidateQueries("players");
+        queryClient.invalidateQueries("fullRating");
+        queryClient.invalidateQueries("dashboardRating");
+        setIsBulkUploadModalOpen(false);
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
   const openCreateModal = () => {
     reset();
     setIsCreateModalOpen(true);
@@ -133,6 +163,44 @@ const AdminPlayers: React.FC = () => {
   const closeCreateModal = () => {
     setIsCreateModalOpen(false);
     reset();
+  };
+
+  const openBulkUploadModal = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setIsBulkUploadModalOpen(true);
+  };
+
+  const closeBulkUploadModal = () => {
+    setIsBulkUploadModalOpen(false);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Проверяем расширение файла
+      if (!file.name.toLowerCase().endsWith(".txt")) {
+        toast.error("Пожалуйста, выберите текстовый файл (.txt)");
+        event.target.value = "";
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleBulkUpload = () => {
+    if (!selectedFile) {
+      toast.error("Пожалуйста, выберите файл");
+      return;
+    }
+
+    bulkUploadMutation.mutate(selectedFile);
   };
 
   const openEditModal = (player: Player) => {
@@ -208,19 +276,28 @@ const AdminPlayers: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Заголовок и кнопка создания */}
+      {/* Заголовок и кнопки */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Игроки</h1>
           <p className="mt-2 text-gray-600">Управление профилями игроков</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="btn-primary flex items-center"
-        >
-          <UsersIcon className="h-5 w-5 mr-2" />
-          Создать игрока
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={openBulkUploadModal}
+            className="btn-secondary flex items-center"
+          >
+            <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
+            Загрузить из файла
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="btn-primary flex items-center"
+          >
+            <UsersIcon className="h-5 w-5 mr-2" />
+            Создать игрока
+          </button>
+        </div>
       </div>
 
       {/* Поиск и статистика */}
@@ -595,6 +672,142 @@ const AdminPlayers: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно массовой загрузки */}
+      {isBulkUploadModalOpen && (
+        <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="card max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Массовая загрузка игроков из текстового файла
+              </h3>
+              <button
+                onClick={closeBulkUploadModal}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={bulkUploadMutation.isLoading}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Информация о формате файла */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <DocumentTextIcon className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-sm text-blue-900">
+                    <p className="font-semibold mb-2">
+                      Формат текстового файла:
+                    </p>
+                    <ul className="space-y-1 ml-4 list-disc">
+                      <li>Каждая строка содержит данные одного игрока</li>
+                      <li>
+                        Формат строки:{" "}
+                        <code className="bg-blue-100 px-1 rounded">
+                          имя, город
+                        </code>{" "}
+                        или{" "}
+                        <code className="bg-blue-100 px-1 rounded">
+                          имя, пол, город
+                        </code>
+                      </li>
+                      <li>
+                        Примеры:{" "}
+                        <code className="bg-blue-100 px-1 rounded">
+                          Иванов Иван, Москва
+                        </code>{" "}
+                        или{" "}
+                        <code className="bg-blue-100 px-1 rounded">
+                          Петрова Анна, female, Казань
+                        </code>
+                      </li>
+                      <li>
+                        Имя должно содержать минимум Фамилию и Имя (не инициалы)
+                      </li>
+                      <li>
+                        Пол может быть: male, female, m, f, м, ж (или не указан)
+                      </li>
+                      <li>
+                        Если игрок уже существует, будут обновлены его пол и
+                        город
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Пример содержимого файла */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Пример содержимого файла:
+                </p>
+                <pre className="text-xs text-gray-600 bg-white p-3 rounded border border-gray-200">
+                  {`Потапов Вячеслав, male, Краснодар
+Панфилова Любовь, female, Анапа
+Иванов Иван, м, Москва
+Петрова Анна, ж, Санкт-Петербург
+Сидоров Дмитрий, Казань`}
+                </pre>
+                <p className="mt-2 text-xs text-gray-500">
+                  * Если пол не указан в файле, будет установлен мужской пол по
+                  умолчанию
+                </p>
+              </div>
+
+              {/* Выбор файла */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Выберите текстовый файл (.txt)
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt"
+                  onChange={handleFileSelect}
+                  disabled={bulkUploadMutation.isLoading}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50"
+                />
+                {selectedFile && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Выбран файл:{" "}
+                    <span className="font-medium">{selectedFile.name}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Кнопки действий */}
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={closeBulkUploadModal}
+                  className="btn-secondary"
+                  disabled={bulkUploadMutation.isLoading}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkUpload}
+                  className="btn-primary flex items-center"
+                  disabled={!selectedFile || bulkUploadMutation.isLoading}
+                >
+                  {bulkUploadMutation.isLoading ? (
+                    <>
+                      <div className="loading-spinner-sm mr-2"></div>
+                      Загрузка...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
+                      Загрузить
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

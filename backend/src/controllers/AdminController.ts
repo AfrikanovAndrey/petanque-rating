@@ -29,10 +29,34 @@ const upload = multer({
   },
 });
 
+// Настройка multer для текстовых файлов
+const textUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    // Разрешаем текстовые файлы
+    const allowedMimes = ["text/plain"];
+    const allowedExtensions = [".txt"];
+    const fileExtension = file.originalname.toLowerCase().slice(-4);
+
+    if (
+      allowedMimes.includes(file.mimetype) ||
+      allowedExtensions.includes(fileExtension)
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Разрешены только текстовые файлы (.txt)"));
+    }
+  },
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB
+  },
+});
+
 export const uploadMiddleware = upload.single("tournament_file");
 export const licensedPlayersUploadMiddleware = upload.single(
   "licensed_players_file"
 );
+export const playersTextUploadMiddleware = textUpload.single("players_file");
 
 export class AdminController {
   // Загрузка результатов турнира из Google Sheets
@@ -910,6 +934,205 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Ошибка при загрузке списка лицензионных игроков",
+      });
+    }
+  }
+
+  // Массовая загрузка игроков из текстового файла
+  static async uploadPlayersFromText(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: "Файл не был загружен",
+        });
+        return;
+      }
+
+      // Читаем текстовый файл
+      const fileContent = req.file.buffer.toString("utf-8");
+      const lines = fileContent.split(/\r?\n/).filter((line) => line.trim());
+
+      if (lines.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: "Файл пустой или не содержит данных",
+        });
+        return;
+      }
+
+      console.log(`📄 Обработка текстового файла: ${lines.length} строк`);
+
+      const results = {
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [] as string[],
+      };
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Парсим строку формата: "имя, город" или "имя, пол, город"
+        const parts = line.split(",").map((part) => part.trim());
+
+        if (parts.length < 2) {
+          results.errors.push(
+            `Строка ${
+              i + 1
+            }: неверный формат "${line}" (ожидается: имя, город или имя, пол, город)`
+          );
+          results.skipped++;
+          continue;
+        }
+
+        const playerName = parts[0];
+        let playerGender = "male"; // По умолчанию мужской пол
+        let city = "";
+
+        // Определяем формат: 2 поля (имя, город) или 3 поля (имя, пол, город)
+        if (parts.length === 2) {
+          // Формат: имя, город
+          city = parts[1];
+        } else if (parts.length >= 3) {
+          // Формат: имя, пол, город
+          const genderField = parts[1].toLowerCase();
+          if (
+            genderField === "male" ||
+            genderField === "female" ||
+            genderField === "m" ||
+            genderField === "f" ||
+            genderField === "м" ||
+            genderField === "ж"
+          ) {
+            // Второе поле это пол
+            playerGender =
+              genderField === "male" ||
+              genderField === "m" ||
+              genderField === "м"
+                ? "male"
+                : "female";
+            city = parts.slice(2).join(", "); // Остальное - город (может содержать запятые)
+          } else {
+            // Второе поле не похоже на пол, считаем что это формат: имя, город (с запятыми в городе)
+            city = parts.slice(1).join(", ");
+          }
+        }
+
+        if (!playerName) {
+          results.errors.push(`Строка ${i + 1}: имя игрока не указано`);
+          results.skipped++;
+          continue;
+        }
+
+        if (!city) {
+          results.errors.push(`Строка ${i + 1}: город не указан`);
+          results.skipped++;
+          continue;
+        }
+
+        // Проверяем, что имя содержит минимум 2 слова (Фамилия Имя)
+        const nameParts = playerName.split(/\s+/);
+        if (nameParts.length < 2) {
+          results.errors.push(
+            `Строка ${
+              i + 1
+            }: имя "${playerName}" должно содержать минимум Фамилию и Имя`
+          );
+          results.skipped++;
+          continue;
+        }
+
+        // Проверяем, что вторая часть не является инициалами
+        const secondPart = nameParts[1];
+        const isInitial = /^[А-ЯA-Z]\.?$/.test(secondPart);
+        if (isInitial) {
+          results.errors.push(
+            `Строка ${
+              i + 1
+            }: нельзя использовать инициалы в имени "${playerName}". Укажите полное имя`
+          );
+          results.skipped++;
+          continue;
+        }
+
+        try {
+          // Проверяем, существует ли игрок с таким именем
+          const existingPlayer = await PlayerModel.getPlayerByName(playerName);
+
+          if (existingPlayer && existingPlayer.length > 0) {
+            // Игрок уже существует, обновляем данные если нужно
+            const player = existingPlayer[0];
+            const needsUpdate =
+              player.city !== city || player.gender !== playerGender;
+
+            if (needsUpdate) {
+              await PlayerModel.updatePlayer(
+                player.id,
+                player.name,
+                playerGender,
+                city
+              );
+              results.updated++;
+              console.log(
+                `✏️ Обновлен игрок: ${playerName} (${playerGender}, ${city})`
+              );
+            } else {
+              results.skipped++;
+              console.log(`⏭️ Пропущен существующий игрок: ${playerName}`);
+            }
+          } else {
+            // Создаем нового игрока
+            const playerId = await PlayerModel.createPlayer(playerName, city);
+
+            // Устанавливаем пол
+            await PlayerModel.updatePlayer(
+              playerId,
+              playerName,
+              playerGender,
+              city
+            );
+
+            results.created++;
+            console.log(
+              `✅ Создан игрок: ${playerName} (${playerGender}, ${city})`
+            );
+          }
+        } catch (error) {
+          console.error(`Ошибка обработки игрока ${playerName}:`, error);
+          results.errors.push(
+            `Строка ${i + 1}: ошибка создания/обновления игрока "${playerName}"`
+          );
+          results.skipped++;
+        }
+      }
+
+      // Формируем сообщение результата
+      let message = `Загрузка завершена. Создано: ${results.created}, Обновлено: ${results.updated}, Пропущено: ${results.skipped}`;
+
+      if (results.errors.length > 0) {
+        message += `\n\nОшибки:\n${results.errors.join("\n")}`;
+      }
+
+      res.json({
+        success: true,
+        message,
+        results: {
+          created: results.created,
+          updated: results.updated,
+          skipped: results.skipped,
+          errors: results.errors,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка массовой загрузки игроков:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка при массовой загрузке игроков",
       });
     }
   }
