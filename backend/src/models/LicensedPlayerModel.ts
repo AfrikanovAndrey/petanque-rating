@@ -76,10 +76,15 @@ export class LicensedPlayerModel {
 
       if (existingPlayer.length > 0) {
         playerId = existingPlayer[0].id;
+        // Обновляем город игрока
+        await connection.execute("UPDATE players SET city = ? WHERE id = ?", [
+          playerData.city,
+          playerId,
+        ]);
       } else {
         const [insertResult] = await connection.execute<ResultSetHeader>(
-          "INSERT INTO players (name) VALUES (?)",
-          [playerData.player_name]
+          "INSERT INTO players (name, city) VALUES (?, ?)",
+          [playerData.player_name, playerData.city]
         );
         playerId = insertResult.insertId;
       }
@@ -156,15 +161,15 @@ export class LicensedPlayerModel {
           if (playerUsage[0].count === 0) {
             // Можно обновить существующего игрока
             await connection.execute(
-              "UPDATE players SET name = ? WHERE id = ?",
-              [playerData.player_name, currentPlayerId]
+              "UPDATE players SET name = ?, city = ? WHERE id = ?",
+              [playerData.player_name, playerData.city || null, currentPlayerId]
             );
             playerId = currentPlayerId;
           } else {
             // Нужно создать нового игрока
             const [insertResult] = await connection.execute<ResultSetHeader>(
-              "INSERT INTO players (name) VALUES (?)",
-              [playerData.player_name]
+              "INSERT INTO players (name, city) VALUES (?, ?)",
+              [playerData.player_name, playerData.city || null]
             );
             playerId = insertResult.insertId;
           }
@@ -273,10 +278,15 @@ export class LicensedPlayerModel {
 
           if (existingPlayer.length > 0) {
             playerId = existingPlayer[0].id;
+            // Обновляем город игрока при массовой загрузке
+            await connection.execute(
+              "UPDATE players SET city = ? WHERE id = ?",
+              [player.city, playerId]
+            );
           } else {
             const [insertResult] = await connection.execute<ResultSetHeader>(
-              "INSERT INTO players (name) VALUES (?)",
-              [player.player_name]
+              "INSERT INTO players (name, city) VALUES (?, ?)",
+              [player.player_name, player.city]
             );
             playerId = insertResult.insertId;
           }

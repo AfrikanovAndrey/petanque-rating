@@ -28,6 +28,7 @@ const formatGender = (gender: string | null | undefined): string => {
 interface EditPlayerForm {
   name: string;
   gender: string;
+  city?: string;
 }
 
 const AdminPlayers: React.FC = () => {
@@ -58,7 +59,7 @@ const AdminPlayers: React.FC = () => {
 
   // Мутация для создания игрока
   const createMutation = useMutation(
-    async (data: { name: string; gender: string }) => {
+    async (data: { name: string; gender: string; city?: string }) => {
       return await adminApi.createPlayer(data);
     },
     {
@@ -78,10 +79,16 @@ const AdminPlayers: React.FC = () => {
 
   // Мутация для обновления игрока
   const updateMutation = useMutation(
-    async (data: { id: number; name: string; gender: string }) => {
+    async (data: {
+      id: number;
+      name: string;
+      gender: string;
+      city?: string;
+    }) => {
       return await adminApi.updatePlayer(data.id, {
         name: data.name,
         gender: data.gender,
+        city: data.city,
       });
     },
     {
@@ -132,6 +139,7 @@ const AdminPlayers: React.FC = () => {
     setEditingPlayer(player);
     setValue("name", player.name);
     setValue("gender", player.gender);
+    setValue("city", player.city || "");
     setIsEditModalOpen(true);
   };
 
@@ -145,6 +153,7 @@ const AdminPlayers: React.FC = () => {
     createMutation.mutate({
       name: data.name.trim(),
       gender: data.gender,
+      city: data.city?.trim() || undefined,
     });
   };
 
@@ -154,6 +163,7 @@ const AdminPlayers: React.FC = () => {
         id: editingPlayer.id,
         name: data.name.trim(),
         gender: data.gender,
+        city: data.city?.trim() || undefined,
       });
     }
   };
@@ -247,6 +257,9 @@ const AdminPlayers: React.FC = () => {
                     Пол
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Город
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата добавления
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -274,6 +287,9 @@ const AdminPlayers: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatGender(player.gender)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {player.city || "—"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateTime(player.created_at)}
@@ -425,6 +441,18 @@ const AdminPlayers: React.FC = () => {
                 )}
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Город
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Введите город"
+                  {...register("city")}
+                />
+              </div>
+
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
@@ -536,6 +564,18 @@ const AdminPlayers: React.FC = () => {
                     {errors.gender.message}
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Город
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Введите город"
+                  {...register("city")}
+                />
               </div>
 
               <div className="flex justify-end space-x-3">

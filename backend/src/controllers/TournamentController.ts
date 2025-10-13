@@ -162,7 +162,7 @@ export class TournamentController {
     }
 
     const swissSheet = ExcelUtils.findXlsSheet(workbook, SWISS_RESULTS_LIST);
-    const groupSheet = ExcelUtils.findXlsSheet(workbook, /Группа \w+/);
+    const groupSheet = ExcelUtils.findXlsSheet(workbook, /группа [aа]/);
 
     if (!swissSheet && !groupSheet) {
       errors.push(
@@ -373,9 +373,7 @@ export class TournamentController {
     teamsCount: number;
     resultsCount: number;
   }> {
-    console.log(
-      `🚀 Начинается парсинг файла турнира без транзакции: "${fileName}"`
-    );
+    console.log(`🚀 Начинается парсинг файла: "${fileName}"`);
 
     // Убираем большую транзакцию для предотвращения блокировок
     // Используем отдельные соединения для разных операций

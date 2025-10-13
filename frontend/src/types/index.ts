@@ -10,6 +10,7 @@ export interface Player {
   id: number;
   name: string;
   gender: string;
+  city?: string | null;
   created_at: string;
   updated_at: string;
 }
