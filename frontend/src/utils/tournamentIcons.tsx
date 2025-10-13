@@ -5,12 +5,12 @@ import { TournamentType } from "../types";
 export function getTournamentTypeIcons(type: TournamentType) {
   switch (type) {
     case TournamentType.TRIPLETTE:
-      // 2 мужчины + 1 женщина
+      // 3 силуэта
       return (
         <span className="flex items-center gap-0.5 ml-2" title="Триплеты">
-          <UserIcon className="h-4 w-4 text-blue-600" />
-          <UserIcon className="h-4 w-4 text-blue-600" />
-          <UserIcon className="h-4 w-4 text-pink-600" />
+          <UserIcon className="h-4 w-4 text-gray-600" />
+          <UserIcon className="h-4 w-4 text-gray-600" />
+          <UserIcon className="h-4 w-4 text-gray-600" />
         </span>
       );
     case TournamentType.DOUBLETTE_MALE:

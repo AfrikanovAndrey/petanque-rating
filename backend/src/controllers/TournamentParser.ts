@@ -6,6 +6,7 @@ import ExcelUtils from "../utils/excelUtils";
 const COMMAND_HEADER = "Команда";
 export const REGISTRATION_LIST = "Регистрация";
 export const SWISS_RESULTS_LIST = "Итоги швейцарки";
+export const GROUP_RESULTS_LIST_REGEXP = /группа [a-zа-я]/;
 
 // Нормализация имени игрока для сравнения
 export function normalizeName(name: string): string {

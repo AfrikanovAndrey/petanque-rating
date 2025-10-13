@@ -125,6 +125,7 @@ export interface TournamentResult {
   updated_at: string;
   tournament_name?: string;
   tournament_date?: string;
+  tournament_type?: TournamentType; // Тип турнира
   team_name?: string;
   team_players?: string; // Строка с именами игроков через запятую
   is_counted?: boolean; // Входит ли в топ-N лучших результатов

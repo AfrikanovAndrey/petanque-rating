@@ -8,6 +8,7 @@ import {
 import { pool } from "../config/database";
 // import removed: PlayerTournamentPointsModel больше не используется
 import {
+  GROUP_RESULTS_LIST_REGEXP,
   normalizeName,
   REGISTRATION_LIST,
   SWISS_RESULTS_LIST,
@@ -90,10 +91,10 @@ export class TournamentController {
 
   /**
    * Обновить результаты команд данными с кубков
-   * @param cup
-   * @param cupTeamResults
-   * @param teams
-   * @param teamResults
+   * @param cup - кубок
+   * @param cupTeamResults - результаты команд в кубке
+   * @param teams - команды
+   * @param teamResults - результаты команд с квалификационного этапа
    */
   static async modifyTeamResultsWithCupResults(
     cup: Cup,
@@ -105,7 +106,13 @@ export class TournamentController {
       const curTeamResults = teamResults.get(teamOrderNum);
 
       if (!curTeamResults) {
-        throw new Error(`Отсутствует запись для команды #${teamOrderNum}`);
+        throw new Error(
+          `Обработка кубка ${cup}: Отсутствуют результаты квалификационного этапа для команды #${
+            teamOrderNum + 1
+          }(${teams[teamOrderNum].players
+            .map((player) => player.name)
+            .join(", ")})`
+        );
       }
 
       let winsModifier = 0;
@@ -162,7 +169,10 @@ export class TournamentController {
     }
 
     const swissSheet = ExcelUtils.findXlsSheet(workbook, SWISS_RESULTS_LIST);
-    const groupSheet = ExcelUtils.findXlsSheet(workbook, /группа [aа]/);
+    const groupSheet = ExcelUtils.findXlsSheet(
+      workbook,
+      GROUP_RESULTS_LIST_REGEXP
+    );
 
     if (!swissSheet && !groupSheet) {
       errors.push(
@@ -424,7 +434,10 @@ export class TournamentController {
         workbook,
         normalizeName(SWISS_RESULTS_LIST)
       );
-      const groupSheet = ExcelUtils.findXlsSheet(workbook, /Группа \w+/);
+      const groupSheet = ExcelUtils.findXlsSheet(
+        workbook,
+        GROUP_RESULTS_LIST_REGEXP
+      );
 
       // Либо находим результаты Швейцарки, либо групп
       if (swissSheet) {
@@ -439,7 +452,11 @@ export class TournamentController {
         );
       }
 
-      console.log(`### Определены результаты квалификационного этапа`);
+      if (teamQualifyingResults.size === 0) {
+        throw new Error("Не определены результаты квалификационного этапа");
+      }
+
+      console.log(`### Результаты квалификационного этапа`);
       for (const [teamOrderNum, results] of teamQualifyingResults) {
         console.log(
           `Team #${teamOrderNum} : ${JSON.stringify(results, null, 0)}`

@@ -110,6 +110,7 @@ export interface TournamentResultWithTournament
   extends Omit<TournamentResult, "cup_position"> {
   tournament_name: string;
   tournament_date: string;
+  tournament_type: TournamentType; // Тип турнира
   is_counted: boolean; // Входит ли результат в топ-8 лучших
   team_players: string; // Строка с именами игроков команды через запятую
   points: number; // Очки за этот результат (добавлено для совместимости с рейтингом)
