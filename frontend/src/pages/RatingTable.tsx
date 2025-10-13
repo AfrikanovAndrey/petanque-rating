@@ -9,6 +9,7 @@ import {
 import { ratingApi } from "../services/api";
 import { PlayerRating, getCupPositionText } from "../types";
 import { formatDate, formatNumber, handleApiError } from "../utils";
+import { getTournamentTypeIcons } from "../utils/tournamentIcons";
 
 type RatingViewType = "male" | "female";
 
@@ -326,8 +327,12 @@ const RatingTable: React.FC = () => {
                                                 {result.points}
                                               </span>
                                               <span>-</span>
-                                              <span>
+                                              <span className="flex items-center">
                                                 {result.tournament_name}
+                                                {result.tournament_type &&
+                                                  getTournamentTypeIcons(
+                                                    result.tournament_type
+                                                  )}
                                               </span>
                                               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
                                                 {getCupPositionText(
