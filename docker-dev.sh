@@ -35,7 +35,7 @@ prod() {
     docker-compose --profile production down
 
     # Пересборка и запуск production режима
-    docker-compose --profile production up -d
+    docker-compose --profile production up -d --build
 
     if [ $? -ne 0 ]; then
         error "Ошибка при сборке или запуске контейнеров"
