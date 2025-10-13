@@ -30,17 +30,13 @@ prod() {
     
     # Создаем директории если их нет
     mkdir -p uploads mysql/data
-    
-    # Информируем о сборке
-    info "Backend будет собран с использованием SWC компилятора (быстро и мало памяти)"
 
-    # Запускаем контейнеры
-    if command -v docker-compose &> /dev/null; then
-        docker-compose --profile production up -d --build
-    else
-        docker compose --profile production up -d --build
-    fi
-    
+    # Остановка production режима
+    docker-compose --profile production down
+
+    # Пересборка и запуск production режима
+    docker-compose --profile production up -d
+
     if [ $? -ne 0 ]; then
         error "Ошибка при сборке или запуске контейнеров"
         exit 1
