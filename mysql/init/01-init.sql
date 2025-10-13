@@ -18,10 +18,12 @@ CREATE TABLE IF NOT EXISTS players (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL UNIQUE,
   gender ENUM('male', 'female') DEFAULT NULL,
+  city VARCHAR(100) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_name (name),
-  INDEX idx_gender (gender)
+  INDEX idx_gender (gender),
+  INDEX idx_city (city)
 );
 
 -- Таблица турниров

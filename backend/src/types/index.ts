@@ -2,6 +2,7 @@ export interface Player {
   id: number;
   name: string;
   gender?: "male" | "female" | null;
+  city?: string | null;
   created_at: Date;
   updated_at: Date;
 }

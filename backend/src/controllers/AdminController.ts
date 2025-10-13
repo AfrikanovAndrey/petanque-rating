@@ -400,7 +400,7 @@ export class AdminController {
   // Создать игрока (админ)
   static async createPlayer(req: Request, res: Response): Promise<void> {
     try {
-      const { name, gender } = req.body;
+      const { name, gender, city } = req.body;
 
       if (!name || !gender) {
         res.status(400).json({
@@ -447,10 +447,10 @@ export class AdminController {
       }
 
       // Создаем игрока
-      const playerId = await PlayerModel.createPlayer(cleanedName);
+      const playerId = await PlayerModel.createPlayer(cleanedName, city);
 
-      // Обновляем пол
-      await PlayerModel.updatePlayer(playerId, cleanedName, gender);
+      // Обновляем пол и город
+      await PlayerModel.updatePlayer(playerId, cleanedName, gender, city);
 
       res.json({
         success: true,
@@ -470,7 +470,7 @@ export class AdminController {
   static async updatePlayer(req: Request, res: Response): Promise<void> {
     try {
       const playerId = parseInt(req.params.playerId);
-      const { name, gender } = req.body;
+      const { name, gender, city } = req.body;
 
       if (isNaN(playerId) || !name || !gender) {
         res.status(400).json({
@@ -480,7 +480,12 @@ export class AdminController {
         return;
       }
 
-      const success = await PlayerModel.updatePlayer(playerId, name, gender);
+      const success = await PlayerModel.updatePlayer(
+        playerId,
+        name,
+        gender,
+        city
+      );
 
       if (success) {
         res.json({

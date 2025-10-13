@@ -200,13 +200,14 @@ export const adminApi = {
   createPlayer: (data: {
     name: string;
     gender: string;
+    city?: string;
   }): Promise<AxiosResponse<ApiResponse<{ player_id: number }>>> =>
     api.post("/admin/players", data),
 
   // Обновить игрока
   updatePlayer: (
     playerId: number,
-    data: { name: string; gender: string }
+    data: { name: string; gender: string; city?: string }
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/players/${playerId}`, data),
 
