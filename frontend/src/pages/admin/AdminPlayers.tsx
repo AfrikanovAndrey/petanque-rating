@@ -9,10 +9,18 @@ import {
   MagnifyingGlassIcon,
   ArrowUpTrayIcon,
   DocumentTextIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "../../services/api";
-import { Player } from "../../types";
-import { formatDateTime, handleApiError } from "../../utils";
+import { Player, PlayerRating, getCupPositionText } from "../../types";
+import {
+  formatDateTime,
+  handleApiError,
+  formatDate,
+  formatNumber,
+} from "../../utils";
+import { getTournamentTypeIcons } from "../../utils/tournamentIcons";
 
 // Функция для форматирования отображения пола
 const formatGender = (gender: string | null | undefined): string => {
@@ -40,6 +48,13 @@ const AdminPlayers: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [expandedPlayers, setExpandedPlayers] = useState<Set<number>>(
+    new Set()
+  );
+  const [playerDetails, setPlayerDetails] = useState<
+    Record<number, PlayerRating>
+  >({});
+  const [loadingDetails, setLoadingDetails] = useState<Set<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
@@ -246,6 +261,47 @@ const AdminPlayers: React.FC = () => {
     }
   };
 
+  const togglePlayer = async (playerId: number, event: React.MouseEvent) => {
+    // Останавливаем распространение события, чтобы клик на кнопки редактирования/удаления не раскрывал строку
+    event.stopPropagation();
+
+    const newExpandedPlayers = new Set(expandedPlayers);
+
+    if (expandedPlayers.has(playerId)) {
+      // Закрываем раскрытого игрока
+      newExpandedPlayers.delete(playerId);
+      setExpandedPlayers(newExpandedPlayers);
+    } else {
+      // Открываем нового игрока
+      newExpandedPlayers.add(playerId);
+      setExpandedPlayers(newExpandedPlayers);
+
+      // Если у нас еще нет данных об этом игроке, загружаем их
+      if (!playerDetails[playerId]) {
+        const newLoadingDetails = new Set(loadingDetails);
+        newLoadingDetails.add(playerId);
+        setLoadingDetails(newLoadingDetails);
+
+        try {
+          const response = await adminApi.getPlayerDetails(playerId);
+          if (response.data.success && response.data.data) {
+            setPlayerDetails((prev) => ({
+              ...prev,
+              [playerId]: response.data.data!,
+            }));
+          }
+        } catch (error) {
+          toast.error("Ошибка загрузки турниров игрока");
+          console.error("Error loading player details:", error);
+        } finally {
+          const newLoadingDetails = new Set(loadingDetails);
+          newLoadingDetails.delete(playerId);
+          setLoadingDetails(newLoadingDetails);
+        }
+      }
+    }
+  };
+
   // Фильтрация игроков по поисковому запросу
   const filteredPlayers =
     players?.filter((player) =>
@@ -345,56 +401,188 @@ const AdminPlayers: React.FC = () => {
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
                   </th>
+                  <th className="w-12"></th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPlayers.map((player) => (
-                  <tr key={player.id} className="table-row">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-primary-600 font-medium text-sm">
-                            {player.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {player.name}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatGender(player.gender)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {player.city || "—"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDateTime(player.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDateTime(player.updated_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => openEditModal(player)}
-                          className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50"
-                          title="Редактировать"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(player)}
-                          disabled={deleteMutation.isLoading}
-                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                          title="Удалить"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filteredPlayers.map((player) => {
+                  const isExpanded = expandedPlayers.has(player.id);
+                  const details = playerDetails[player.id];
+                  const isLoadingDetails = loadingDetails.has(player.id);
+
+                  return (
+                    <React.Fragment key={player.id}>
+                      {/* Основная строка игрока */}
+                      <tr
+                        className={`table-row cursor-pointer ${
+                          isExpanded ? "expanded" : ""
+                        }`}
+                        onClick={(e) => togglePlayer(player.id, e)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                              <span className="text-primary-600 font-medium text-sm">
+                                {player.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {player.name}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatGender(player.gender)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {player.city || "—"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDateTime(player.created_at)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDateTime(player.updated_at)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(player);
+                              }}
+                              className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50"
+                              title="Редактировать"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(player);
+                              }}
+                              disabled={deleteMutation.isLoading}
+                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                              title="Удалить"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {isExpanded ? (
+                            <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                          ) : (
+                            <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Расширенная информация */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-4 bg-gray-50">
+                            {isLoadingDetails ? (
+                              <div className="flex items-center justify-center py-4">
+                                <div className="loading-spinner mr-2"></div>
+                                <p className="text-gray-600">
+                                  Загрузка турниров...
+                                </p>
+                              </div>
+                            ) : details ? (
+                              <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="font-medium text-gray-900">
+                                    Турниры игрока
+                                  </h4>
+                                  <div className="text-sm text-gray-600">
+                                    Всего турниров:{" "}
+                                    {details.all_results?.length || 0} | Общий
+                                    рейтинг:{" "}
+                                    <span className="font-semibold">
+                                      {formatNumber(details.total_points)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {details.all_results &&
+                                details.all_results.length > 0 ? (
+                                  <div className="grid gap-2">
+                                    {details.all_results
+                                      .sort((a, b) => b.points - a.points)
+                                      .map((result) => (
+                                        <div
+                                          key={`${result.tournament_id}-${result.team_id}`}
+                                          className={`flex justify-between items-center p-3 rounded-lg ${
+                                            result.is_counted
+                                              ? "bg-primary-50 border border-primary-200"
+                                              : "bg-white border border-gray-200"
+                                          }`}
+                                        >
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2 font-medium text-gray-900">
+                                              <span
+                                                className={`${
+                                                  result.is_counted
+                                                    ? "text-primary-600"
+                                                    : "text-gray-900"
+                                                }`}
+                                              >
+                                                {result.points}
+                                              </span>
+                                              <span>-</span>
+                                              <span className="flex items-center">
+                                                {result.tournament_name}
+                                                {result.tournament_type &&
+                                                  getTournamentTypeIcons(
+                                                    result.tournament_type
+                                                  )}
+                                              </span>
+                                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                                {getCupPositionText(
+                                                  result.cup_position || "",
+                                                  result.cup
+                                                ) || "Квалификация"}
+                                              </span>
+                                            </div>
+                                            <div className="text-sm text-gray-500 mt-1">
+                                              {formatDate(
+                                                result.tournament_date || ""
+                                              )}
+                                              {result.team_players && (
+                                                <span className="ml-2">
+                                                  | Команда:{" "}
+                                                  {result.team_players}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center">
+                                            {result.is_counted && (
+                                              <div className="badge badge-primary">
+                                                Засчитано
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-500 italic text-center py-4">
+                                    Игрок еще не участвовал в турнирах
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-gray-500 italic text-center py-4">
+                                Нет данных о турнирах
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

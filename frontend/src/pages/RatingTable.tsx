@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from "react";
-import { useQuery } from "react-query";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "react-query";
 import { ratingApi } from "../services/api";
 import { PlayerRating, getCupPositionText } from "../types";
 import { formatDate, formatNumber, handleApiError } from "../utils";
@@ -345,6 +345,9 @@ const RatingTable: React.FC = () => {
                                               {formatDate(
                                                 result.tournament_date || ""
                                               )}
+                                            </div>
+                                            <div className="text-sm text-gray-500">
+                                              Команда: {result.team_players}
                                             </div>
                                           </div>
                                           <div className="flex items-center">

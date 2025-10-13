@@ -227,6 +227,12 @@ export const adminApi = {
   deletePlayer: (playerId: number): Promise<AxiosResponse<ApiResponse>> =>
     api.delete(`/admin/players/${playerId}`),
 
+  // Получить детали игрока (турниры, результаты)
+  getPlayerDetails: (
+    playerId: number
+  ): Promise<AxiosResponse<ApiResponse<PlayerRating>>> =>
+    api.get(`/rating/player/${playerId}`),
+
   // === УПРАВЛЕНИЕ КОМАНДАМИ ===
   // Удалить все команды
   deleteAllTeams: (): Promise<
