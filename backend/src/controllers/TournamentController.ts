@@ -127,11 +127,11 @@ export class TournamentController {
           winsModifier = 2;
           losesModifier = 1;
           break;
-        case CupPosition.SEMI_FINAL:
+        case CupPosition.ROUND_OF_4:
           winsModifier = 1;
           losesModifier = 1;
           break;
-        case CupPosition.QUARTER_FINAL:
+        case CupPosition.ROUND_OF_8:
           winsModifier = 0;
           losesModifier = 1;
           break;
@@ -221,11 +221,12 @@ export class TournamentController {
       const sortedResults = filteredResults.sort((a, b) => {
         // Порядок позиций по приоритету (лучшие позиции первыми)
         const positionPriority: Record<CupPosition, number> = {
-          WINNER: 1,
-          RUNNER_UP: 2,
-          THIRD_PLACE: 3,
-          SEMI_FINAL: 4,
-          QUARTER_FINAL: 5,
+          [CupPosition.WINNER]: 1,
+          [CupPosition.RUNNER_UP]: 2,
+          [CupPosition.THIRD_PLACE]: 3,
+          [CupPosition.ROUND_OF_4]: 4,
+          [CupPosition.ROUND_OF_8]: 5,
+          [CupPosition.ROUND_OF_16]: 6,
         };
 
         // Сначала сортируем по кубку (A, затем B)

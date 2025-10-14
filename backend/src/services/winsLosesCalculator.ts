@@ -34,10 +34,10 @@ export function calculateWins(
     case CupPosition.THIRD_PLACE:
       totalWins += 2;
       break;
-    case CupPosition.SEMI_FINAL:
+    case CupPosition.ROUND_OF_4:
       totalWins += 1;
       break;
-    case CupPosition.QUARTER_FINAL:
+    case CupPosition.ROUND_OF_8:
       // Четвертьфинал не добавляет победы
       break;
     default:
@@ -73,7 +73,7 @@ export function calculateLoses(
 
   // Добавляем поражения за позицию в кубке
   switch (cup_position) {
-    case CupPosition.SEMI_FINAL:
+    case CupPosition.ROUND_OF_4:
       totalLoses += 1; // Проиграл в полуфинале
       break;
     case CupPosition.THIRD_PLACE:
@@ -85,7 +85,7 @@ export function calculateLoses(
     case CupPosition.WINNER:
       // Победитель не получает дополнительных поражений
       break;
-    case CupPosition.QUARTER_FINAL:
+    case CupPosition.ROUND_OF_8:
       // Четвертьфинал - проиграл в четвертьфинале, но это уже учтено в швейцарке
       break;
     default:

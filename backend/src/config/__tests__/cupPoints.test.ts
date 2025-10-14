@@ -41,7 +41,7 @@ describe("getCupPoints", () => {
       // Arrange
       const category = TournamentCategoryEnum.REGIONAL as const;
       const cup = "A" as const;
-      const position = CupPosition.SEMI_FINAL;
+      const position = CupPosition.ROUND_OF_4;
       const totalTeams = 29;
       const expectedPoints = 7;
 
@@ -56,7 +56,7 @@ describe("getCupPoints", () => {
       // Arrange
       const category = TournamentCategoryEnum.REGIONAL as const;
       const cup = "A" as const;
-      const position = CupPosition.QUARTER_FINAL;
+      const position = CupPosition.ROUND_OF_8;
       const totalTeams = 29;
       const expectedPoints = 6;
 
@@ -331,7 +331,7 @@ describe("getCupPoints для кубка C", () => {
       // Arrange
       const category = TournamentCategoryEnum.FEDERAL as const;
       const cup = "C" as const;
-      const position = CupPosition.SEMI_FINAL;
+      const position = CupPosition.ROUND_OF_4;
       const totalTeams = 25;
       const qualifyingRoundPoints = 4;
       const expectedPoints = 5; // 4 + 1
@@ -353,7 +353,7 @@ describe("getCupPoints для кубка C", () => {
       // Arrange
       const category = TournamentCategoryEnum.REGIONAL as const;
       const cup = "C" as const;
-      const position = CupPosition.QUARTER_FINAL;
+      const position = CupPosition.ROUND_OF_8;
       const totalTeams = 40;
       const qualifyingRoundPoints = 2;
       const expectedPoints = 2; // 2 + 0

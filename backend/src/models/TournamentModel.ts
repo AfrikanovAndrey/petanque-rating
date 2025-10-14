@@ -252,20 +252,36 @@ export class TournamentModel {
 
       let cupPosition: CupPosition | undefined;
       switch (result.cup_position) {
+        case "1":
         case "WINNER":
+        case "CUP_WINNER":
           cupPosition = CupPosition.WINNER;
           break;
+        case "2":
         case "RUNNER_UP":
+        case "CUP_RUNNER_UP":
           cupPosition = CupPosition.RUNNER_UP;
           break;
+        case "3":
         case "THIRD_PLACE":
+        case "CUP_THIRD_PLACE":
           cupPosition = CupPosition.THIRD_PLACE;
           break;
+        case "1/2":
         case "SEMI_FINAL":
-          cupPosition = CupPosition.SEMI_FINAL;
+        case "ROUND_OF_4":
+        case "CUP_SEMI_FINAL":
+          cupPosition = CupPosition.ROUND_OF_4;
           break;
+        case "1/4":
         case "QUARTER_FINAL":
-          cupPosition = CupPosition.QUARTER_FINAL;
+        case "ROUND_OF_8":
+        case "CUP_QUARTER_FINAL":
+          cupPosition = CupPosition.ROUND_OF_8;
+          break;
+        case "1/8":
+        case "ROUND_OF_16":
+          cupPosition = CupPosition.ROUND_OF_16;
           break;
         default:
           cupPosition = undefined;

@@ -231,13 +231,13 @@ export class TournamentParser {
       quarterFinals: [
         {
           cells: ["B4", "B8", "B12", "B16", "B20", "B24", "B28", "B32"],
-          position: CupPosition.QUARTER_FINAL,
+          position: CupPosition.ROUND_OF_8,
         },
       ],
       semiFinals: [
         {
           cells: ["F6", "F14", "F22", "F30"],
-          position: CupPosition.SEMI_FINAL,
+          position: CupPosition.ROUND_OF_4,
         },
       ],
       thirdPlace: [{ cells: ["F38"], position: CupPosition.THIRD_PLACE }],

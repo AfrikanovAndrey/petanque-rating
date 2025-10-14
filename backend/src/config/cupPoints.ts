@@ -16,8 +16,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 10], // П
       [CupPosition.RUNNER_UP, 8], // Ф
-      [CupPosition.SEMI_FINAL, 6], // 1/2
-      [CupPosition.QUARTER_FINAL, 5], // 1/4
+      [CupPosition.ROUND_OF_4, 6], // 1/2
+      [CupPosition.ROUND_OF_8, 5], // 1/4
     ]),
   ],
 
@@ -27,8 +27,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 11], // П
       [CupPosition.RUNNER_UP, 9], // Ф
-      [CupPosition.SEMI_FINAL, 7], // 1/2
-      [CupPosition.QUARTER_FINAL, 6], // 1/4
+      [CupPosition.ROUND_OF_4, 7], // 1/2
+      [CupPosition.ROUND_OF_8, 6], // 1/4
     ]),
   ],
 
@@ -38,8 +38,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 12], // П
       [CupPosition.RUNNER_UP, 10], // Ф
-      [CupPosition.SEMI_FINAL, 8], // 1/2
-      [CupPosition.QUARTER_FINAL, 7], // 1/4
+      [CupPosition.ROUND_OF_4, 8], // 1/2
+      [CupPosition.ROUND_OF_8, 7], // 1/4
     ]),
   ],
 
@@ -49,8 +49,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 13], // П
       [CupPosition.RUNNER_UP, 11], // Ф
-      [CupPosition.SEMI_FINAL, 9], // 1/2
-      [CupPosition.QUARTER_FINAL, 8], // 1/4
+      [CupPosition.ROUND_OF_4, 9], // 1/2
+      [CupPosition.ROUND_OF_8, 8], // 1/4
     ]),
   ],
 
@@ -60,8 +60,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 14], // П
       [CupPosition.RUNNER_UP, 12], // Ф
-      [CupPosition.SEMI_FINAL, 10], // 1/2
-      [CupPosition.QUARTER_FINAL, 9], // 1/4
+      [CupPosition.ROUND_OF_4, 10], // 1/2
+      [CupPosition.ROUND_OF_8, 9], // 1/4
     ]),
   ],
 
@@ -71,8 +71,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 16], // П
       [CupPosition.RUNNER_UP, 14], // Ф
-      [CupPosition.SEMI_FINAL, 12], // 1/2
-      [CupPosition.QUARTER_FINAL, 11], // 1/4
+      [CupPosition.ROUND_OF_4, 12], // 1/2
+      [CupPosition.ROUND_OF_8, 11], // 1/4
     ]),
   ],
 
@@ -91,7 +91,7 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 6], // П
       [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.SEMI_FINAL, 4], // 1/2
+      [CupPosition.ROUND_OF_4, 4], // 1/2
     ]),
   ],
 
@@ -101,8 +101,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 7], // П
       [CupPosition.RUNNER_UP, 6], // Ф
-      [CupPosition.SEMI_FINAL, 5], // 1/2
-      [CupPosition.QUARTER_FINAL, 4], // 1/4
+      [CupPosition.ROUND_OF_4, 5], // 1/2
+      [CupPosition.ROUND_OF_8, 4], // 1/4
     ]),
   ],
 
@@ -112,8 +112,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 8], // П
       [CupPosition.RUNNER_UP, 7], // Ф
-      [CupPosition.SEMI_FINAL, 6], // 1/2
-      [CupPosition.QUARTER_FINAL, 5], // 1/4
+      [CupPosition.ROUND_OF_4, 6], // 1/2
+      [CupPosition.ROUND_OF_8, 5], // 1/4
     ]),
   ],
 
@@ -123,8 +123,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 9], // П
       [CupPosition.RUNNER_UP, 8], // Ф
-      [CupPosition.SEMI_FINAL, 7], // 1/2
-      [CupPosition.QUARTER_FINAL, 6], // 1/4
+      [CupPosition.ROUND_OF_4, 7], // 1/2
+      [CupPosition.ROUND_OF_8, 6], // 1/4
     ]),
   ],
 
@@ -136,8 +136,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 6], // П
       [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.SEMI_FINAL, 4], // 1/2
-      [CupPosition.QUARTER_FINAL, 3], // 1/4
+      [CupPosition.ROUND_OF_4, 4], // 1/2
+      [CupPosition.ROUND_OF_8, 3], // 1/4
     ]),
   ],
 
@@ -147,8 +147,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 7], // П
       [CupPosition.RUNNER_UP, 6], // Ф
-      [CupPosition.SEMI_FINAL, 5], // 1/2
-      [CupPosition.QUARTER_FINAL, 4], // 1/4
+      [CupPosition.ROUND_OF_4, 5], // 1/2
+      [CupPosition.ROUND_OF_8, 4], // 1/4
     ]),
   ],
 
@@ -158,8 +158,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 8], // П
       [CupPosition.RUNNER_UP, 7], // Ф
-      [CupPosition.SEMI_FINAL, 6], // 1/2
-      [CupPosition.QUARTER_FINAL, 5], // 1/4
+      [CupPosition.ROUND_OF_4, 6], // 1/2
+      [CupPosition.ROUND_OF_8, 5], // 1/4
     ]),
   ],
 
@@ -169,8 +169,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 9], // П
       [CupPosition.RUNNER_UP, 8], // Ф
-      [CupPosition.SEMI_FINAL, 7], // 1/2
-      [CupPosition.QUARTER_FINAL, 6], // 1/4
+      [CupPosition.ROUND_OF_4, 7], // 1/2
+      [CupPosition.ROUND_OF_8, 6], // 1/4
     ]),
   ],
 
@@ -180,8 +180,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 10], // П
       [CupPosition.RUNNER_UP, 9], // Ф
-      [CupPosition.SEMI_FINAL, 8], // 1/2
-      [CupPosition.QUARTER_FINAL, 7], // 1/4
+      [CupPosition.ROUND_OF_4, 8], // 1/2
+      [CupPosition.ROUND_OF_8, 7], // 1/4
     ]),
   ],
 
@@ -191,8 +191,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 12], // П
       [CupPosition.RUNNER_UP, 11], // Ф
-      [CupPosition.SEMI_FINAL, 10], // 1/2
-      [CupPosition.QUARTER_FINAL, 9], // 1/4
+      [CupPosition.ROUND_OF_4, 10], // 1/2
+      [CupPosition.ROUND_OF_8, 9], // 1/4
     ]),
   ],
 
@@ -211,7 +211,7 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 5], // П
       [CupPosition.RUNNER_UP, 4], // Ф
-      [CupPosition.SEMI_FINAL, 3], // 1/2
+      [CupPosition.ROUND_OF_4, 3], // 1/2
     ]),
   ],
 
@@ -221,8 +221,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 6], // П
       [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.SEMI_FINAL, 4], // 1/2
-      [CupPosition.QUARTER_FINAL, 3], // 1/4
+      [CupPosition.ROUND_OF_4, 4], // 1/2
+      [CupPosition.ROUND_OF_8, 3], // 1/4
     ]),
   ],
 
@@ -232,8 +232,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 6], // П
       [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.SEMI_FINAL, 4], // 1/2
-      [CupPosition.QUARTER_FINAL, 3], // 1/4
+      [CupPosition.ROUND_OF_4, 4], // 1/2
+      [CupPosition.ROUND_OF_8, 3], // 1/4
     ]),
   ],
 
@@ -243,8 +243,8 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
     new Map([
       [CupPosition.WINNER, 7], // П
       [CupPosition.RUNNER_UP, 6], // Ф
-      [CupPosition.SEMI_FINAL, 5], // 1/2
-      [CupPosition.QUARTER_FINAL, 4], // 1/4
+      [CupPosition.ROUND_OF_4, 5], // 1/2
+      [CupPosition.ROUND_OF_8, 4], // 1/4
     ]),
   ],
 ]);
@@ -295,7 +295,7 @@ export function getPoints(
         // Финалисты кубка С получают +2 очка
         return qualifyingPoints + 2;
       } else if (
-        position === CupPosition.SEMI_FINAL ||
+        position === CupPosition.ROUND_OF_4 ||
         position === CupPosition.THIRD_PLACE
       ) {
         // Полуфиналисты кубка С получают +1 очко
@@ -335,7 +335,7 @@ export function getPoints(
 
       // Специальная логика для 3 места в кубке A турниров 1 категории
       if (position === CupPosition.THIRD_PLACE) {
-        const semiFinalPoints = cupPointsMap.get(CupPosition.SEMI_FINAL);
+        const semiFinalPoints = cupPointsMap.get(CupPosition.ROUND_OF_4);
         if (semiFinalPoints === undefined) {
           throw new Error(
             `Рассчет очков: Не найдены очки за полуфинал для кубка ${cup}`

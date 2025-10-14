@@ -176,11 +176,12 @@ export enum TournamentCategoryEnum {
 }
 
 export enum CupPosition {
-  WINNER = "WINNER",
-  RUNNER_UP = "RUNNER_UP",
-  THIRD_PLACE = "THIRD_PLACE",
-  SEMI_FINAL = "SEMI_FINAL",
-  QUARTER_FINAL = "QUARTER_FINAL",
+  WINNER = "1",
+  RUNNER_UP = "2",
+  THIRD_PLACE = "3",
+  ROUND_OF_4 = "1/2",
+  ROUND_OF_8 = "1/4",
+  ROUND_OF_16 = "1/8",
 }
 
 export interface Team {
