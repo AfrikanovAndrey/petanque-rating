@@ -164,6 +164,48 @@ export class TournamentParser {
   }
 
   /**
+   * Проверить, содержит ли лист кубка сетку плей-офф на 16 команд
+   * @param worksheet - лист Excel с результатами кубка
+   * @returns true, если сетка на 16 команд
+   */
+  static isCup16Grid(worksheet: XLSX.WorkSheet): boolean {
+    // Проверяем ключевые ячейки, которые должны быть заполнены для сетки 16 команд
+    const isB4NotEmpty = !ExcelUtils.isCellEmpty(worksheet["B4"]);
+    const isB64NotEmpty = !ExcelUtils.isCellEmpty(worksheet["B64"]);
+    const isR34NotEmpty = !ExcelUtils.isCellEmpty(worksheet["R34"]);
+
+    return isB4NotEmpty && isB64NotEmpty && isR34NotEmpty;
+  }
+
+  /**
+   * Проверить, содержит ли лист кубка сетку плей-офф на 8 команд
+   * @param worksheet - лист Excel с результатами кубка
+   * @returns true, если сетка на 8 команд
+   */
+  static isCup8Grid(worksheet: XLSX.WorkSheet): boolean {
+    // Проверяем ключевые ячейки, которые должны быть заполнены для сетки 8 команд
+    const isB4NotEmpty = !ExcelUtils.isCellEmpty(worksheet["B4"]);
+    const isB32NotEmpty = !ExcelUtils.isCellEmpty(worksheet["B32"]);
+    const isN18NotEmpty = !ExcelUtils.isCellEmpty(worksheet["N18"]);
+
+    return isB4NotEmpty && isB32NotEmpty && isN18NotEmpty;
+  }
+
+  /**
+   * Проверить, содержит ли лист кубка сетку плей-офф на 4 команд
+   * @param worksheet - лист Excel с результатами кубка
+   * @returns true, если сетка на 4 команд
+   */
+  static isCup4Grid(worksheet: XLSX.WorkSheet): boolean {
+    // Проверяем ключевые ячейки, которые должны быть заполнены для сетки 4 команд
+    const isB4NotEmpty = !ExcelUtils.isCellEmpty(worksheet["B4"]);
+    const isB16NotEmpty = !ExcelUtils.isCellEmpty(worksheet["B16"]);
+    const isJ10NotEmpty = !ExcelUtils.isCellEmpty(worksheet["J10"]);
+
+    return isB4NotEmpty && isB16NotEmpty && isJ10NotEmpty;
+  }
+
+  /**
    * Парсинг листа с результатами кубка
    * @param workbook
    * @param teams
