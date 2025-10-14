@@ -160,10 +160,6 @@ export class TournamentController {
       errors.push(`Отсутствует обязательный лист 'Кубок А'`);
     }
 
-    if (!ExcelUtils.findXlsSheet(workbook, /^кубок [bб]$/)) {
-      errors.push(`Отсутствует обязательный лист 'Кубок Б'`);
-    }
-
     const swissSheet = ExcelUtils.findXlsSheet(workbook, SWISS_RESULTS_LIST);
     const groupSheet = ExcelUtils.findXlsSheet(
       workbook,
