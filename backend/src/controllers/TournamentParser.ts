@@ -169,7 +169,7 @@ export class TournamentParser {
    * @param teams
    * @returns
    */
-  static async parseCupResults(
+  static async parseCup8Results(
     workbook: XLSX.WorkBook,
     cup: Cup,
     teams: TeamPlayers[]

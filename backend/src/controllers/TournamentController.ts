@@ -1,10 +1,6 @@
 import { Request, Response } from "express";
 import * as XLSX from "xlsx";
-import {
-  getAllCupPointsConfig,
-  getCupPoints,
-  getPointsByQualifyingStage,
-} from "../config/cupPoints";
+import { getAllCupPointsConfig, getPoints } from "../config/cupPoints";
 import { pool } from "../config/database";
 // import removed: PlayerTournamentPointsModel больше не используется
 import {
@@ -463,17 +459,17 @@ export class TournamentController {
         );
       }
 
-      const aCupTeamsResults = await TournamentParser.parseCupResults(
+      const aCupTeamsResults = await TournamentParser.parseCup8Results(
         workbook,
         "A",
         teams
       );
-      const bCupTeamsResults = await TournamentParser.parseCupResults(
+      const bCupTeamsResults = await TournamentParser.parseCup8Results(
         workbook,
         "B",
         teams
       );
-      const cCupTeamsResults = await TournamentParser.parseCupResults(
+      const cCupTeamsResults = await TournamentParser.parseCup8Results(
         workbook,
         "C",
         teams
@@ -489,7 +485,7 @@ export class TournamentController {
         });
       }
 
-      // Привзяка результатов кубков - команде
+      // Привязка результатов кубков - команде
       // Кубок А
       await this.modifyTeamResultsWithCupResults(
         "A",
@@ -570,20 +566,13 @@ export class TournamentController {
           }
 
           // Рассчитываем количество рейтинговых очков
-          let points = 0;
-          if (results.cup) {
-            points = getCupPoints(
-              tournamentCategory,
-              results.cup!,
-              results.cupPosition!,
-              effectiveTeamsCount
-            );
-          } else {
-            points = getPointsByQualifyingStage(
-              tournamentCategory,
-              results.qualifyingWins!
-            );
-          }
+          const points = getPoints(
+            tournamentCategory,
+            results.cup,
+            results.cupPosition,
+            effectiveTeamsCount,
+            results.qualifyingWins
+          );
 
           // Записываем результат команды в БД
           await TournamentModel.addTournamentResult(

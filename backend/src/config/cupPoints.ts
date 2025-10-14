@@ -1,8 +1,4 @@
-import {
-  CupPosition,
-  TournamentCategory,
-  TournamentCategoryEnum,
-} from "../types";
+import { Cup, CupPosition, TournamentCategoryEnum } from "../types";
 
 // Структура для хранения очков за кубки согласно таблице РФП
 // Ключ: "category-cup_type-teams_range"
@@ -262,95 +258,105 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
  * @param qualifyingRoundPoints - очки, заработанные в отборочном туре (только для кубка C)
  * @returns количество очков
  */
-export function getCupPoints(
+export function getPoints(
   category: TournamentCategoryEnum,
-  cup: "A" | "B" | "C",
-  position: CupPosition,
+  cup: Cup | undefined,
+  position: CupPosition | undefined,
   totalTeams: number,
-  qualifyingRoundPoints: number = 0
+  qualifyingWins: number = 0
 ): number {
-  // Специальная обработка для кубка C
-  if (cup === "C") {
-    let additionalPoints = 0;
+  let qualifyingPoints: number;
+  let points: number;
 
-    if (position === CupPosition.WINNER || position === CupPosition.RUNNER_UP) {
-      // Финалисты кубка С получают +2 очка
-      additionalPoints = 2;
-    } else if (position === CupPosition.SEMI_FINAL) {
-      // Полуфиналисты кубка С получают +1 очко
-      additionalPoints = 1;
-    }
-
-    const totalPoints = qualifyingRoundPoints + additionalPoints;
-
-    console.log(
-      `✅ Кубок C: ${qualifyingRoundPoints} (отборочный) + ${additionalPoints} (дополнительные) = ${totalPoints} очков`
-    );
-
-    return totalPoints;
-  }
-
-  // Определяем диапазон команд
-  let teamsRange: TeamsRange;
-  if (totalTeams <= 12) {
-    teamsRange = "8-12";
-  } else if (totalTeams <= 18) {
-    teamsRange = "13-18";
-  } else if (totalTeams <= 24) {
-    teamsRange = "19-24";
-  } else if (totalTeams <= 30) {
-    teamsRange = "25-30";
-  } else if (totalTeams <= 36) {
-    teamsRange = "31-36";
+  // Очки за победы в квалификационном этапе
+  if (qualifyingWins >= 3) {
+    // Больше или равно трём победам
+    qualifyingPoints = category === TournamentCategoryEnum.FEDERAL ? 3 : 2;
+  } else if (qualifyingWins >= 1) {
+    // 1-2 победы
+    qualifyingPoints = category === TournamentCategoryEnum.FEDERAL ? 2 : 1;
   } else {
-    teamsRange = "36+";
+    qualifyingPoints = 0;
   }
 
-  const key: CupPointsKey = `${category}-${cup}-${teamsRange}`;
-  console.log(`🔑 Ключ для поиска очков: "${key}"`);
-
-  const cupPointsMap = CUP_POINTS.get(key);
-
-  if (!cupPointsMap) {
-    console.warn(
-      `❌ Не найдена конфигурация очков для кубка ${cup} категории ${category} с ${totalTeams} командами (ключ: ${key})`
-    );
-    console.log("🗂️ Доступные ключи:", Array.from(CUP_POINTS.keys()));
-    return 0;
-  }
-
-  // Специальная логика для 3 места
-  if (position === CupPosition.THIRD_PLACE) {
-    // За 3 место даётся столько же очков, сколько за полуфинал
-    const semiFinalPoints = cupPointsMap.get(CupPosition.SEMI_FINAL);
-    if (semiFinalPoints === undefined) {
-      console.warn(`Не найдены очки за полуфинал для кубка ${cup}`);
-      return 0;
+  if (!cup) {
+    return qualifyingPoints;
+  } else {
+    if (!position) {
+      throw new Error(`Рассчет очков: Не задана позиция в кубке ${cup}`);
     }
 
-    // Для кубка A турниров 1 категории добавляется +1 очко за игру за 3 место
-    const bonusPoint =
-      category === TournamentCategoryEnum.FEDERAL && cup === "A" ? 1 : 0;
-    const totalPoints = semiFinalPoints + bonusPoint;
+    // В случае проведения утешительного турнира (Кубка С), финалисты этого турнира дополнительно к очкам, заработанным на квалификационном этапе, получают по 2 очка, полуфиналисты - по 1 очку.
+    if (cup === "C") {
+      if (
+        position === CupPosition.WINNER ||
+        position === CupPosition.RUNNER_UP
+      ) {
+        // Финалисты кубка С получают +2 очка
+        return qualifyingPoints + 2;
+      } else if (
+        position === CupPosition.SEMI_FINAL ||
+        position === CupPosition.THIRD_PLACE
+      ) {
+        // Полуфиналисты кубка С получают +1 очко
+        return qualifyingPoints + 1;
+      } else {
+        return qualifyingPoints;
+      }
+    } else {
+      // Кубки А и Б
 
-    console.log(
-      `✅ Очки за 3 место в кубке ${cup} категории ${category}: полуфинал ${semiFinalPoints} + бонус ${bonusPoint} = ${totalPoints}`
-    );
+      // Определяем диапазон команд
+      let teamsRange: TeamsRange;
+      if (totalTeams <= 12) {
+        teamsRange = "8-12";
+      } else if (totalTeams <= 18) {
+        teamsRange = "13-18";
+      } else if (totalTeams <= 24) {
+        teamsRange = "19-24";
+      } else if (totalTeams <= 30) {
+        teamsRange = "25-30";
+      } else if (totalTeams <= 36) {
+        teamsRange = "31-36";
+      } else {
+        teamsRange = "36+";
+      }
 
-    return totalPoints;
+      const key: CupPointsKey = `${category}-${cup}-${teamsRange}`;
+      console.log(`🔑 Ключ для поиска очков: "${key}"`);
+
+      const cupPointsMap = CUP_POINTS.get(key);
+
+      if (!cupPointsMap) {
+        throw new Error(
+          `Рассчет очков: ❌ Не найдена конфигурация очков для кубка ${cup} категории ${category} с ${totalTeams} командами (ключ: ${key})`
+        );
+      }
+
+      // Специальная логика для 3 места в кубке A турниров 1 категории
+      if (position === CupPosition.THIRD_PLACE) {
+        const semiFinalPoints = cupPointsMap.get(CupPosition.SEMI_FINAL);
+        if (semiFinalPoints === undefined) {
+          throw new Error(
+            `Рассчет очков: Не найдены очки за полуфинал для кубка ${cup}`
+          );
+        }
+        if (category === TournamentCategoryEnum.FEDERAL && cup === "A") {
+          return semiFinalPoints + 1;
+        } else {
+          return semiFinalPoints;
+        }
+      } else {
+        const points = cupPointsMap.get(position);
+        if (points === undefined) {
+          throw new Error(
+            `Рассчет очков: Не найдены очки для позиции ${position} в кубке ${cup}`
+          );
+        }
+        return points;
+      }
+    }
   }
-
-  const points = cupPointsMap.get(position);
-  if (points === undefined) {
-    console.warn(`❌ Не найдены очки для позиции ${position} в кубке ${cup}`);
-    console.log("🗂️ Доступные позиции:", Array.from(cupPointsMap.keys()));
-    return 0;
-  }
-
-  console.log(
-    `✅ Найдены очки: ${points} для позиции ${position} в кубке ${cup}`
-  );
-  return points;
 }
 
 /**
@@ -370,49 +376,4 @@ export function getAllCupPointsConfig(): Record<
   });
 
   return result;
-}
-
-/**
- * Получить пример расчета очков для демонстрации
- */
-/**
- * Получить очки за количество побед команды
- * @param category - категория турнира (1 или 2)
- * @param qualifying_wins - количество побед команды
- * @returns количество очков за победы
- */
-export function getPointsByQualifyingStage(
-  category: TournamentCategoryEnum,
-  qualifying_wins: number
-): number {
-  console.log(`🏆 getWinsPoints вызвана с параметрами:`, {
-    category,
-    qualifying_wins,
-  });
-
-  if (qualifying_wins === 0) {
-    console.log(`✅ 0 побед = 0 очков`);
-    return 0;
-  }
-
-  let points: number;
-
-  if (qualifying_wins >= 3) {
-    // Больше или равно трём победам
-    points = category === TournamentCategoryEnum.FEDERAL ? 3 : 2;
-    console.log(
-      `✅ ${qualifying_wins} побед (≥3) в категории ${category} = ${points} очков`
-    );
-  } else if (qualifying_wins >= 1) {
-    // 1-2 победы
-    points = category === TournamentCategoryEnum.FEDERAL ? 2 : 1;
-    console.log(
-      `✅ ${qualifying_wins} побед (1-2) в категории ${category} = ${points} очков`
-    );
-  } else {
-    points = 0;
-    console.log(`✅ ${qualifying_wins} побед = 0 очков`);
-  }
-
-  return points;
 }

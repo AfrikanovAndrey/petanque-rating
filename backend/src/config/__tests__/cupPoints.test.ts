@@ -1,5 +1,5 @@
 import {
-  getCupPoints,
+  getPoints,
   getAllCupPointsConfig,
   getPointsByQualifyingStage,
 } from "../cupPoints";
@@ -16,7 +16,7 @@ describe("getCupPoints", () => {
       const expectedPoints = 9;
 
       // Act
-      const actualPoints = getCupPoints(category, cup, position, totalTeams);
+      const actualPoints = getPoints(category, cup, position, totalTeams);
 
       // Assert
       expect(actualPoints).toBe(expectedPoints);
@@ -31,7 +31,7 @@ describe("getCupPoints", () => {
       const expectedPoints = 8;
 
       // Act
-      const actualPoints = getCupPoints(category, cup, position, totalTeams);
+      const actualPoints = getPoints(category, cup, position, totalTeams);
 
       // Assert
       expect(actualPoints).toBe(expectedPoints);
@@ -46,7 +46,7 @@ describe("getCupPoints", () => {
       const expectedPoints = 7;
 
       // Act
-      const actualPoints = getCupPoints(category, cup, position, totalTeams);
+      const actualPoints = getPoints(category, cup, position, totalTeams);
 
       // Assert
       expect(actualPoints).toBe(expectedPoints);
@@ -61,7 +61,7 @@ describe("getCupPoints", () => {
       const expectedPoints = 6;
 
       // Act
-      const actualPoints = getCupPoints(category, cup, position, totalTeams);
+      const actualPoints = getPoints(category, cup, position, totalTeams);
 
       // Assert
       expect(actualPoints).toBe(expectedPoints);
@@ -70,7 +70,7 @@ describe("getCupPoints", () => {
 
   describe("Граничные случаи", () => {
     test("должен правильно определить диапазон 25-30 команд для 25 команд", () => {
-      const points = getCupPoints(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
         "A",
         CupPosition.WINNER,
@@ -80,7 +80,7 @@ describe("getCupPoints", () => {
     });
 
     test("должен правильно определить диапазон 25-30 команд для 30 команд", () => {
-      const points = getCupPoints(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
         "A",
         CupPosition.WINNER,
@@ -90,7 +90,7 @@ describe("getCupPoints", () => {
     });
 
     test("должен правильно определить диапазон 31-36 команд для 31 команды", () => {
-      const points = getCupPoints(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
         "A",
         CupPosition.WINNER,
@@ -100,7 +100,7 @@ describe("getCupPoints", () => {
     });
 
     test("должен правильно определить диапазон 36+ команд для 50 команд", () => {
-      const points = getCupPoints(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
         "A",
         CupPosition.WINNER,
@@ -116,13 +116,13 @@ describe("getCupPoints", () => {
       const position = CupPosition.WINNER;
       const cup = "A" as const;
 
-      const category1Points = getCupPoints(
+      const category1Points = getPoints(
         TournamentCategoryEnum.FEDERAL,
         cup,
         position,
         teams
       );
-      const category2Points = getCupPoints(
+      const category2Points = getPoints(
         TournamentCategoryEnum.REGIONAL,
         cup,
         position,
@@ -141,8 +141,8 @@ describe("getCupPoints", () => {
       const teams = 29;
       const position = CupPosition.WINNER;
 
-      const cupAPoints = getCupPoints(category, "A", position, teams);
-      const cupBPoints = getCupPoints(category, "B", position, teams);
+      const cupAPoints = getPoints(category, "A", position, teams);
+      const cupBPoints = getPoints(category, "B", position, teams);
 
       expect(cupAPoints).toBeGreaterThan(cupBPoints);
       expect(cupAPoints).toBe(13); // Кубок А
@@ -152,7 +152,7 @@ describe("getCupPoints", () => {
 
   describe("Обработка ошибок", () => {
     test("должен вернуть 0 для несуществующей позиции", () => {
-      const points = getCupPoints(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
         "A",
         "invalid" as CupPosition,
@@ -163,7 +163,7 @@ describe("getCupPoints", () => {
 
     test("должен вернуть 0 для кубка Б с малым количеством команд (категория 1)", () => {
       // Кубок Б в категории 1 начинается с 13 команд
-      const points = getCupPoints(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
         "B",
         CupPosition.WINNER,
@@ -174,7 +174,7 @@ describe("getCupPoints", () => {
 
     test("должен вернуть 0 для кубка Б с малым количеством команд (категория 2)", () => {
       // Кубок Б в категории 2 начинается с 13 команд, поэтому 10 команд не должны давать очки
-      const points = getCupPoints(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
         "B",
         CupPosition.WINNER,
@@ -293,7 +293,7 @@ describe("getCupPoints для кубка C", () => {
       const expectedPoints = 7; // 5 + 2
 
       // Act
-      const actualPoints = getCupPoints(
+      const actualPoints = getPoints(
         category,
         cup,
         position,
@@ -315,7 +315,7 @@ describe("getCupPoints для кубка C", () => {
       const expectedPoints = 5; // 3 + 2
 
       // Act
-      const actualPoints = getCupPoints(
+      const actualPoints = getPoints(
         category,
         cup,
         position,
@@ -337,7 +337,7 @@ describe("getCupPoints для кубка C", () => {
       const expectedPoints = 5; // 4 + 1
 
       // Act
-      const actualPoints = getCupPoints(
+      const actualPoints = getPoints(
         category,
         cup,
         position,
@@ -359,7 +359,7 @@ describe("getCupPoints для кубка C", () => {
       const expectedPoints = 2; // 2 + 0
 
       // Act
-      const actualPoints = getCupPoints(
+      const actualPoints = getPoints(
         category,
         cup,
         position,
@@ -381,7 +381,7 @@ describe("getCupPoints для кубка C", () => {
       const expectedPoints = 2; // 0 + 2
 
       // Act
-      const actualPoints = getCupPoints(
+      const actualPoints = getPoints(
         category,
         cup,
         position,
