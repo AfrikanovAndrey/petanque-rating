@@ -21,7 +21,7 @@ export class PlayerModel {
   static async getPlayerByName(name: string): Promise<Player[] | null> {
     let rows: Player[] & RowDataPacket[];
 
-    // Если игрок указан с фамилией и именем (абривеатурой). Например: "Елсвков С"
+    // Если игрок указан с фамилией и именем (абривеатурой). Например: "Елсаков С"
     if (name.includes(" ")) {
       [rows] = await pool.execute<Player[] & RowDataPacket[]>(
         "SELECT * FROM players WHERE name LIKE ?",

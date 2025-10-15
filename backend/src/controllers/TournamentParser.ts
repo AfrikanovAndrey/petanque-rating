@@ -7,6 +7,7 @@ const COMMAND_HEADER = "Команда";
 export const REGISTRATION_LIST = "Регистрация";
 export const SWISS_RESULTS_LIST = "Итоги швейцарки";
 export const GROUP_RESULTS_LIST_REGEXP = /группа [a-zа-я]/;
+export const BUTTING_MATCH_LIST_REGEXP = "/стык [aа]/[bб]/";
 
 // Нормализация имени игрока для сравнения
 export function normalizeName(name: string): string {
@@ -211,6 +212,126 @@ export class TournamentParser {
    * @param teams
    * @returns
    */
+  static async parseCupResults(
+    workbook: XLSX.WorkBook,
+    cup: Cup,
+    teams: TeamPlayers[]
+  ): Promise<Map<number, CupPosition>> {
+    let worksheet = ExcelUtils.findXlsSheet(workbook, getCupListName(cup));
+    if (!worksheet) {
+      throw new Error(`❌  Лист с результатами кубка ${cup} не найден`);
+    }
+
+    if (this.isCup16Grid(worksheet)) {
+      return this.parseCup16Results(workbook, cup, teams);
+    } else if (this.isCup8Grid(worksheet)) {
+      return this.parseCup8Results(workbook, cup, teams);
+    } else if (this.isCup4Grid(worksheet)) {
+      return this.parseCup4Results(workbook, cup, teams);
+    } else {
+      throw new Error(
+        `❌  Лист с результатами кубка ${cup} не содержит корректную структуру`
+      );
+    }
+  }
+
+  /**
+   * Парсинг листа с результатами кубка с сеткой на 4 команды
+   * @param workbook
+   * @param teams
+   * @returns
+   */
+  static async parseCup4Results(
+    workbook: XLSX.WorkBook,
+    cup: Cup,
+    teams: TeamPlayers[]
+  ): Promise<Map<number, CupPosition>> {
+    console.log(`🎯 Парсим результаты Кубка ${cup}`);
+
+    let worksheet = ExcelUtils.findXlsSheet(workbook, getCupListName(cup));
+
+    const cupTeamResults: Map<number, CupPosition> = new Map();
+
+    if (!worksheet) {
+      console.log(`❌  Лист с результатами кубка ${cup} не найден`);
+      return new Map();
+    }
+
+    const stages = {
+      semiFinals: [
+        {
+          cells: ["B4", "B8", "B12", "B16"],
+          position: CupPosition.ROUND_OF_4,
+        },
+      ],
+      thirdPlace: [{ cells: ["F22"], position: CupPosition.THIRD_PLACE }],
+      finals: [{ cells: ["F6", "F14"], position: CupPosition.RUNNER_UP }],
+      winner: [{ cells: ["J10"], position: CupPosition.WINNER }],
+    } as Record<string, StageWithCells[]>;
+
+    const errors: string[] = [];
+
+    for (const stage of Object.values(stages)) {
+      for (const stageInfo of stage) {
+        for (const cellAddress of stageInfo.cells) {
+          console.log(`Обрабатываем ячейку: "${cellAddress}"`);
+          let player: Player;
+          try {
+            if (ExcelUtils.isCellEmpty(worksheet[cellAddress])) {
+              // Игра за третье место может отсутствовать
+              if (stageInfo.position == CupPosition.THIRD_PLACE) {
+                continue;
+              } else {
+                errors.push(
+                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+                );
+              }
+            } else {
+              const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
+              player = await this.detectPlayer(playerName);
+              const team = this.detectPlayerTeamOrderNum(
+                player,
+                teams,
+                `Кубок ${cup}`
+              );
+
+              if (!team) {
+                errors.push(
+                  `Игрок "${playerName}" с листа ${SWISS_RESULTS_LIST} не найден среди игроков команд на Листе регистрации`
+                );
+              } else {
+                cupTeamResults.set(team.orderNum, stageInfo.position);
+              }
+            }
+          } catch (error) {
+            errors.push(`${cellAddress}: ${(error as Error).message}`);
+          }
+        }
+      }
+    }
+
+    if (errors.length !== 0) {
+      throw new Error(
+        `#Ошибки парсинга данных на листе "Кубок ${cup}":\n${errors.join("\n")}`
+      );
+    }
+
+    console.log(`### Определены результаты кубка ${cup}`);
+    for (const [teamOrderNum, results] of cupTeamResults) {
+      console.log(
+        `Team #${teamOrderNum} : ${JSON.stringify(results, null, 0)}`
+      );
+    }
+
+    return cupTeamResults;
+  }
+
+  /**
+   * Парсинг листа с результатами кубка с сеткой на 8 команд
+   * @param workbook
+   * @param teams
+   * @returns
+   */
   static async parseCup8Results(
     workbook: XLSX.WorkBook,
     cup: Cup,
@@ -228,7 +349,7 @@ export class TournamentParser {
     }
 
     const stages = {
-      quarterFinals: [
+      round_of_8: [
         {
           cells: ["B4", "B8", "B12", "B16", "B20", "B24", "B28", "B32"],
           position: CupPosition.ROUND_OF_8,
@@ -243,6 +364,126 @@ export class TournamentParser {
       thirdPlace: [{ cells: ["F38"], position: CupPosition.THIRD_PLACE }],
       finals: [{ cells: ["J10", "J26"], position: CupPosition.RUNNER_UP }],
       winner: [{ cells: ["N18"], position: CupPosition.WINNER }],
+    } as Record<string, StageWithCells[]>;
+
+    const errors: string[] = [];
+
+    for (const stage of Object.values(stages)) {
+      for (const stageInfo of stage) {
+        for (const cellAddress of stageInfo.cells) {
+          console.log(`Обрабатываем ячейку: "${cellAddress}"`);
+          let player: Player;
+          try {
+            if (ExcelUtils.isCellEmpty(worksheet[cellAddress])) {
+              // Игра за третье место может отсутствовать
+              if (stageInfo.position == CupPosition.THIRD_PLACE) {
+                continue;
+              } else {
+                errors.push(
+                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+                );
+              }
+            } else {
+              const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
+              player = await this.detectPlayer(playerName);
+              const team = this.detectPlayerTeamOrderNum(
+                player,
+                teams,
+                `Кубок ${cup}`
+              );
+
+              if (!team) {
+                errors.push(
+                  `Игрок "${playerName}" с листа ${SWISS_RESULTS_LIST} не найден среди игроков команд на Листе регистрации`
+                );
+              } else {
+                cupTeamResults.set(team.orderNum, stageInfo.position);
+              }
+            }
+          } catch (error) {
+            errors.push(`${cellAddress}: ${(error as Error).message}`);
+          }
+        }
+      }
+    }
+
+    if (errors.length !== 0) {
+      throw new Error(
+        `#Ошибки парсинга данных на листе "Кубок ${cup}":\n${errors.join("\n")}`
+      );
+    }
+
+    console.log(`### Определены результаты кубка ${cup}`);
+    for (const [teamOrderNum, results] of cupTeamResults) {
+      console.log(
+        `Team #${teamOrderNum} : ${JSON.stringify(results, null, 0)}`
+      );
+    }
+
+    return cupTeamResults;
+  }
+
+  /**
+   * Парсинг листа с результатами кубка с сеткой на 16 команд
+   * @param workbook
+   * @param teams
+   * @returns
+   */
+  static async parseCup16Results(
+    workbook: XLSX.WorkBook,
+    cup: Cup,
+    teams: TeamPlayers[]
+  ): Promise<Map<number, CupPosition>> {
+    console.log(`🎯 Парсим результаты Кубка ${cup}`);
+
+    let worksheet = ExcelUtils.findXlsSheet(workbook, getCupListName(cup));
+
+    const cupTeamResults: Map<number, CupPosition> = new Map();
+
+    if (!worksheet) {
+      console.log(`❌  Лист с результатами кубка ${cup} не найден`);
+      return new Map();
+    }
+
+    const stages = {
+      round_of_16: [
+        {
+          cells: [
+            "B4",
+            "B8",
+            "B12",
+            "B16",
+            "B20",
+            "B24",
+            "B28",
+            "B32",
+            "B36",
+            "B40",
+            "B44",
+            "B48",
+            "B52",
+            "B56",
+            "B60",
+            "B64",
+          ],
+          position: CupPosition.ROUND_OF_16,
+        },
+      ],
+      round_of_8: [
+        {
+          cells: ["F6", "F14", "F22", "F30", "F38", "F46", "F54", "F62"],
+          position: CupPosition.ROUND_OF_8,
+        },
+      ],
+      semiFinals: [
+        {
+          cells: ["J10", "J26", "J42", "J58"],
+          position: CupPosition.ROUND_OF_4,
+        },
+      ],
+      thirdPlace: [{ cells: ["F70"], position: CupPosition.THIRD_PLACE }],
+      finals: [{ cells: ["N18", "N50"], position: CupPosition.RUNNER_UP }],
+      winner: [{ cells: ["R34"], position: CupPosition.WINNER }],
     } as Record<string, StageWithCells[]>;
 
     const errors: string[] = [];

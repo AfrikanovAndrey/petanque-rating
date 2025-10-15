@@ -114,26 +114,81 @@ export class TournamentController {
       let winsModifier = 0;
       let losesModifier = 0;
 
-      switch (cupPosition) {
-        case CupPosition.WINNER:
-          winsModifier = 3;
-          losesModifier = 0;
+      switch (cupTeamResults.size / 4) {
+        // Кубок на 4 команды
+        case 1:
+          switch (cupPosition) {
+            case CupPosition.WINNER:
+              winsModifier = 2;
+              losesModifier = 0;
+              break;
+            case CupPosition.RUNNER_UP:
+              winsModifier = 1;
+              losesModifier = 1;
+              break;
+            case CupPosition.THIRD_PLACE:
+              winsModifier = 1;
+              losesModifier = 1;
+              break;
+            case CupPosition.ROUND_OF_4:
+              winsModifier = 0;
+              losesModifier = 2;
+              break;
+          }
           break;
-        case CupPosition.RUNNER_UP:
-          winsModifier = 2;
-          losesModifier = 1;
+        // Кубок на 8 команд
+        case 2:
+          switch (cupPosition) {
+            case CupPosition.WINNER:
+              winsModifier = 3;
+              losesModifier = 0;
+              break;
+            case CupPosition.RUNNER_UP:
+              winsModifier = 2;
+              losesModifier = 1;
+              break;
+            case CupPosition.THIRD_PLACE:
+              winsModifier = 2;
+              losesModifier = 1;
+              break;
+            case CupPosition.ROUND_OF_4:
+              winsModifier = 1;
+              losesModifier = 1;
+              break;
+            case CupPosition.ROUND_OF_8:
+              winsModifier = 0;
+              losesModifier = 1;
+              break;
+          }
           break;
-        case CupPosition.THIRD_PLACE:
-          winsModifier = 2;
-          losesModifier = 1;
-          break;
-        case CupPosition.ROUND_OF_4:
-          winsModifier = 1;
-          losesModifier = 1;
-          break;
-        case CupPosition.ROUND_OF_8:
-          winsModifier = 0;
-          losesModifier = 1;
+        // Кубок на 16 команд
+        case 4:
+          switch (cupPosition) {
+            case CupPosition.WINNER:
+              winsModifier = 4;
+              losesModifier = 0;
+              break;
+            case CupPosition.RUNNER_UP:
+              winsModifier = 3;
+              losesModifier = 1;
+              break;
+            case CupPosition.THIRD_PLACE:
+              winsModifier = 3;
+              losesModifier = 1;
+              break;
+            case CupPosition.ROUND_OF_4:
+              winsModifier = 2;
+              losesModifier = 1;
+              break;
+            case CupPosition.ROUND_OF_8:
+              winsModifier = 1;
+              losesModifier = 1;
+              break;
+            case CupPosition.ROUND_OF_16:
+              winsModifier = 0;
+              losesModifier = 1;
+              break;
+          }
           break;
       }
 
@@ -456,17 +511,17 @@ export class TournamentController {
         );
       }
 
-      const aCupTeamsResults = await TournamentParser.parseCup8Results(
+      const aCupTeamsResults = await TournamentParser.parseCupResults(
         workbook,
         "A",
         teams
       );
-      const bCupTeamsResults = await TournamentParser.parseCup8Results(
+      const bCupTeamsResults = await TournamentParser.parseCupResults(
         workbook,
         "B",
         teams
       );
-      const cCupTeamsResults = await TournamentParser.parseCup8Results(
+      const cCupTeamsResults = await TournamentParser.parseCupResults(
         workbook,
         "C",
         teams
