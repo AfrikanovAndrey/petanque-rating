@@ -512,21 +512,11 @@ const AdminPlayers: React.FC = () => {
                                       .map((result) => (
                                         <div
                                           key={`${result.tournament_id}-${result.team_id}`}
-                                          className={`flex justify-between items-center p-3 rounded-lg ${
-                                            result.is_counted
-                                              ? "bg-primary-50 border border-primary-200"
-                                              : "bg-white border border-gray-200"
-                                          }`}
+                                          className="flex justify-between items-center p-3 rounded-lg bg-white border border-gray-200"
                                         >
                                           <div className="flex-1">
                                             <div className="flex items-center gap-2 font-medium text-gray-900">
-                                              <span
-                                                className={`${
-                                                  result.is_counted
-                                                    ? "text-primary-600"
-                                                    : "text-gray-900"
-                                                }`}
-                                              >
+                                              <span className="text-gray-900">
                                                 {result.points}
                                               </span>
                                               <span>-</span>
@@ -555,13 +545,6 @@ const AdminPlayers: React.FC = () => {
                                                 </span>
                                               )}
                                             </div>
-                                          </div>
-                                          <div className="flex items-center">
-                                            {result.is_counted && (
-                                              <div className="badge badge-primary">
-                                                Засчитано
-                                              </div>
-                                            )}
                                           </div>
                                         </div>
                                       ))}
