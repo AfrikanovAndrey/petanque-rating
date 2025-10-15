@@ -3,6 +3,7 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
+  total?: number; // Для пагинации
 }
 
 // Игрок

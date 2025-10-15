@@ -13,6 +13,26 @@ import { getTournamentTypeIcons } from "../utils/tournamentIcons";
 
 type RatingViewType = "male" | "female";
 
+// Функция для расчета win rate
+const calculateWinRate = (
+  results: { wins?: number; loses?: number }[]
+): number => {
+  const totalWins = results.reduce(
+    (sum, result) => sum + (result.wins || 0),
+    0
+  );
+  const totalLoses = results.reduce(
+    (sum, result) => sum + (result.loses || 0),
+    0
+  );
+
+  if (totalWins === 0 && totalLoses === 0) {
+    return 0;
+  }
+
+  return (totalWins / (totalWins + totalLoses)) * 100;
+};
+
 const RatingTable: React.FC = () => {
   const [expandedPlayers, setExpandedPlayers] = useState<Set<number | null>>(
     new Set()
@@ -229,6 +249,9 @@ const RatingTable: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Турниры
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Win Rate
+                  </th>
                   <th className="w-12"></th>
                 </tr>
               </thead>
@@ -284,6 +307,25 @@ const RatingTable: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {player.all_results.length}
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className="font-medium">
+                              {calculateWinRate(player.all_results).toFixed(1)}%
+                            </span>
+                            <span className="text-gray-500 ml-1">
+                              (
+                              {player.all_results.reduce(
+                                (sum, r) => sum + (r.wins || 0),
+                                0
+                              )}
+                              /
+                              {player.all_results.reduce(
+                                (sum, r) =>
+                                  sum + (r.wins || 0) + (r.loses || 0),
+                                0
+                              )}
+                              )
+                            </span>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             {isExpanded ? (
                               <ChevronDownIcon className="h-5 w-5 text-gray-400" />
@@ -296,7 +338,7 @@ const RatingTable: React.FC = () => {
                         {/* Расширенная информация */}
                         {isExpanded && (
                           <tr>
-                            <td colSpan={5} className="px-6 py-4 bg-gray-50">
+                            <td colSpan={6} className="px-6 py-4 bg-gray-50">
                               <div className="space-y-4">
                                 <h4 className="font-medium text-gray-900">
                                   Результаты турниров
@@ -348,6 +390,26 @@ const RatingTable: React.FC = () => {
                                             </div>
                                             <div className="text-sm text-gray-500">
                                               Команда: {result.team_players}
+                                            </div>
+                                            <div className="text-sm text-gray-500 mt-1">
+                                              Win Rate:{" "}
+                                              {(result.wins || 0) +
+                                                (result.loses || 0) >
+                                              0
+                                                ? (
+                                                    ((result.wins || 0) /
+                                                      ((result.wins || 0) +
+                                                        (result.loses || 0))) *
+                                                    100
+                                                  ).toFixed(1)
+                                                : "0.0"}
+                                              %
+                                              <span className="text-gray-500 ml-1">
+                                                ({result.wins || 0}/
+                                                {(result.wins || 0) +
+                                                  (result.loses || 0)}
+                                                )
+                                              </span>
                                             </div>
                                           </div>
                                           <div className="flex items-center">
