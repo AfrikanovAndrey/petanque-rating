@@ -3,6 +3,7 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
+  total?: number; // Для пагинации
 }
 
 // Игрок
@@ -42,11 +43,12 @@ export type TournamentCategory = "FEDERAL" | "REGIONAL";
 // Enum для причин получения очков
 export enum CupPosition {
   // Кубки
-  WINNER = "WINNER",
-  RUNNER_UP = "RUNNER_UP",
-  THIRD_PLACE = "THIRD_PLACE",
-  SEMI_FINAL = "SEMI_FINAL",
-  QUARTER_FINAL = "QUARTER_FINAL",
+  WINNER = "1",
+  RUNNER_UP = "2",
+  THIRD_PLACE = "3",
+  ROUND_OF_4 = "1/2",
+  ROUND_OF_8 = "1/4",
+  ROUND_OF_16 = "1/8",
 
   // Квалификация (швейцарка)
   QUALIFYING_HIGH = "QUALIFYING_HIGH", // >=3 побед
@@ -79,11 +81,14 @@ export function getCupPositionText(
       case CupPosition.THIRD_PLACE:
         return `3 ${cup}`;
 
-      case CupPosition.SEMI_FINAL:
+      case CupPosition.ROUND_OF_4:
         return `1/2 ${cup}`;
 
-      case CupPosition.QUARTER_FINAL:
+      case CupPosition.ROUND_OF_8:
         return `1/4 ${cup}`;
+
+      case CupPosition.ROUND_OF_16:
+        return `1/8 ${cup}`;
     }
   }
 

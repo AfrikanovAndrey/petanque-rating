@@ -16,7 +16,7 @@ async function recalculate() {
       `SELECT id, cup, cup_position, qualifying_wins, points 
        FROM tournament_results 
        WHERE tournament_id = ? AND cup = 'A'
-       ORDER BY FIELD(cup_position, 'WINNER', 'RUNNER_UP', 'THIRD_PLACE', 'SEMI_FINAL', 'QUARTER_FINAL')
+       ORDER BY FIELD(cup_position, '1', '2', '3', '1/2', '1/4', '1/8')
        LIMIT 5`,
       [tournamentId]
     );

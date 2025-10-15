@@ -1,5 +1,5 @@
-import { ResultSetHeader, RowDataPacket, PoolConnection } from "mysql2/promise";
-import { getCupPoints, getPointsByQualifyingStage } from "../config/cupPoints";
+import { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { getPoints } from "../config/cupPoints";
 import { pool } from "../config/database";
 
 import {
@@ -250,54 +250,50 @@ export class TournamentModel {
     for (const result of resultsRows) {
       let newPoints = 0;
 
-      if (result.cup) {
-        // Команда в кубке - рассчитываем очки за место в кубке
-        let cupPosition: CupPosition;
-        switch (result.cup_position) {
-          case "WINNER":
-            cupPosition = CupPosition.WINNER;
-            break;
-          case "RUNNER_UP":
-            cupPosition = CupPosition.RUNNER_UP;
-            break;
-          case "THIRD_PLACE":
-            cupPosition = CupPosition.THIRD_PLACE;
-            break;
-          case "SEMI_FINAL":
-            cupPosition = CupPosition.SEMI_FINAL;
-            break;
-          case "QUARTER_FINAL":
-            cupPosition = CupPosition.QUARTER_FINAL;
-            break;
-          default:
-            throw new Error(
-              `⚠️ Неизвестная позиция в кубке: ${result.cup_position}`
-            );
-        }
-
-        // Для кубка C нужны очки из отборочного тура
-        const qualifyingRoundPoints =
-          result.cup === "C"
-            ? getPointsByQualifyingStage(
-                categoryEnum,
-                result.qualifying_wins || 0
-              )
-            : 0;
-
-        newPoints = getCupPoints(
-          categoryEnum,
-          result.cup,
-          cupPosition,
-          totalTeams,
-          qualifyingRoundPoints
-        );
-      } else {
-        // Команда НЕ в кубке - рассчитываем очки за победы в квалификации
-        newPoints = getPointsByQualifyingStage(
-          categoryEnum,
-          result.qualifying_wins || 0
-        );
+      let cupPosition: CupPosition | undefined;
+      switch (result.cup_position) {
+        case "1":
+        case "WINNER":
+        case "CUP_WINNER":
+          cupPosition = CupPosition.WINNER;
+          break;
+        case "2":
+        case "RUNNER_UP":
+        case "CUP_RUNNER_UP":
+          cupPosition = CupPosition.RUNNER_UP;
+          break;
+        case "3":
+        case "THIRD_PLACE":
+        case "CUP_THIRD_PLACE":
+          cupPosition = CupPosition.THIRD_PLACE;
+          break;
+        case "1/2":
+        case "SEMI_FINAL":
+        case "ROUND_OF_4":
+        case "CUP_SEMI_FINAL":
+          cupPosition = CupPosition.ROUND_OF_4;
+          break;
+        case "1/4":
+        case "QUARTER_FINAL":
+        case "ROUND_OF_8":
+        case "CUP_QUARTER_FINAL":
+          cupPosition = CupPosition.ROUND_OF_8;
+          break;
+        case "1/8":
+        case "ROUND_OF_16":
+          cupPosition = CupPosition.ROUND_OF_16;
+          break;
+        default:
+          cupPosition = undefined;
       }
+
+      newPoints = getPoints(
+        categoryEnum,
+        result.cup,
+        cupPosition,
+        totalTeams,
+        result.qualifying_wins
+      );
 
       // Обновляем очки в базе tournament_results
       await pool.execute(

@@ -39,7 +39,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для CUP_SEMI_FINAL", () => {
       const qualifying_wins = 3;
-      const cup_position = CupPosition.SEMI_FINAL;
+      const cup_position = CupPosition.ROUND_OF_4;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -49,7 +49,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать победы для CUP_QUARTER_FINAL", () => {
       const qualifying_wins = 3;
-      const cup_position = CupPosition.QUARTER_FINAL;
+      const cup_position = CupPosition.ROUND_OF_8;
 
       const result = calculateWins(cup_position, qualifying_wins);
 
@@ -110,7 +110,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для CUP_SEMI_FINAL", () => {
       const qualifying_wins = 3;
-      const cup_position = CupPosition.SEMI_FINAL;
+      const cup_position = CupPosition.ROUND_OF_4;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -120,7 +120,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать поражения для CUP_QUARTER_FINAL", () => {
       const qualifying_wins = 2;
-      const cup_position = CupPosition.QUARTER_FINAL;
+      const cup_position = CupPosition.ROUND_OF_8;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -140,7 +140,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен работать со строковыми значениями cup_position", () => {
       const qualifying_wins = 3;
-      const cup_position = CupPosition.SEMI_FINAL;
+      const cup_position = CupPosition.ROUND_OF_4;
 
       const result = calculateLoses(cup_position, qualifying_wins);
 
@@ -201,7 +201,7 @@ describe("WinsLosesCalculator", () => {
 
     it("должен правильно рассчитывать для полуфиналиста", () => {
       const qualifying_wins = 3;
-      const cup_position = CupPosition.SEMI_FINAL;
+      const cup_position = CupPosition.ROUND_OF_4;
 
       const result = calculateWinsAndLoses(cup_position, qualifying_wins);
 

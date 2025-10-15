@@ -227,6 +227,12 @@ export const adminApi = {
   deletePlayer: (playerId: number): Promise<AxiosResponse<ApiResponse>> =>
     api.delete(`/admin/players/${playerId}`),
 
+  // Получить детали игрока (турниры, результаты)
+  getPlayerDetails: (
+    playerId: number
+  ): Promise<AxiosResponse<ApiResponse<PlayerRating>>> =>
+    api.get(`/rating/player/${playerId}`),
+
   // === УПРАВЛЕНИЕ КОМАНДАМИ ===
   // Удалить все команды
   deleteAllTeams: (): Promise<
@@ -249,6 +255,64 @@ export const adminApi = {
   // Пересчитать очки для всех турниров
   recalculateTournamentPoints: (): Promise<AxiosResponse<ApiResponse>> =>
     api.post("/admin/tournaments/recalculate-points"),
+
+  // === ЛОГИ АУДИТА (только для ADMIN) ===
+  // Получить логи аудита с фильтрацией
+  getAuditLogs: (params?: {
+    user_id?: number;
+    username?: string;
+    action?: string;
+    entity_type?: string;
+    entity_id?: number;
+    success?: boolean;
+    date_from?: string;
+    date_to?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get("/admin/audit-logs", { params }),
+
+  // Получить конкретную запись аудита
+  getAuditLogById: (id: number): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get(`/admin/audit-logs/${id}`),
+
+  // Получить историю действий пользователя
+  getUserAuditHistory: (
+    userId: number,
+    limit?: number
+  ): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get(`/admin/audit-logs/user/${userId}`, {
+      params: { limit },
+    }),
+
+  // Получить историю изменений сущности
+  getEntityAuditHistory: (
+    entityType: string,
+    entityId: number,
+    limit?: number
+  ): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get(`/admin/audit-logs/entity/${entityType}/${entityId}`, {
+      params: { limit },
+    }),
+
+  // Получить статистику по действиям
+  getAuditStatistics: (params?: {
+    date_from?: string;
+    date_to?: string;
+  }): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get("/admin/audit-logs/statistics", { params }),
+
+  // Получить список доступных действий
+  getAuditActions: (): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get("/admin/audit-logs/actions"),
+
+  // Получить список типов сущностей
+  getAuditEntityTypes: (): Promise<AxiosResponse<ApiResponse<any>>> =>
+    api.get("/admin/audit-logs/entity-types"),
+
+  // Удалить старые записи аудита
+  cleanupAuditLogs: (days: number): Promise<AxiosResponse<ApiResponse>> =>
+    api.delete("/admin/audit-logs/cleanup", { data: { days } }),
 };
 
 export default api;

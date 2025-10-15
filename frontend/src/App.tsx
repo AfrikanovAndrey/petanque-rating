@@ -18,6 +18,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPlayers from "./pages/admin/AdminPlayers";
 import AdminLicensedPlayers from "./pages/admin/AdminLicensedPlayers";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
 
 // Components
 import Layout from "./components/Layout";
@@ -141,6 +142,17 @@ function App() {
                 <ProtectedRoute>
                   <AdminLayout>
                     <AdminUsers />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/audit-logs"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout>
+                    <AdminAuditLogs />
                   </AdminLayout>
                 </ProtectedRoute>
               }

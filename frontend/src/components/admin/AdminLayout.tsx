@@ -10,6 +10,7 @@ import {
   XMarkIcon,
   IdentificationIcon,
   UserGroupIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { logout } from "../../utils";
 import { adminApi } from "../../services/api";
@@ -100,6 +101,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       name: "Пользователи",
       href: "/admin/users",
       icon: UserGroupIcon,
+      adminOnly: true, // Только для ADMIN
+    },
+    {
+      name: "Логи аудита",
+      href: "/admin/audit-logs",
+      icon: DocumentTextIcon,
       adminOnly: true, // Только для ADMIN
     },
     {

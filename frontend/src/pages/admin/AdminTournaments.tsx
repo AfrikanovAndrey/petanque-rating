@@ -1079,10 +1079,12 @@ const AdminTournaments: React.FC = () => {
                       "2": 2, // тоже второе место
                       THIRD_PLACE: 3,
                       "3": 3, // тоже третье место
-                      SEMI_FINAL: 4,
+                      ROUND_OF_4: 4,
                       "1/2": 4, // полуфинал
-                      QUARTER_FINAL: 5,
+                      ROUND_OF_8: 5,
                       "1/4": 5, // четвертьфинал
+                      ROUND_OF_16: 6,
+                      "1/8": 6, // 1/8 финала
                     };
 
                     const aPriority = positionPriority[a.cup_position] || 999;

@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { AuthModel } from "../models/AuthModel";
 import { UserModel } from "../models/UserModel";
 import { AuthRequest, AuthResponse } from "../types";
+import { auditLogin } from "../middleware/audit";
 
 export class AuthController {
   static async login(req: Request, res: Response): Promise<void> {
@@ -34,6 +35,16 @@ export class AuthController {
       }
 
       if (!user) {
+        // Логируем неудачную попытку входа
+        await auditLogin(
+          req,
+          0,
+          username,
+          "UNKNOWN",
+          false,
+          "Пользователь не найден"
+        );
+
         res.status(401).json({
           success: false,
           message: "Неверные учетные данные",
@@ -48,6 +59,16 @@ export class AuthController {
       );
 
       if (!isPasswordValid) {
+        // Логируем неудачную попытку входа
+        await auditLogin(
+          req,
+          user.id,
+          user.username,
+          user.role,
+          false,
+          "Неверный пароль"
+        );
+
         res.status(401).json({
           success: false,
           message: "Неверные учетные данные",
@@ -68,6 +89,9 @@ export class AuthController {
           expiresIn: "7d", // Токен действует 7 дней
         }
       );
+
+      // Логируем успешный вход
+      await auditLogin(req, user.id, user.username, user.role, true);
 
       const response: AuthResponse = {
         success: true,

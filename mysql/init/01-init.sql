@@ -153,6 +153,50 @@ CREATE TABLE IF NOT EXISTS licensed_players (
   UNIQUE KEY unique_player_year (player_id, year)
 );
 
+-- Таблица пользователей (users)
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL COMMENT 'Фамилия Имя',
+  username VARCHAR(100) NOT NULL UNIQUE COMMENT 'Логин пользователя',
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('ADMIN', 'MANAGER') NOT NULL DEFAULT 'MANAGER',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_username (username),
+  INDEX idx_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Таблица логов аудита
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL COMMENT 'ID пользователя, совершившего действие',
+  username VARCHAR(100) NOT NULL COMMENT 'Имя пользователя для удобства',
+  user_role ENUM('ADMIN', 'MANAGER') NOT NULL COMMENT 'Роль пользователя на момент действия',
+  action VARCHAR(100) NOT NULL COMMENT 'Тип действия (CREATE, UPDATE, DELETE, LOGIN, etc.)',
+  entity_type VARCHAR(50) NULL COMMENT 'Тип сущности (tournament, player, team, user, etc.)',
+  entity_id INT NULL COMMENT 'ID сущности, над которой совершено действие',
+  entity_name VARCHAR(255) NULL COMMENT 'Название сущности для удобства чтения',
+  description TEXT NULL COMMENT 'Подробное описание действия',
+  ip_address VARCHAR(45) NULL COMMENT 'IP адрес пользователя (поддержка IPv6)',
+  user_agent TEXT NULL COMMENT 'User Agent браузера',
+  request_method VARCHAR(10) NULL COMMENT 'HTTP метод (GET, POST, PUT, DELETE)',
+  request_url VARCHAR(500) NULL COMMENT 'URL запроса',
+  request_body JSON NULL COMMENT 'Тело запроса (без чувствительных данных)',
+  changes JSON NULL COMMENT 'Изменения в формате JSON (old/new values)',
+  success BOOLEAN DEFAULT TRUE COMMENT 'Успешность операции',
+  error_message TEXT NULL COMMENT 'Сообщение об ошибке, если не успешно',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Время выполнения действия',
+  INDEX idx_user_id (user_id),
+  INDEX idx_username (username),
+  INDEX idx_action (action),
+  INDEX idx_entity (entity_type, entity_id),
+  INDEX idx_created_at (created_at DESC),
+  INDEX idx_success (success),
+  INDEX idx_user_action (user_id, action),
+  INDEX idx_entity_type (entity_type),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Логи действий пользователей в системе';
+
 -- ========================================
 -- 3. НАЧАЛЬНЫЕ ДАННЫЕ
 -- ========================================

@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { RowDataPacket } from "mysql2/promise";
+import { pool } from "../config/database";
 import { TournamentModel } from "../models/TournamentModel";
 import { PlayerModel } from "../models/PlayerModel";
 import { SettingsModel } from "../models/SettingsModel";
@@ -531,7 +533,7 @@ export class AdminController {
     }
   }
 
-  // Удалить игрока (админ)
+  // Удалить игрока (админ и менеджер, если игрок не участвовал в турнирах)
   static async deletePlayer(req: Request, res: Response): Promise<void> {
     try {
       const playerId = parseInt(req.params.playerId);
@@ -540,6 +542,25 @@ export class AdminController {
         res.status(400).json({
           success: false,
           message: "Неверный ID игрока",
+        });
+        return;
+      }
+
+      // Проверяем, участвовал ли игрок в турнирах
+      const [participationRows] = await pool.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) as count 
+         FROM team_players tp
+         JOIN tournament_results tr ON tp.team_id = tr.team_id
+         WHERE tp.player_id = ?`,
+        [playerId]
+      );
+
+      const participationCount = (participationRows[0] as any).count;
+
+      if (participationCount > 0) {
+        res.status(400).json({
+          success: false,
+          message: `Невозможно удалить игрока. Игрок участвовал в ${participationCount} турнирах. Удаление игроков, участвовавших в турнирах, запрещено для сохранения истории соревнований.`,
         });
         return;
       }
