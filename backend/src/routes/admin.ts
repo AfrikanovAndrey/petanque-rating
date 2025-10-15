@@ -82,7 +82,11 @@ router.post(
   auditLog({
     action: "UPLOAD_TOURNAMENT",
     entityType: "tournament",
-    getDescription: (req) => `Загрузка турнира из файла`,
+    getEntityName: (req) => req.body.tournament_name || null,
+    getDescription: (req) =>
+      `Загрузка турнира "${
+        req.body.tournament_name || "без названия"
+      }" из файла`,
   }),
   AdminController.uploadTournament
 );
@@ -119,7 +123,7 @@ router.put(
     action: "UPDATE_TOURNAMENT",
     entityType: "tournament",
     getEntityId: (req) => parseInt(req.params.tournamentId),
-    getEntityName: (req) => req.body.name || null,
+    // entity_name будет получено автоматически из БД через getEntityNameFromDB
     getDescription: (req) => `Обновление турнира ID ${req.params.tournamentId}`,
   }),
   AdminController.updateTournament
@@ -144,7 +148,7 @@ router.delete(
   requireAdmin,
   auditLogDelete({
     action: "DELETE_TOURNAMENT",
-    entityType: "tournament",
+    entityType: "tournament_result",
     getEntityId: (req) => parseInt(req.params.resultId),
     getDescription: (req, entityName) =>
       `Удаление результата турнира "${

@@ -101,9 +101,9 @@ export const auditLog = (options: {
 
         // Создаем запись в логе
         const auditData: CreateAuditLogData = {
-          user_id: req.userId,
-          username: req.username,
-          user_role: req.userRole,
+          user_id: req.userId!,
+          username: req.username!,
+          user_role: req.userRole!,
           action: options.action,
           entity_type: options.entityType || null,
           entity_id: entityId,
@@ -229,6 +229,13 @@ export const getEntityNameFromDB = async (
         break;
       case "tournament":
         query = "SELECT name FROM tournaments WHERE id = ?";
+        break;
+      case "tournament_result":
+        // Для результата турнира получаем название турнира через JOIN
+        query = `SELECT t.name 
+                 FROM tournament_results tr 
+                 JOIN tournaments t ON tr.tournament_id = t.id 
+                 WHERE tr.id = ?`;
         break;
       case "user":
         query = "SELECT name FROM users WHERE id = ?";
