@@ -59,13 +59,6 @@ router.post(
   TournamentController.checkGoogleSheetsAccess
 );
 
-// POST /api/admin/tournaments/diagnose - диагностика структуры файла турнира
-router.post(
-  "/tournaments/diagnose",
-  uploadMiddleware,
-  TournamentController.diagnoseFile
-);
-
 // GET /api/admin/tournaments - получить все турниры
 router.get("/tournaments", AdminController.getTournaments);
 

@@ -4,6 +4,8 @@ import { getAllCupPointsConfig, getPoints } from "../config/cupPoints";
 import { pool } from "../config/database";
 // import removed: PlayerTournamentPointsModel больше не используется
 import {
+  BUTTING_MATCH_LIST_REGEXP,
+  generateTeamDescription,
   GROUP_RESULTS_LIST_REGEXP,
   normalizeName,
   REGISTRATION_LIST,
@@ -476,40 +478,12 @@ export class TournamentController {
       );
 
       // 3. Сбор данных об играх квалификационного этапа
-      let teamQualifyingResults = new Map<number, TeamQualifyingResults>();
 
-      const swissSheet = ExcelUtils.findXlsSheet(
-        workbook,
-        normalizeName(SWISS_RESULTS_LIST)
-      );
-      const groupSheet = ExcelUtils.findXlsSheet(
-        workbook,
-        GROUP_RESULTS_LIST_REGEXP
-      );
+      const teamQualifyingResults =
+        await TournamentParser.parseQualifyingResults(workbook, teams);
 
-      // Либо находим результаты Швейцарки, либо групп
-      if (swissSheet) {
-        teamQualifyingResults = await TournamentParser.parseSwissSystemResults(
-          workbook,
-          teams
-        );
-      } else if (groupSheet) {
-        teamQualifyingResults = await TournamentParser.parseGroupResults(
-          workbook,
-          teams
-        );
-      }
-
-      if (teamQualifyingResults.size === 0) {
-        throw new Error("Не определены результаты квалификационного этапа");
-      }
-
-      console.log(`### Результаты квалификационного этапа`);
-      for (const [teamOrderNum, results] of teamQualifyingResults) {
-        console.log(
-          `Team #${teamOrderNum} : ${JSON.stringify(results, null, 0)}`
-        );
-      }
+      const abButtingMatchResults =
+        await TournamentParser.parseABButtingMatchResults(workbook, teams);
 
       const aCupTeamsResults = await TournamentParser.parseCupResults(
         workbook,
@@ -528,13 +502,32 @@ export class TournamentController {
       );
 
       // 4. Объединяем все результаты команд вместе
-      const orderedTeamResults: Map<number, TeamResults> = new Map(); // key = teamOrderNum
+      const teamResults: Map<number, TeamResults> = new Map(); // key = teamOrderNum
+
+      // Привязка результатов квалификационного этапа - команде
       for (const [teamOrderNum, qualifyingResults] of teamQualifyingResults) {
-        orderedTeamResults.set(teamOrderNum, {
+        teamResults.set(teamOrderNum, {
           qualifyingWins: qualifyingResults.wins,
           wins: qualifyingResults.wins,
           loses: qualifyingResults.loses,
         });
+      }
+
+      // Привязка результатов стыковочных игр - команде
+      for (const [teamOrderNum, result] of abButtingMatchResults) {
+        let curTeamResults = teamResults.get(teamOrderNum);
+        if (!curTeamResults) {
+          throw new Error(
+            `Обработка стыковочных игр: Отсутствуют результаты квалификационного этапа для команды #${generateTeamDescription(
+              teams[teamOrderNum]
+            )}`
+          );
+        }
+        if (result) curTeamResults.wins++;
+        else {
+          curTeamResults.loses++;
+        }
+        teamResults.set(teamOrderNum, curTeamResults);
       }
 
       // Привязка результатов кубков - команде
@@ -543,7 +536,7 @@ export class TournamentController {
         "A",
         aCupTeamsResults,
         teams,
-        orderedTeamResults
+        teamResults
       );
 
       if (bCupTeamsResults) {
@@ -551,7 +544,7 @@ export class TournamentController {
           "B",
           bCupTeamsResults,
           teams,
-          orderedTeamResults
+          teamResults
         );
       }
 
@@ -560,7 +553,7 @@ export class TournamentController {
           "C",
           cCupTeamsResults,
           teams,
-          orderedTeamResults
+          teamResults
         );
       }
 
@@ -612,7 +605,7 @@ export class TournamentController {
             teamId = foundedTeam?.id;
           }
 
-          const results = orderedTeamResults.get(team.orderNum);
+          const results = teamResults.get(team.orderNum);
           if (!results) {
             throw new Error("Не может такого быть ))");
           }
@@ -701,127 +694,6 @@ export class TournamentController {
       // либо уже удалён в блоке try-catch выше
 
       throw new Error((error as Error).message);
-    }
-  }
-
-  // Диагностика структуры Excel файла
-  static analyzeExcelFileStructure(fileBuffer: Buffer, fileName: string) {
-    try {
-      const workbook = XLSX.read(fileBuffer, { type: "buffer" });
-
-      const analysis: {
-        fileName: string;
-        totalSheets: number;
-        sheets: Array<{
-          name: string;
-          rowCount: number;
-          columnCount: number;
-          isEmpty: boolean;
-          firstRowSample: unknown;
-        }>;
-        registrationSheetFound: boolean;
-        cupSheetsFound: string[];
-        recommendations: string[];
-      } = {
-        fileName: fileName,
-        totalSheets: workbook.SheetNames.length,
-        sheets: [],
-        registrationSheetFound: false,
-        cupSheetsFound: [],
-        recommendations: [],
-      };
-
-      // Анализируем каждый лист
-      workbook.SheetNames.forEach((sheetName, index) => {
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-        const sheetInfo = {
-          name: sheetName,
-          rowCount: jsonData.length,
-          columnCount:
-            jsonData.length > 0
-              ? Math.max(...jsonData.map((row) => (row as any[]).length))
-              : 0,
-          isEmpty: jsonData.length === 0,
-          firstRowSample: jsonData.length > 0 ? jsonData[0] : null,
-        };
-
-        analysis.sheets.push(sheetInfo);
-
-        // Проверяем, подходит ли для листа регистрации
-        const registrationSheetNames = [
-          "лист регистрации",
-          "лист регистрации",
-          "регистрация",
-          "registration",
-          "sheet1",
-          "команды",
-          "teams",
-        ];
-
-        if (
-          registrationSheetNames.some((name) =>
-            sheetName.toLowerCase().includes(name.toLowerCase())
-          )
-        ) {
-          analysis.registrationSheetFound = true;
-        }
-
-        // Проверяем листы кубков
-        if (
-          sheetName.toLowerCase().includes("кубок") ||
-          sheetName.toLowerCase().includes("cup")
-        ) {
-          analysis.cupSheetsFound.push(sheetName);
-        }
-      });
-
-      // Генерируем рекомендации
-      if (!analysis.registrationSheetFound) {
-        analysis.recommendations.push(
-          "Не найден лист регистрации. Создайте лист с названием 'Лист регистрации' или переименуйте существующий лист."
-        );
-      }
-
-      if (analysis.cupSheetsFound.length === 0) {
-        analysis.recommendations.push(
-          "Не найдены листы кубков. Создайте листы с названиями 'Кубок А' и 'Кубок Б' для результатов турнира."
-        );
-      }
-
-      return analysis;
-    } catch (error) {
-      throw new Error(`Ошибка анализа файла: ${(error as Error).message}`);
-    }
-  }
-
-  // Endpoint для диагностики файла турнира
-  static async diagnoseFile(req: Request, res: Response) {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "Файл не загружен",
-      });
-    }
-
-    try {
-      const analysis = this.analyzeExcelFileStructure(
-        req.file.buffer,
-        req.file.originalname
-      );
-
-      res.json({
-        success: true,
-        message: "Анализ файла завершен",
-        data: analysis,
-      });
-    } catch (error) {
-      console.error("Ошибка диагностики файла:", error);
-      res.status(500).json({
-        success: false,
-        message: "Ошибка при анализе файла: " + (error as Error).message,
-      });
     }
   }
 

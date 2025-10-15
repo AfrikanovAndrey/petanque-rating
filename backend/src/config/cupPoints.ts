@@ -323,7 +323,6 @@ export function getPoints(
       }
 
       const key: CupPointsKey = `${category}-${cup}-${teamsRange}`;
-      console.log(`🔑 Ключ для поиска очков: "${key}"`);
 
       const cupPointsMap = CUP_POINTS.get(key);
 
