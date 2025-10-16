@@ -7,6 +7,8 @@ import {
   BUTTING_MATCH_LIST_REGEXP,
   generateTeamDescription,
   GROUP_RESULTS_LIST_REGEXP,
+  ManualInputTeam,
+  MANUAL_INPUT_LIST,
   normalizeName,
   REGISTRATION_LIST,
   SWISS_RESULTS_LIST,
@@ -467,94 +469,144 @@ export class TournamentController {
         );
       }
 
-      // 1. Проверка наличия обязательных листов
-      this.validateDocumentStructure(workbook);
-      console.log("✓ Структура файла корректна");
-
-      // 2. Парсинг данных c листов
-      // Сбор данных о командах
-      const teams = await TournamentParser.parseTeamsFromRegistrationSheet(
-        workbook
-      );
-
-      // 3. Сбор данных об играх квалификационного этапа
-
-      const teamQualifyingResults =
-        await TournamentParser.parseQualifyingResults(workbook, teams);
-
-      const abButtingMatchResults =
-        await TournamentParser.parseABButtingMatchResults(workbook, teams);
-
-      const aCupTeamsResults = await TournamentParser.parseCupResults(
+      // 1. Проверяем наличие листа "Ручной ввод"
+      const manualInputSheet = ExcelUtils.findXlsSheet(
         workbook,
-        "A",
-        teams
-      );
-      const bCupTeamsResults = await TournamentParser.parseCupResults(
-        workbook,
-        "B",
-        teams
-      );
-      const cCupTeamsResults = await TournamentParser.parseCupResults(
-        workbook,
-        "C",
-        teams
+        MANUAL_INPUT_LIST
       );
 
-      // 4. Объединяем все результаты команд вместе
-      const teamResults: Map<number, TeamResults> = new Map(); // key = teamOrderNum
+      let teams: TeamPlayers[];
+      let teamResults: Map<number, TeamResults>;
 
-      // Привязка результатов квалификационного этапа - команде
-      for (const [teamOrderNum, qualifyingResults] of teamQualifyingResults) {
-        teamResults.set(teamOrderNum, {
-          qualifyingWins: qualifyingResults.wins,
-          wins: qualifyingResults.wins,
-          loses: qualifyingResults.loses,
-        });
-      }
+      if (manualInputSheet) {
+        // ====== РЕЖИМ: Ручной ввод ======
+        console.log(
+          `📝 Обнаружен лист "${MANUAL_INPUT_LIST}" - используем режим ручного ввода`
+        );
 
-      // Привязка результатов стыковочных игр - команде
-      for (const [teamOrderNum, result] of abButtingMatchResults) {
-        let curTeamResults = teamResults.get(teamOrderNum);
-        if (!curTeamResults) {
-          throw new Error(
-            `Обработка стыковочных игр: Отсутствуют результаты квалификационного этапа для команды #${generateTeamDescription(
-              teams[teamOrderNum]
-            )}`
+        // Парсим лист с ручным вводом
+        const manualInputTeams: ManualInputTeam[] =
+          await TournamentParser.parseManualInputSheet(workbook);
+
+        // Создаем результаты из данных ручного ввода
+        teamResults = new Map<number, TeamResults>();
+        for (const team of manualInputTeams) {
+          // Преобразуем строковые значения в нужные типы
+          const cup = team.cup as Cup | undefined;
+          const cupPosition = team.position as CupPosition | undefined;
+
+          teamResults.set(team.orderNum, {
+            cup: cup,
+            cupPosition: cupPosition,
+            qualifyingWins: 0,
+            wins: 0,
+            loses: 0,
+            points: team.points,
+          });
+        }
+
+        // Конвертируем ManualInputTeam[] в TeamPlayers[] для дальнейшего использования
+        teams = manualInputTeams.map((t) => ({
+          orderNum: t.orderNum,
+          players: t.players,
+        }));
+
+        console.log(
+          `✓ Режим ручного ввода: обработано ${teams.length} команд(ы)`
+        );
+      } else {
+        // ====== РЕЖИМ: Стандартный парсинг ======
+        console.log(`📋 Используем стандартный режим парсинга турнира`);
+
+        // Проверка наличия обязательных листов
+        this.validateDocumentStructure(workbook);
+        console.log("✓ Структура файла корректна");
+
+        // 2. Парсинг данных c листов
+        // Сбор данных о командах
+        teams = await TournamentParser.parseTeamsFromRegistrationSheet(
+          workbook
+        );
+
+        // 3. Сбор данных об играх квалификационного этапа
+
+        const teamQualifyingResults =
+          await TournamentParser.parseQualifyingResults(workbook, teams);
+
+        const abButtingMatchResults =
+          await TournamentParser.parseABButtingMatchResults(workbook, teams);
+
+        const aCupTeamsResults = await TournamentParser.parseCupResults(
+          workbook,
+          "A",
+          teams
+        );
+        const bCupTeamsResults = await TournamentParser.parseCupResults(
+          workbook,
+          "B",
+          teams
+        );
+        const cCupTeamsResults = await TournamentParser.parseCupResults(
+          workbook,
+          "C",
+          teams
+        );
+
+        // 4. Объединяем все результаты команд вместе
+        teamResults = new Map<number, TeamResults>(); // key = teamOrderNum
+
+        // Привязка результатов квалификационного этапа - команде
+        for (const [teamOrderNum, qualifyingResults] of teamQualifyingResults) {
+          teamResults.set(teamOrderNum, {
+            qualifyingWins: qualifyingResults.wins,
+            wins: qualifyingResults.wins,
+            loses: qualifyingResults.loses,
+          });
+        }
+
+        // Привязка результатов стыковочных игр - команде
+        for (const [teamOrderNum, result] of abButtingMatchResults) {
+          let curTeamResults = teamResults.get(teamOrderNum);
+          if (!curTeamResults) {
+            throw new Error(
+              `Обработка стыковочных игр: Отсутствуют результаты квалификационного этапа для команды #${generateTeamDescription(
+                teams[teamOrderNum]
+              )}`
+            );
+          }
+          if (result) curTeamResults.wins++;
+          else {
+            curTeamResults.loses++;
+          }
+          teamResults.set(teamOrderNum, curTeamResults);
+        }
+
+        // Привязка результатов кубков - команде
+        // Кубок А
+        await this.modifyTeamResultsWithCupResults(
+          "A",
+          aCupTeamsResults,
+          teams,
+          teamResults
+        );
+
+        if (bCupTeamsResults) {
+          await this.modifyTeamResultsWithCupResults(
+            "B",
+            bCupTeamsResults,
+            teams,
+            teamResults
           );
         }
-        if (result) curTeamResults.wins++;
-        else {
-          curTeamResults.loses++;
+
+        if (cCupTeamsResults) {
+          await this.modifyTeamResultsWithCupResults(
+            "C",
+            cCupTeamsResults,
+            teams,
+            teamResults
+          );
         }
-        teamResults.set(teamOrderNum, curTeamResults);
-      }
-
-      // Привязка результатов кубков - команде
-      // Кубок А
-      await this.modifyTeamResultsWithCupResults(
-        "A",
-        aCupTeamsResults,
-        teams,
-        teamResults
-      );
-
-      if (bCupTeamsResults) {
-        await this.modifyTeamResultsWithCupResults(
-          "B",
-          bCupTeamsResults,
-          teams,
-          teamResults
-        );
-      }
-
-      if (cCupTeamsResults) {
-        await this.modifyTeamResultsWithCupResults(
-          "C",
-          cCupTeamsResults,
-          teams,
-          teamResults
-        );
       }
 
       // 5. Сохраняем данные в БД (в транзакции)
@@ -611,13 +663,17 @@ export class TournamentController {
           }
 
           // Рассчитываем количество рейтинговых очков
-          const points = getPoints(
-            tournamentCategory,
-            results.cup,
-            results.cupPosition,
-            effectiveTeamsCount,
-            results.qualifyingWins
-          );
+          // Для режима ручного ввода используем points из данных, для стандартного режима - рассчитываем
+          const points =
+            results.points !== undefined
+              ? results.points
+              : getPoints(
+                  tournamentCategory,
+                  results.cup,
+                  results.cupPosition,
+                  effectiveTeamsCount,
+                  results.qualifyingWins
+                );
 
           // Записываем результат команды в БД
           await TournamentModel.addTournamentResult(

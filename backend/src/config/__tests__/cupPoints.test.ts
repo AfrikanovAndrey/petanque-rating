@@ -1,15 +1,11 @@
-import {
-  getPoints,
-  getAllCupPointsConfig,
-  getPointsByQualifyingStage,
-} from "../cupPoints";
+import { getPoints, getAllCupPointsConfig } from "../cupPoints";
 import { CupPosition, TournamentCategoryEnum } from "../../types";
 
 describe("getCupPoints", () => {
   describe("Турнир 2-й категории, кубок А, 29 команд", () => {
     test("должен вернуть 9 очков для победителя кубка А", () => {
       // Arrange
-      const category = TournamentCategoryEnum.FEDERAL as const;
+      const category = TournamentCategoryEnum.REGIONAL as const;
       const cup = "A" as const;
       const position = CupPosition.WINNER;
       const totalTeams = 29;
@@ -151,77 +147,95 @@ describe("getCupPoints", () => {
   });
 
   describe("Обработка ошибок", () => {
-    test("должен вернуть 0 для несуществующей позиции", () => {
-      const points = getPoints(
-        TournamentCategoryEnum.FEDERAL,
-        "A",
-        "invalid" as CupPosition,
-        20
-      );
-      expect(points).toBe(0);
+    test("должен выбросить ошибку для несуществующей позиции", () => {
+      expect(() => {
+        getPoints(
+          TournamentCategoryEnum.FEDERAL,
+          "A",
+          "invalid" as CupPosition,
+          20
+        );
+      }).toThrow("Рассчет очков: Не найдены очки для позиции invalid в кубке A");
     });
 
-    test("должен вернуть 0 для кубка Б с малым количеством команд (категория 1)", () => {
+    test("должен выбросить ошибку для кубка Б с малым количеством команд (категория 1)", () => {
       // Кубок Б в категории 1 начинается с 13 команд
-      const points = getPoints(
-        TournamentCategoryEnum.FEDERAL,
-        "B",
-        CupPosition.WINNER,
-        10
-      );
-      expect(points).toBe(0);
+      expect(() => {
+        getPoints(
+          TournamentCategoryEnum.FEDERAL,
+          "B",
+          CupPosition.WINNER,
+          10
+        );
+      }).toThrow("Рассчет очков: ❌ Не найдена конфигурация очков для кубка B категории 1 с 10 командами");
     });
 
-    test("должен вернуть 0 для кубка Б с малым количеством команд (категория 2)", () => {
+    test("должен выбросить ошибку для кубка Б с малым количеством команд (категория 2)", () => {
       // Кубок Б в категории 2 начинается с 13 команд, поэтому 10 команд не должны давать очки
-      const points = getPoints(
-        TournamentCategoryEnum.REGIONAL,
-        "B",
-        CupPosition.WINNER,
-        10
-      );
-      expect(points).toBe(0);
+      expect(() => {
+        getPoints(
+          TournamentCategoryEnum.REGIONAL,
+          "B",
+          CupPosition.WINNER,
+          10
+        );
+      }).toThrow("Рассчет очков: ❌ Не найдена конфигурация очков для кубка B категории 2 с 10 командами");
     });
   });
 });
 
-describe("getWinsPoints", () => {
+describe("getPoints для отборочного тура", () => {
   describe("Турниры 1 категории", () => {
     test("должен вернуть 3 очка за 3 победы", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
+        undefined,
+        undefined,
+        0,
         3
       );
       expect(points).toBe(3);
     });
 
     test("должен вернуть 3 очка за 5 побед", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
+        undefined,
+        undefined,
+        0,
         5
       );
       expect(points).toBe(3);
     });
 
     test("должен вернуть 2 очка за 2 победы", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
+        undefined,
+        undefined,
+        0,
         2
       );
       expect(points).toBe(2);
     });
 
     test("должен вернуть 2 очка за 1 победу", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
+        undefined,
+        undefined,
+        0,
         1
       );
       expect(points).toBe(2);
     });
 
     test("должен вернуть 0 очков за 0 побед", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
+        undefined,
+        undefined,
+        0,
         0
       );
       expect(points).toBe(0);
@@ -230,40 +244,55 @@ describe("getWinsPoints", () => {
 
   describe("Турниры 2 категории", () => {
     test("должен вернуть 2 очка за 3 победы", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
+        undefined,
+        undefined,
+        0,
         3
       );
       expect(points).toBe(2);
     });
 
     test("должен вернуть 2 очка за 4 победы", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
+        undefined,
+        undefined,
+        0,
         4
       );
       expect(points).toBe(2);
     });
 
     test("должен вернуть 1 очко за 2 победы", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
+        undefined,
+        undefined,
+        0,
         2
       );
       expect(points).toBe(1);
     });
 
     test("должен вернуть 1 очко за 1 победу", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
+        undefined,
+        undefined,
+        0,
         1
       );
       expect(points).toBe(1);
     });
 
     test("должен вернуть 0 очков за 0 побед", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.REGIONAL,
+        undefined,
+        undefined,
+        0,
         0
       );
       expect(points).toBe(0);
@@ -272,8 +301,11 @@ describe("getWinsPoints", () => {
 
   describe("Граничные случаи", () => {
     test("должен корректно обрабатывать отрицательные значения", () => {
-      const points = getPointsByQualifyingStage(
+      const points = getPoints(
         TournamentCategoryEnum.FEDERAL,
+        undefined,
+        undefined,
+        0,
         -1
       );
       expect(points).toBe(0);
@@ -289,8 +321,8 @@ describe("getCupPoints для кубка C", () => {
       const cup = "C" as const;
       const position = CupPosition.WINNER;
       const totalTeams = 20;
-      const qualifyingRoundPoints = 5; // Очки, заработанные в отборочном туре
-      const expectedPoints = 7; // 5 + 2
+      const qualifyingWins = 3; // 3 победы дают 3 очка для категории 1
+      const expectedPoints = 5; // 3 (за победы) + 2 (за победу в кубке С)
 
       // Act
       const actualPoints = getPoints(
@@ -298,7 +330,7 @@ describe("getCupPoints для кубка C", () => {
         cup,
         position,
         totalTeams,
-        qualifyingRoundPoints
+        qualifyingWins
       );
 
       // Assert
@@ -311,8 +343,8 @@ describe("getCupPoints для кубка C", () => {
       const cup = "C" as const;
       const position = CupPosition.RUNNER_UP;
       const totalTeams = 30;
-      const qualifyingRoundPoints = 3;
-      const expectedPoints = 5; // 3 + 2
+      const qualifyingWins = 3; // 3 победы дают 2 очка для категории 2
+      const expectedPoints = 4; // 2 (за победы) + 2 (за финал кубка С)
 
       // Act
       const actualPoints = getPoints(
@@ -320,7 +352,7 @@ describe("getCupPoints для кубка C", () => {
         cup,
         position,
         totalTeams,
-        qualifyingRoundPoints
+        qualifyingWins
       );
 
       // Assert
@@ -333,8 +365,8 @@ describe("getCupPoints для кубка C", () => {
       const cup = "C" as const;
       const position = CupPosition.ROUND_OF_4;
       const totalTeams = 25;
-      const qualifyingRoundPoints = 4;
-      const expectedPoints = 5; // 4 + 1
+      const qualifyingWins = 3; // 3 победы дают 3 очка для категории 1
+      const expectedPoints = 4; // 3 (за победы) + 1 (за полуфинал кубка С)
 
       // Act
       const actualPoints = getPoints(
@@ -342,7 +374,7 @@ describe("getCupPoints для кубка C", () => {
         cup,
         position,
         totalTeams,
-        qualifyingRoundPoints
+        qualifyingWins
       );
 
       // Assert
@@ -355,8 +387,8 @@ describe("getCupPoints для кубка C", () => {
       const cup = "C" as const;
       const position = CupPosition.ROUND_OF_8;
       const totalTeams = 40;
-      const qualifyingRoundPoints = 2;
-      const expectedPoints = 2; // 2 + 0
+      const qualifyingWins = 1; // 1 победа дает 1 очко для категории 2
+      const expectedPoints = 1; // 1 (за победы) + 0 (за четвертьфинал кубка С)
 
       // Act
       const actualPoints = getPoints(
@@ -364,7 +396,7 @@ describe("getCupPoints для кубка C", () => {
         cup,
         position,
         totalTeams,
-        qualifyingRoundPoints
+        qualifyingWins
       );
 
       // Assert
@@ -377,8 +409,8 @@ describe("getCupPoints для кубка C", () => {
       const cup = "C" as const;
       const position = CupPosition.WINNER;
       const totalTeams = 16;
-      const qualifyingRoundPoints = 0;
-      const expectedPoints = 2; // 0 + 2
+      const qualifyingWins = 0; // 0 побед дают 0 очков
+      const expectedPoints = 2; // 0 (за победы) + 2 (за победу в кубке С)
 
       // Act
       const actualPoints = getPoints(
@@ -386,7 +418,7 @@ describe("getCupPoints для кубка C", () => {
         cup,
         position,
         totalTeams,
-        qualifyingRoundPoints
+        qualifyingWins
       );
 
       // Assert
