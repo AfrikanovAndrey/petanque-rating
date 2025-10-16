@@ -232,7 +232,7 @@ export class TournamentController {
     }
 
     if (errors.length > 0) {
-      throw new Error(errors.join("\n"));
+      throw new Error(`#Ошибки структуры документа:\n${errors.join("\n")}`);
     }
   }
 
@@ -477,9 +477,11 @@ export class TournamentController {
 
       let teams: TeamPlayers[];
       let teamResults: Map<number, TeamResults>;
+      let isManualInput = false; // Флаг для определения режима ручного ввода
 
       if (manualInputSheet) {
         // ====== РЕЖИМ: Ручной ввод ======
+        isManualInput = true;
         console.log(
           `📝 Обнаружен лист "${MANUAL_INPUT_LIST}" - используем режим ручного ввода`
         );
@@ -622,6 +624,7 @@ export class TournamentController {
           tournamentType,
           tournamentCategory,
           tournamentDate,
+          isManualInput,
           connection
         );
 

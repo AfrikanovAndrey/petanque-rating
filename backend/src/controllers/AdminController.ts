@@ -320,10 +320,10 @@ export class AdminController {
         return;
       }
 
-      const { name, type, category, date } = req.body;
+      const { name, type, category, date, manual } = req.body;
 
       // Проверяем, что передан хотя бы один параметр для обновления
-      if (!name && !type && !category && !date) {
+      if (!name && !type && !category && !date && manual === undefined) {
         res.status(400).json({
           success: false,
           message: "Необходимо указать хотя бы один параметр для обновления",
@@ -348,7 +348,8 @@ export class AdminController {
         name,
         type,
         category,
-        date
+        date,
+        manual
       );
 
       if (success) {
