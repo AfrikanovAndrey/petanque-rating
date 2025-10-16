@@ -6,7 +6,7 @@ import {
 } from "@heroicons/react/24/outline";
 import React, { useMemo, useState } from "react";
 import { useQuery } from "react-query";
-import { ratingApi } from "../services/api";
+import { adminApi, ratingApi } from "../services/api";
 import { PlayerRating, getCupPositionText } from "../types";
 import { formatDate, formatNumber, handleApiError } from "../utils";
 import { getTournamentTypeIcons } from "../utils/tournamentIcons";
@@ -55,6 +55,20 @@ const RatingTable: React.FC = () => {
       refetchInterval: 5 * 60 * 1000, // Обновляем каждые 5 минут
     }
   );
+
+  // Получаем настройку количества лучших результатов
+  const { data: settingsData } = useQuery<{ best_results_count: number }>(
+    "bestResultsCount",
+    async () => {
+      const response = await adminApi.getBestResultsCount();
+      return response.data?.data || { best_results_count: 8 };
+    },
+    {
+      refetchInterval: 5 * 60 * 1000, // Обновляем каждые 5 минут
+    }
+  );
+
+  const bestResultsCount = settingsData?.best_results_count || 8;
 
   // Фильтрация данных по поисковому запросу
   const filteredRatingData = useMemo(() => {
@@ -169,8 +183,8 @@ const RatingTable: React.FC = () => {
         </div>
 
         <p className="text-gray-600">
-          Рейтинг основан на {ratingData?.[0]?.best_results?.length || 8} лучших
-          результатах ({ratingData?.length || 0} игроков)
+          Рейтинг основан на {bestResultsCount} лучших результатах (
+          {ratingData?.length || 0} игроков)
         </p>
         <p className="text-sm text-gray-500 mt-1">
           Последнее обновление: {new Date().toLocaleString("ru-RU")}
@@ -450,13 +464,13 @@ const RatingTable: React.FC = () => {
             турнирах
           </p>
           <p>
-            • Для подсчета общего рейтинга используются{" "}
-            {ratingData?.[0]?.best_results?.length || 8} лучших результата
+            • Для подсчета общего рейтинга используются {bestResultsCount}{" "}
+            лучших результата
           </p>
           <p>• Очки начисляются в зависимости от занятого места в турнире</p>
           <p>
             • Результаты, входящие в топ-
-            {ratingData?.[0]?.best_results?.length || 8}, выделены цветом
+            {bestResultsCount}, выделены цветом
           </p>
           <p>• В рейтинге участвуют только лицензированные игроки</p>
           <p>• Игроки турниров сопоставляются с лицензированными по фамилии</p>
