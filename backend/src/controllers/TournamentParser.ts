@@ -177,15 +177,25 @@ export class TournamentParser {
           }
         }
 
-        // Парсим очки
-        const pointsCell = sheet[`${pointsColumnCell.column}${rowIndex}`];
-        if (ExcelUtils.isCellEmpty(pointsCell)) {
+        if ((cup && !position) || (!cup && position)) {
           errors.push(
-            `Строка ${rowIndex}: не указаны очки для команды "${teamPlayersString}"`
+            `Строка ${rowIndex}: некорректное значение кубка или позиции для команды`
           );
           continue;
         }
+
+        // Парсим очки
+        const pointsCell = sheet[`${pointsColumnCell.column}${rowIndex}`];
+        if (ExcelUtils.isCellEmpty(pointsCell)) {
+          errors.push(`Строка ${rowIndex}: не указаны очки для команды`);
+          continue;
+        }
         const points = Number(pointsCell.v);
+
+        if (points === null) {
+          errors.push(`Строка ${rowIndex}: не указаны очки для команды`);
+          continue;
+        }
 
         // Создаем команду с результатами
         teams.push({
