@@ -147,39 +147,47 @@ describe("getCupPoints", () => {
   });
 
   describe("Обработка ошибок", () => {
-    test("должен выбросить ошибку для несуществующей позиции", () => {
-      expect(() => {
-        getPoints(
-          TournamentCategoryEnum.FEDERAL,
-          "A",
-          "invalid" as CupPosition,
-          20
-        );
-      }).toThrow("Рассчет очков: Не найдены очки для позиции invalid в кубке A");
+    test("должен вернуть квалификационные очки для позиции без очков в таблице", () => {
+      // Если в таблице нет очков для позиции, возвращаются квалификационные
+      const qualifyingWins = 3; // 3 победы = 3 очка для категории 1
+      const points = getPoints(
+        TournamentCategoryEnum.FEDERAL,
+        "A",
+        "invalid" as CupPosition,
+        20,
+        qualifyingWins
+      );
+      expect(points).toBe(3); // Должны вернуться квалификационные очки
+    });
+
+    test("должен вернуть 0 очков для позиции без очков в таблице и без квалификационных побед", () => {
+      // Если нет очков в таблице и нет квалификационных побед
+      const points = getPoints(
+        TournamentCategoryEnum.REGIONAL,
+        "A",
+        "invalid" as CupPosition,
+        20,
+        0 // 0 побед = 0 очков
+      );
+      expect(points).toBe(0); // Должны вернуться 0 очков
     });
 
     test("должен выбросить ошибку для кубка Б с малым количеством команд (категория 1)", () => {
       // Кубок Б в категории 1 начинается с 13 команд
       expect(() => {
-        getPoints(
-          TournamentCategoryEnum.FEDERAL,
-          "B",
-          CupPosition.WINNER,
-          10
-        );
-      }).toThrow("Рассчет очков: ❌ Не найдена конфигурация очков для кубка B категории 1 с 10 командами");
+        getPoints(TournamentCategoryEnum.FEDERAL, "B", CupPosition.WINNER, 10);
+      }).toThrow(
+        "Рассчет очков: ❌ Не найдена конфигурация очков для кубка B категории 1 с 10 командами"
+      );
     });
 
     test("должен выбросить ошибку для кубка Б с малым количеством команд (категория 2)", () => {
       // Кубок Б в категории 2 начинается с 13 команд, поэтому 10 команд не должны давать очки
       expect(() => {
-        getPoints(
-          TournamentCategoryEnum.REGIONAL,
-          "B",
-          CupPosition.WINNER,
-          10
-        );
-      }).toThrow("Рассчет очков: ❌ Не найдена конфигурация очков для кубка B категории 2 с 10 командами");
+        getPoints(TournamentCategoryEnum.REGIONAL, "B", CupPosition.WINNER, 10);
+      }).toThrow(
+        "Рассчет очков: ❌ Не найдена конфигурация очков для кубка B категории 2 с 10 командами"
+      );
     });
   });
 });

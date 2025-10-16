@@ -251,12 +251,31 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
 
 /**
  * Получить очки за позицию в кубке
- * @param category - категория турнира (1 или 2)
- * @param cup - тип кубка (A, B, C)
+ *
+ * ПРАВИЛА НАЧИСЛЕНИЯ ОЧКОВ:
+ *
+ * 1) Рейтинговые очки игрокам, не вышедшим в плей-офф, начисляются
+ *    в зависимости от числа побед в квалификационном этапе:
+ *    - FEDERAL (1 категория): 3+ побед = 3 очка, 1-2 победы = 2 очка, иначе 0
+ *    - REGIONAL (2 категория): 3+ побед = 2 очка, 1-2 победы = 1 очко, иначе 0
+ *
+ * 2) В Кубках А турниров 1 категории победитель игры за третье место
+ *    (в том случае, когда она проводится) дополнительно получает 1 очко
+ *    относительно очков участника полуфинала
+ *
+ * 3) В случае проведения утешительного турнира (Кубка С), финалисты этого турнира
+ *    дополнительно к очкам, заработанным на квалификационном этапе, получают
+ *    по 2 очка, полуфиналисты - по 1 очку
+ *
+ * 4) Участники кубков A и B получают очки в соответствии с таблицами
+ *    (иногда очков за место в кубке может не быть)
+ *
+ * @param category - категория турнира (FEDERAL=1 или REGIONAL=2)
+ * @param cup - тип кубка (A, B, C) или undefined если не вышел в плей-офф
  * @param position - позиция в кубке
  * @param totalTeams - общее количество команд в турнире
- * @param qualifyingRoundPoints - очки, заработанные в отборочном туре (только для кубка C)
- * @returns количество очков
+ * @param qualifyingWins - количество побед в квалификационном этапе
+ * @returns количество рейтинговых очков
  */
 export function getPoints(
   category: TournamentCategoryEnum,
@@ -265,96 +284,146 @@ export function getPoints(
   totalTeams: number,
   qualifyingWins: number = 0
 ): number {
-  let qualifyingPoints: number;
-  let points: number;
+  // ПРАВИЛО 1: Расчет очков за квалификационный этап
+  // (для игроков, не вышедших в плей-офф)
+  const qualifyingPoints = calculateQualifyingPoints(category, qualifyingWins);
 
-  // Очки за победы в квалификационном этапе
-  if (qualifyingWins >= 3) {
-    // Больше или равно трём победам
-    qualifyingPoints = category === TournamentCategoryEnum.FEDERAL ? 3 : 2;
-  } else if (qualifyingWins >= 1) {
-    // 1-2 победы
-    qualifyingPoints = category === TournamentCategoryEnum.FEDERAL ? 2 : 1;
-  } else {
-    qualifyingPoints = 0;
-  }
-
+  // Если игрок не вышел в плей-офф (нет кубка), возвращаем только квалификационные очки
   if (!cup) {
     return qualifyingPoints;
+  }
+
+  // Игрок вышел в плей-офф, проверяем наличие позиции
+  if (!position) {
+    throw new Error(`Рассчет очков: Не задана позиция в кубке ${cup}`);
+  }
+
+  // ПРАВИЛО 3: Кубок С (утешительный турнир)
+  // Игроки получают квалификационные очки + бонус за позицию
+  if (cup === "C") {
+    return calculateCupCPoints(qualifyingPoints, position);
+  }
+
+  // ПРАВИЛА 2 и 4: Кубки А и Б
+  // Игроки получают очки по таблице, но если их нет - квалификационные очки
+  return calculateCupABPoints(
+    category,
+    cup,
+    position,
+    totalTeams,
+    qualifyingPoints
+  );
+}
+
+/**
+ * Расчет очков за квалификационный этап
+ * ПРАВИЛО 1
+ */
+function calculateQualifyingPoints(
+  category: TournamentCategoryEnum,
+  qualifyingWins: number
+): number {
+  if (qualifyingWins >= 3) {
+    // 3 и более побед
+    return category === TournamentCategoryEnum.FEDERAL ? 3 : 2;
+  } else if (qualifyingWins >= 1) {
+    // 1-2 победы
+    return category === TournamentCategoryEnum.FEDERAL ? 2 : 1;
   } else {
-    if (!position) {
-      throw new Error(`Рассчет очков: Не задана позиция в кубке ${cup}`);
-    }
+    // 0 побед
+    return 0;
+  }
+}
 
-    // В случае проведения утешительного турнира (Кубка С), финалисты этого турнира дополнительно к очкам, заработанным на квалификационном этапе, получают по 2 очка, полуфиналисты - по 1 очку.
-    if (cup === "C") {
-      if (
-        position === CupPosition.WINNER ||
-        position === CupPosition.RUNNER_UP
-      ) {
-        // Финалисты кубка С получают +2 очка
-        return qualifyingPoints + 2;
-      } else if (
-        position === CupPosition.ROUND_OF_4 ||
-        position === CupPosition.THIRD_PLACE
-      ) {
-        // Полуфиналисты кубка С получают +1 очко
-        return qualifyingPoints + 1;
-      } else {
-        return qualifyingPoints;
-      }
+/**
+ * Расчет очков для Кубка С (утешительный турнир)
+ * ПРАВИЛО 3: квалификационные очки + бонус за позицию
+ */
+function calculateCupCPoints(
+  qualifyingPoints: number,
+  position: CupPosition
+): number {
+  if (position === CupPosition.WINNER || position === CupPosition.RUNNER_UP) {
+    // Финалисты кубка С: +2 очка к квалификационным
+    return qualifyingPoints + 2;
+  } else if (
+    position === CupPosition.ROUND_OF_4 ||
+    position === CupPosition.THIRD_PLACE
+  ) {
+    // Полуфиналисты кубка С: +1 очко к квалификационным
+    return qualifyingPoints + 1;
+  } else {
+    // Остальные позиции: только квалификационные очки
+    return qualifyingPoints;
+  }
+}
+
+/**
+ * Расчет очков для Кубков А и Б по таблицам
+ * ПРАВИЛА 2 и 4
+ *
+ * Если для позиции нет очков в таблице, возвращаются квалификационные очки
+ */
+function calculateCupABPoints(
+  category: TournamentCategoryEnum,
+  cup: Cup,
+  position: CupPosition,
+  totalTeams: number,
+  qualifyingPoints: number
+): number {
+  // Определяем диапазон количества команд для выбора таблицы
+  const teamsRange = getTeamsRange(totalTeams);
+  const key: CupPointsKey = `${category}-${cup}-${teamsRange}`;
+
+  const cupPointsMap = CUP_POINTS.get(key);
+
+  if (!cupPointsMap) {
+    throw new Error(
+      `Рассчет очков: ❌ Не найдена конфигурация очков для кубка ${cup} категории ${category} с ${totalTeams} командами (ключ: ${key})`
+    );
+  }
+
+  // ПРАВИЛО 2: Специальная логика для 3 места в кубке A турниров 1 категории
+  if (position === CupPosition.THIRD_PLACE) {
+    const semiFinalPoints = cupPointsMap.get(CupPosition.ROUND_OF_4);
+    if (semiFinalPoints === undefined) {
+      // Если нет очков за полуфинал в таблице, возвращаем квалификационные
+      return qualifyingPoints;
+    }
+    if (category === TournamentCategoryEnum.FEDERAL && cup === "A") {
+      // В кубке A категории 1: победитель за 3 место получает очки полуфинала +1
+      return semiFinalPoints + 1;
     } else {
-      // Кубки А и Б
-
-      // Определяем диапазон команд
-      let teamsRange: TeamsRange;
-      if (totalTeams <= 12) {
-        teamsRange = "8-12";
-      } else if (totalTeams <= 18) {
-        teamsRange = "13-18";
-      } else if (totalTeams <= 24) {
-        teamsRange = "19-24";
-      } else if (totalTeams <= 30) {
-        teamsRange = "25-30";
-      } else if (totalTeams <= 36) {
-        teamsRange = "31-36";
-      } else {
-        teamsRange = "36+";
-      }
-
-      const key: CupPointsKey = `${category}-${cup}-${teamsRange}`;
-
-      const cupPointsMap = CUP_POINTS.get(key);
-
-      if (!cupPointsMap) {
-        throw new Error(
-          `Рассчет очков: ❌ Не найдена конфигурация очков для кубка ${cup} категории ${category} с ${totalTeams} командами (ключ: ${key})`
-        );
-      }
-
-      // Специальная логика для 3 места в кубке A турниров 1 категории
-      if (position === CupPosition.THIRD_PLACE) {
-        const semiFinalPoints = cupPointsMap.get(CupPosition.ROUND_OF_4);
-        if (semiFinalPoints === undefined) {
-          throw new Error(
-            `Рассчет очков: Не найдены очки за полуфинал для кубка ${cup}`
-          );
-        }
-        if (category === TournamentCategoryEnum.FEDERAL && cup === "A") {
-          return semiFinalPoints + 1;
-        } else {
-          return semiFinalPoints;
-        }
-      } else {
-        const points = cupPointsMap.get(position);
-        if (points === undefined) {
-          throw new Error(
-            `Рассчет очков: Не найдены очки для позиции ${position} в кубке ${cup}`
-          );
-        }
-        return points;
-      }
+      // В остальных случаях: очки полуфинала
+      return semiFinalPoints;
     }
+  }
+
+  // ПРАВИЛО 4: Получаем очки из таблицы для данной позиции
+  const points = cupPointsMap.get(position);
+  if (points === undefined) {
+    // Если для позиции нет очков в таблице, возвращаем квалификационные
+    return qualifyingPoints;
+  }
+  return points;
+}
+
+/**
+ * Определяет диапазон количества команд для выбора таблицы очков
+ */
+function getTeamsRange(totalTeams: number): TeamsRange {
+  if (totalTeams <= 12) {
+    return "8-12";
+  } else if (totalTeams <= 18) {
+    return "13-18";
+  } else if (totalTeams <= 24) {
+    return "19-24";
+  } else if (totalTeams <= 30) {
+    return "25-30";
+  } else if (totalTeams <= 36) {
+    return "31-36";
+  } else {
+    return "36+";
   }
 }
 
