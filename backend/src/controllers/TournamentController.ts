@@ -662,6 +662,11 @@ export class TournamentController {
 
           const results = teamResults.get(team.orderNum);
           if (!results) {
+            console.log(
+              `Не найдены результаты для команды #${generateTeamDescription(
+                team
+              )}`
+            );
             throw new Error("Не может такого быть ))");
           }
 

@@ -19,6 +19,7 @@ export function parseCupValue(value: string): Cup | null {
     case "А": // Кириллица А
       return "A";
     case "Б": // Кириллица Б
+    case "В": // Кириллица В
       return "B";
     case "С": // Кириллица С
       return "C";
