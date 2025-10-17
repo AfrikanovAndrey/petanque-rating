@@ -17,7 +17,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="flex justify-end">
           <Link
             to="/admin"
-            className="text-sm text-gray-600 hover:text-primary-600 font-medium transition-colors duration-200"
+            className="text-xs sm:text-sm text-gray-600 hover:text-primary-600 font-medium transition-colors duration-200"
           >
             Админ панель →
           </Link>
@@ -25,15 +25,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+      <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 pb-8">
         {children}
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <footer className="bg-white border-t border-gray-200 mt-8 sm:mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center text-gray-500">
-            <p className="text-sm">
+            <p className="text-xs sm:text-sm">
               © {new Date().getFullYear()} Система рейтинга игроков в петанк.
             </p>
             <p className="text-xs mt-2">
