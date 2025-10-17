@@ -17,7 +17,7 @@ export function normalizeName(name: string): string {
   return name
     .toLowerCase()
     .replace(/,/g, "") // убираем запятые
-    .replace(/ё/g, "е") // меняем буквы ё на е
+    .replace(/[ёë]/g, "е") // меняем буквы ё на е
     .replace(/\s+/g, " ") // заменяем множественные пробелы на одинарные
     .replace(/[*.]/g, " ") // заменяем дефисы и точки на пробелы
     .replace(/\(.+\)/g, "") // убираем текст в скобках. Пример: (юн) / (юниор)
