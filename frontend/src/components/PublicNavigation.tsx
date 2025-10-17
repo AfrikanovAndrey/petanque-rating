@@ -50,7 +50,7 @@ const PublicNavigation: React.FC = () => {
                   key={item.name}
                   to={item.href}
                   className={cn(
-                    "inline-flex items-center px-1 pt-1 border-b-2 text-xs md:text-sm font-medium transition-colors duration-200",
+                    "inline-flex items-center px-1 py-1 pt-1 border-b-2 text-xs md:text-sm font-medium transition-colors duration-200",
                     item.current
                       ? "border-primary-500 text-gray-900"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
