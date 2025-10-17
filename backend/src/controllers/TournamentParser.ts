@@ -1,8 +1,8 @@
 import * as XLSX from "xlsx";
 import { PlayerModel } from "../models/PlayerModel";
 import { Cup, CupPosition, Player, StageWithCells } from "../types";
+import { parseCupPosition, parseCupValue } from "../utils/cupValidators";
 import ExcelUtils from "../utils/excelUtils";
-import { parseCupValue, parseCupPosition } from "../utils/cupValidators";
 
 const COMMAND_HEADER = "Команда";
 export const REGISTRATION_LIST = "Регистрация";
@@ -658,11 +658,16 @@ export class TournamentParser {
               // Игра за третье место может отсутствовать
               if (stageInfo.position == CupPosition.THIRD_PLACE) {
                 continue;
-              } else {
-                errors.push(
-                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
-                );
               }
+
+              // Игроков может не хватать для полной сетки, и могут быть пустые ячейки
+              if (stageInfo.position == CupPosition.ROUND_OF_4) {
+                continue;
+              }
+
+              errors.push(
+                `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+              );
             } else {
               const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
               player = await this.detectPlayer(playerName);
@@ -754,11 +759,16 @@ export class TournamentParser {
               // Игра за третье место может отсутствовать
               if (stageInfo.position == CupPosition.THIRD_PLACE) {
                 continue;
-              } else {
-                errors.push(
-                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
-                );
               }
+
+              // Игроков может не хватать для полной сетки, и могут быть пустые ячейки
+              if (stageInfo.position == CupPosition.ROUND_OF_8) {
+                continue;
+              }
+
+              errors.push(
+                `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+              );
             } else {
               const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
               player = await this.detectPlayer(playerName);
@@ -873,11 +883,16 @@ export class TournamentParser {
               // Игра за третье место может отсутствовать
               if (stageInfo.position == CupPosition.THIRD_PLACE) {
                 continue;
-              } else {
-                errors.push(
-                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
-                );
               }
+
+              // Игроков может не хватать для полной сетки, и могут быть пустые ячейки
+              if (stageInfo.position == CupPosition.ROUND_OF_16) {
+                continue;
+              }
+
+              errors.push(
+                `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+              );
             } else {
               const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
               player = await this.detectPlayer(playerName);
