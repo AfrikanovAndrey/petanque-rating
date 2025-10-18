@@ -33,6 +33,7 @@ export interface Tournament {
   type: TournamentType;
   category: TournamentCategory;
   date: string;
+  manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
   created_at: string;
   updated_at: string;
   teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров

@@ -61,12 +61,13 @@ export class TournamentModel {
     type: TournamentType,
     category: TournamentCategoryEnum,
     date: string,
+    manual: boolean = false,
     connection?: PoolConnection
   ): Promise<number> {
     const executor = connection || pool;
     const [result] = await executor.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, type, category, date) VALUES (?, ?, ?, ?)",
-      [name, type, TournamentCategoryEnum[category], date]
+      "INSERT INTO tournaments (name, type, category, date, manual) VALUES (?, ?, ?, ?, ?)",
+      [name, type, TournamentCategoryEnum[category], date, manual]
     );
     return result.insertId;
   }
@@ -76,7 +77,8 @@ export class TournamentModel {
     name?: string,
     type?: TournamentType,
     category?: TournamentCategoryEnum,
-    date?: string
+    date?: string,
+    manual?: boolean
   ): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
@@ -96,6 +98,10 @@ export class TournamentModel {
     if (date !== undefined) {
       updates.push("date = ?");
       values.push(date);
+    }
+    if (manual !== undefined) {
+      updates.push("manual = ?");
+      values.push(manual);
     }
 
     if (updates.length === 0) {
@@ -217,6 +223,14 @@ export class TournamentModel {
       throw new Error(`Турнир с ID ${tournamentId} не найден`);
     }
 
+    // Пропускаем турниры с ручным вводом данных
+    if (tournament.manual) {
+      console.log(
+        `⏭️  Пропускаю турнир #${tournamentId} "${tournament.name}" - результаты введены вручную`
+      );
+      return;
+    }
+
     // Получаем все результаты турнира
     const [resultsRows] = await pool.execute<RowDataPacket[]>(
       `
@@ -254,29 +268,24 @@ export class TournamentModel {
       switch (result.cup_position) {
         case "1":
         case "WINNER":
-        case "CUP_WINNER":
           cupPosition = CupPosition.WINNER;
           break;
         case "2":
         case "RUNNER_UP":
-        case "CUP_RUNNER_UP":
           cupPosition = CupPosition.RUNNER_UP;
           break;
         case "3":
         case "THIRD_PLACE":
-        case "CUP_THIRD_PLACE":
           cupPosition = CupPosition.THIRD_PLACE;
           break;
         case "1/2":
         case "SEMI_FINAL":
         case "ROUND_OF_4":
-        case "CUP_SEMI_FINAL":
           cupPosition = CupPosition.ROUND_OF_4;
           break;
         case "1/4":
         case "QUARTER_FINAL":
         case "ROUND_OF_8":
-        case "CUP_QUARTER_FINAL":
           cupPosition = CupPosition.ROUND_OF_8;
           break;
         case "1/8":
@@ -307,7 +316,7 @@ export class TournamentModel {
 
   /**
    * Получить эффективное количество команд для расчёта очков
-   * Если в один день прошли DOUBLETTE_MALE и DOUBLETTE_FEMALE, суммируем команды
+   * Если в один день прошли DOUBLETTE_MALE и DOUBLETTE_FEMALE, или TET_A_TET_MALE и TET_A_TET_FEMALE, суммируем команды
    */
   static async getEffectiveTeamsCount(
     tournamentId: number,
@@ -318,20 +327,33 @@ export class TournamentModel {
     const currentTournamentTeams =
       await TournamentModel.getTournamentTeamsCount(tournamentId);
 
-    // Проверяем, является ли турнир DOUBLETTE_MALE или DOUBLETTE_FEMALE
-    if (
-      tournamentType !== TournamentType.DOUBLETTE_MALE &&
-      tournamentType !== TournamentType.DOUBLETTE_FEMALE
-    ) {
+    // Проверяем, является ли турнир DOUBLETTE_MALE/FEMALE или TET_A_TET_MALE/FEMALE
+    const isDoublette =
+      tournamentType === TournamentType.DOUBLETTE_MALE ||
+      tournamentType === TournamentType.DOUBLETTE_FEMALE;
+
+    const isTetATet =
+      tournamentType === TournamentType.TET_A_TET_MALE ||
+      tournamentType === TournamentType.TET_A_TET_FEMALE;
+
+    if (!isDoublette && !isTetATet) {
       // Для других типов турниров просто возвращаем количество команд
       return currentTournamentTeams;
     }
 
-    // Ищем парный турнир в тот же день
-    const pairType =
-      tournamentType === TournamentType.DOUBLETTE_MALE
-        ? TournamentType.DOUBLETTE_FEMALE
-        : TournamentType.DOUBLETTE_MALE;
+    // Определяем парный тип турнира
+    let pairType: TournamentType;
+    if (isDoublette) {
+      pairType =
+        tournamentType === TournamentType.DOUBLETTE_MALE
+          ? TournamentType.DOUBLETTE_FEMALE
+          : TournamentType.DOUBLETTE_MALE;
+    } else {
+      pairType =
+        tournamentType === TournamentType.TET_A_TET_MALE
+          ? TournamentType.TET_A_TET_FEMALE
+          : TournamentType.TET_A_TET_MALE;
+    }
 
     const [pairTournaments] = await pool.execute<RowDataPacket[]>(
       `SELECT id FROM tournaments 
@@ -364,27 +386,46 @@ export class TournamentModel {
 
     // Получаем все турниры
     const [tournamentRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT id, name FROM tournaments ORDER BY id"
+      "SELECT id, name, manual FROM tournaments ORDER BY id"
     );
 
     console.log(`📊 Найдено ${tournamentRows.length} турниров для пересчета`);
 
+    let skippedCount = 0;
+    let processedCount = 0;
+
     for (const tournamentRow of tournamentRows) {
-      const tournament = tournamentRow as { id: number; name: string };
+      const tournament = tournamentRow as {
+        id: number;
+        name: string;
+        manual: boolean;
+      };
 
       console.log(
         `\n📝 Обрабатываю турнир ID ${tournament.id}: "${tournament.name}"`
       );
 
+      // Пропускаем турниры с ручным вводом
+      if (tournament.manual) {
+        console.log(
+          `   ⏭️  Пропускаю турнир "${tournament.name}" - результаты введены вручную`
+        );
+        skippedCount++;
+        continue;
+      }
+
       // Используем централизованную функцию пересчёта для каждого турнира
       await TournamentModel.recalculateTournamentPoints(tournament.id);
+      processedCount++;
 
       console.log(
         `   ✅ Пересчет очков для турнира "${tournament.name}" завершен`
       );
     }
 
-    console.log(`\n🎉 Пересчет очков для всех турниров успешно завершен!`);
+    console.log(
+      `\n🎉 Пересчет очков завершен! Обработано: ${processedCount}, пропущено: ${skippedCount}`
+    );
   }
 
   static async getTournamentWithResults(id: number): Promise<{

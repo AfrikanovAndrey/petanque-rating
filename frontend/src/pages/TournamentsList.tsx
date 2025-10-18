@@ -102,32 +102,34 @@ const TournamentsList: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Заголовок */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Турниры</h1>
-        <p className="text-gray-600">
+      <div className="text-center px-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+          Турниры
+        </h1>
+        <p className="text-sm sm:text-base text-gray-600">
           История турниров с детальными результатами
         </p>
       </div>
 
       {/* Статистика */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="text-center">
-            <TrophyIcon className="h-8 w-8 text-primary-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900">
+            <TrophyIcon className="h-6 w-6 sm:h-8 sm:w-8 text-primary-600 mx-auto mb-2" />
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">
               {tournaments?.length || 0}
             </p>
-            <p className="text-sm text-gray-500">Всего турниров</p>
+            <p className="text-xs sm:text-sm text-gray-500">Всего турниров</p>
           </div>
           <div className="text-center">
-            <CalendarIcon className="h-8 w-8 text-green-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-gray-900">
+            <CalendarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 mx-auto mb-2" />
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">
               {tournaments?.filter(
                 (t) =>
                   new Date(t.date).getFullYear() === new Date().getFullYear()
               ).length || 0}
             </p>
-            <p className="text-sm text-gray-500">В этом году</p>
+            <p className="text-xs sm:text-sm text-gray-500">В этом году</p>
           </div>
         </div>
       </div>
@@ -150,32 +152,32 @@ const TournamentsList: React.FC = () => {
                 >
                   {/* Заголовок турнира */}
                   <div
-                    className="p-6 cursor-pointer"
+                    className="p-4 sm:p-6 cursor-pointer"
                     onClick={() => handleToggleExpand(tournament.id)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center mb-1">
-                          <h3 className="text-lg font-semibold text-gray-900">
+                    <div className="flex items-start sm:items-center justify-between">
+                      <div className="flex-1 min-w-0 mr-2">
+                        <div className="flex items-center mb-1 flex-wrap gap-1">
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
                             {tournament.name}
                           </h3>
                           {getTournamentTypeIcons(tournament.type)}
                         </div>
-                        <div className="flex items-center text-sm text-gray-500 space-x-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center text-xs sm:text-sm text-gray-500 gap-1 sm:gap-4">
                           <div className="flex items-center">
-                            <CalendarIcon className="h-4 w-4 mr-1" />
+                            <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                             {formatDate(tournament.date)}
                           </div>
                           <div className="flex items-center">
                             {getTornamentCategoryText(tournament.category)}
                           </div>
                           <div className="flex items-center">
-                            <UsersIcon className="h-4 w-4 mr-1" />
+                            <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                             Команд: {tournament.teams_count ?? 0}
                           </div>
                         </div>
                       </div>
-                      <div className="ml-4">
+                      <div className="flex-shrink-0">
                         {isExpanded ? (
                           <ChevronUpIcon className="h-5 w-5 text-gray-400" />
                         ) : (
@@ -187,7 +189,7 @@ const TournamentsList: React.FC = () => {
 
                   {/* Результаты турнира */}
                   {isExpanded && (
-                    <div className="border-t border-gray-200 px-6 pb-6">
+                    <div className="border-t border-gray-200 px-4 sm:px-6 pb-4 sm:pb-6">
                       {details ? (
                         <div className="pt-4">
                           {(() => {
@@ -208,11 +210,12 @@ const TournamentsList: React.FC = () => {
                               return (
                                 <div key={cupTitle} className="mb-6">
                                   <div className="mb-4">
-                                    <h4 className="text-md font-medium text-gray-900">
+                                    <h4 className="text-sm sm:text-md font-medium text-gray-900">
                                       {cupTitle}
                                     </h4>
                                   </div>
-                                  <div className="overflow-x-auto">
+                                  {/* Таблица для десктопа */}
+                                  <div className="hidden sm:block overflow-x-auto">
                                     <table className="min-w-full">
                                       <thead className="bg-gray-50">
                                         <tr>
@@ -266,6 +269,40 @@ const TournamentsList: React.FC = () => {
                                       </tbody>
                                     </table>
                                   </div>
+                                  {/* Карточки для мобильных */}
+                                  <div className="sm:hidden space-y-2">
+                                    {results.map((result: TournamentResult) => {
+                                      const isTopPosition = [
+                                        "WINNER",
+                                        "RUNNER_UP",
+                                        "THIRD_PLACE",
+                                      ].includes(result.cup_position);
+                                      return (
+                                        <div
+                                          key={result.id}
+                                          className={`p-3 rounded-lg border ${
+                                            isTopPosition
+                                              ? "bg-gradient-to-r from-yellow-50 to-transparent border-yellow-200"
+                                              : "bg-white border-gray-200"
+                                          }`}
+                                        >
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <div className="text-sm font-medium text-gray-900 mb-1">
+                                                {getPositionBadge(
+                                                  result.cup_position || "",
+                                                  result.cup
+                                                )}
+                                              </div>
+                                              <div className="text-sm font-semibold text-gray-900 break-words">
+                                                {result.team_players}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               );
                             };
@@ -281,7 +318,7 @@ const TournamentsList: React.FC = () => {
                       ) : (
                         <div className="pt-4 text-center">
                           <div className="animate-spin h-6 w-6 border-2 border-primary-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-xs sm:text-sm text-gray-600">
                             Загрузка результатов...
                           </p>
                         </div>
