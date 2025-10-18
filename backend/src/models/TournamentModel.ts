@@ -316,7 +316,7 @@ export class TournamentModel {
 
   /**
    * Получить эффективное количество команд для расчёта очков
-   * Если в один день прошли DOUBLETTE_MALE и DOUBLETTE_FEMALE, суммируем команды
+   * Если в один день прошли DOUBLETTE_MALE и DOUBLETTE_FEMALE, или TET_A_TET_MALE и TET_A_TET_FEMALE, суммируем команды
    */
   static async getEffectiveTeamsCount(
     tournamentId: number,
@@ -327,20 +327,33 @@ export class TournamentModel {
     const currentTournamentTeams =
       await TournamentModel.getTournamentTeamsCount(tournamentId);
 
-    // Проверяем, является ли турнир DOUBLETTE_MALE или DOUBLETTE_FEMALE
-    if (
-      tournamentType !== TournamentType.DOUBLETTE_MALE &&
-      tournamentType !== TournamentType.DOUBLETTE_FEMALE
-    ) {
+    // Проверяем, является ли турнир DOUBLETTE_MALE/FEMALE или TET_A_TET_MALE/FEMALE
+    const isDoublette =
+      tournamentType === TournamentType.DOUBLETTE_MALE ||
+      tournamentType === TournamentType.DOUBLETTE_FEMALE;
+
+    const isTetATet =
+      tournamentType === TournamentType.TET_A_TET_MALE ||
+      tournamentType === TournamentType.TET_A_TET_FEMALE;
+
+    if (!isDoublette && !isTetATet) {
       // Для других типов турниров просто возвращаем количество команд
       return currentTournamentTeams;
     }
 
-    // Ищем парный турнир в тот же день
-    const pairType =
-      tournamentType === TournamentType.DOUBLETTE_MALE
-        ? TournamentType.DOUBLETTE_FEMALE
-        : TournamentType.DOUBLETTE_MALE;
+    // Определяем парный тип турнира
+    let pairType: TournamentType;
+    if (isDoublette) {
+      pairType =
+        tournamentType === TournamentType.DOUBLETTE_MALE
+          ? TournamentType.DOUBLETTE_FEMALE
+          : TournamentType.DOUBLETTE_MALE;
+    } else {
+      pairType =
+        tournamentType === TournamentType.TET_A_TET_MALE
+          ? TournamentType.TET_A_TET_FEMALE
+          : TournamentType.TET_A_TET_MALE;
+    }
 
     const [pairTournaments] = await pool.execute<RowDataPacket[]>(
       `SELECT id FROM tournaments 

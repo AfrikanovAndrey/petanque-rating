@@ -43,27 +43,40 @@ export class TournamentController {
 
   /**
    * Получить эффективное количество команд для расчёта очков при загрузке турнира
-   * Если в этот день уже есть парный турнир (DOUBLETTE_MALE/FEMALE), суммируем команды
+   * Если в этот день уже есть парный турнир (DOUBLETTE_MALE/FEMALE или TET_A_TET_MALE/FEMALE), суммируем команды
    */
   private static async getEffectiveTeamsCountForNewTournament(
     tournamentDate: string,
     tournamentType: TournamentType,
     currentTeamsCount: number
   ): Promise<number> {
-    // Проверяем, является ли турнир DOUBLETTE_MALE или DOUBLETTE_FEMALE
-    if (
-      tournamentType !== TournamentType.DOUBLETTE_MALE &&
-      tournamentType !== TournamentType.DOUBLETTE_FEMALE
-    ) {
+    // Проверяем, является ли турнир DOUBLETTE_MALE/FEMALE или TET_A_TET_MALE/FEMALE
+    const isDoublette =
+      tournamentType === TournamentType.DOUBLETTE_MALE ||
+      tournamentType === TournamentType.DOUBLETTE_FEMALE;
+
+    const isTetATet =
+      tournamentType === TournamentType.TET_A_TET_MALE ||
+      tournamentType === TournamentType.TET_A_TET_FEMALE;
+
+    if (!isDoublette && !isTetATet) {
       // Для других типов турниров просто возвращаем количество команд
       return currentTeamsCount;
     }
 
-    // Ищем парный турнир в тот же день
-    const pairType =
-      tournamentType === TournamentType.DOUBLETTE_MALE
-        ? TournamentType.DOUBLETTE_FEMALE
-        : TournamentType.DOUBLETTE_MALE;
+    // Определяем парный тип турнира
+    let pairType: TournamentType;
+    if (isDoublette) {
+      pairType =
+        tournamentType === TournamentType.DOUBLETTE_MALE
+          ? TournamentType.DOUBLETTE_FEMALE
+          : TournamentType.DOUBLETTE_MALE;
+    } else {
+      pairType =
+        tournamentType === TournamentType.TET_A_TET_MALE
+          ? TournamentType.TET_A_TET_FEMALE
+          : TournamentType.TET_A_TET_MALE;
+    }
 
     const [pairTournaments] = await pool.execute<any[]>(
       `SELECT id FROM tournaments WHERE date = ? AND type = ?`,
@@ -700,21 +713,33 @@ export class TournamentController {
         await connection.commit();
         console.log("✅ Транзакция успешно завершена");
 
-        // Если это DOUBLETTE турнир и найден парный турнир, нужно пересчитать его очки
-        if (
-          (tournamentType === TournamentType.DOUBLETTE_MALE ||
-            tournamentType === TournamentType.DOUBLETTE_FEMALE) &&
-          effectiveTeamsCount > teams.length
-        ) {
+        // Если это DOUBLETTE или TET-A-TET турнир и найден парный турнир, нужно пересчитать его очки
+        const isDoublette =
+          tournamentType === TournamentType.DOUBLETTE_MALE ||
+          tournamentType === TournamentType.DOUBLETTE_FEMALE;
+
+        const isTetATet =
+          tournamentType === TournamentType.TET_A_TET_MALE ||
+          tournamentType === TournamentType.TET_A_TET_FEMALE;
+
+        if ((isDoublette || isTetATet) && effectiveTeamsCount > teams.length) {
           console.log(
             "🔄 Пересчитываем очки для парного турнира с учётом нового турнира..."
           );
 
           // Находим парный турнир
-          const pairType =
-            tournamentType === TournamentType.DOUBLETTE_MALE
-              ? TournamentType.DOUBLETTE_FEMALE
-              : TournamentType.DOUBLETTE_MALE;
+          let pairType: TournamentType;
+          if (isDoublette) {
+            pairType =
+              tournamentType === TournamentType.DOUBLETTE_MALE
+                ? TournamentType.DOUBLETTE_FEMALE
+                : TournamentType.DOUBLETTE_MALE;
+          } else {
+            pairType =
+              tournamentType === TournamentType.TET_A_TET_MALE
+                ? TournamentType.TET_A_TET_FEMALE
+                : TournamentType.TET_A_TET_MALE;
+          }
 
           const [pairTournaments] = await pool.execute<any[]>(
             `SELECT id FROM tournaments WHERE date = ? AND type = ? AND id != ?`,
