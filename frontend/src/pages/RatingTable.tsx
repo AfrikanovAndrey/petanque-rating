@@ -431,13 +431,6 @@ const RatingTable: React.FC = () => {
                                                 </span>
                                               </div>
                                             </div>
-                                            <div className="flex items-center">
-                                              {result.is_counted && (
-                                                <div className="badge badge-primary">
-                                                  Засчитано
-                                                </div>
-                                              )}
-                                            </div>
                                           </div>
                                         ))}
                                     </div>
@@ -563,11 +556,12 @@ const RatingTable: React.FC = () => {
                                         >
                                           {result.points}
                                         </span>
-                                        {result.is_counted && (
-                                          <span className="badge badge-primary text-xs">
-                                            Засчитано
-                                          </span>
-                                        )}
+                                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                                          {getCupPositionText(
+                                            result.cup_position || "",
+                                            result.cup
+                                          ) || "Квалификация"}
+                                        </span>
                                       </div>
                                       <div className="text-sm font-medium text-gray-900 flex items-center gap-1 flex-wrap">
                                         <span>{result.tournament_name}</span>
@@ -584,14 +578,7 @@ const RatingTable: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="space-y-1 text-xs text-gray-600">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
-                                        {getCupPositionText(
-                                          result.cup_position || "",
-                                          result.cup
-                                        ) || "Квалификация"}
-                                      </span>
-                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap"></div>
                                     <div>Команда: {result.team_players}</div>
                                     <div>
                                       Win Rate:{" "}
