@@ -1,6 +1,7 @@
 import {
   ChevronDownIcon,
   ChevronRightIcon,
+  InformationCircleIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -13,15 +14,46 @@ import { getTournamentTypeIcons } from "../utils/tournamentIcons";
 
 type RatingViewType = "male" | "female";
 
+// Компонент всплывающей подсказки
+const Tooltip: React.FC<{ children: React.ReactNode; text: string }> = ({
+  children,
+  text,
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+        className="cursor-help"
+      >
+        {children}
+      </div>
+      {isVisible && (
+        <div className="absolute z-10 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg top-full left-1/2 transform -translate-x-1/2 mt-2 whitespace-nowrap normal-case">
+          {text}
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Функция для расчета win rate
 const calculateWinRate = (
-  results: { wins?: number; loses?: number }[]
+  results: { wins?: number; loses?: number; tournament_manual?: boolean }[]
 ): number => {
-  const totalWins = results.reduce(
+  // Фильтруем только турниры без manual режима
+  const nonManualResults = results.filter(
+    (result) => !result.tournament_manual
+  );
+
+  const totalWins = nonManualResults.reduce(
     (sum, result) => sum + (result.wins || 0),
     0
   );
-  const totalLoses = results.reduce(
+  const totalLoses = nonManualResults.reduce(
     (sum, result) => sum + (result.loses || 0),
     0
   );
@@ -266,7 +298,12 @@ const RatingTable: React.FC = () => {
                       Турниры
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Win Rate
+                      <div className="flex items-center gap-1">
+                        Win Rate
+                        <Tooltip text="Отношение выигранных матчей к общему количеству">
+                          <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                        </Tooltip>
+                      </div>
                     </th>
                     <th className="w-12"></th>
                   </tr>
@@ -324,26 +361,41 @@ const RatingTable: React.FC = () => {
                               {player.all_results.length}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              <span className="font-medium">
-                                {calculateWinRate(player.all_results).toFixed(
-                                  1
-                                )}
-                                %
-                              </span>
-                              <span className="text-gray-500 ml-1">
-                                (
-                                {player.all_results.reduce(
+                              {(() => {
+                                const nonManualResults =
+                                  player.all_results.filter(
+                                    (result) => !result.tournament_manual
+                                  );
+                                const totalWins = nonManualResults.reduce(
                                   (sum, r) => sum + (r.wins || 0),
                                   0
-                                )}
-                                /
-                                {player.all_results.reduce(
+                                );
+                                const totalGames = nonManualResults.reduce(
                                   (sum, r) =>
                                     sum + (r.wins || 0) + (r.loses || 0),
                                   0
-                                )}
-                                )
-                              </span>
+                                );
+
+                                if (totalGames === 0) {
+                                  return (
+                                    <span className="text-gray-400">—</span>
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    <span className="font-medium">
+                                      {calculateWinRate(
+                                        player.all_results
+                                      ).toFixed(1)}
+                                      %
+                                    </span>
+                                    <span className="text-gray-500 ml-1">
+                                      ({totalWins}/{totalGames})
+                                    </span>
+                                  </>
+                                );
+                              })()}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               {isExpanded ? (
@@ -409,27 +461,29 @@ const RatingTable: React.FC = () => {
                                               <div className="text-sm text-gray-500">
                                                 Команда: {result.team_players}
                                               </div>
-                                              <div className="text-sm text-gray-500 mt-1">
-                                                Win Rate:{" "}
-                                                {(result.wins || 0) +
-                                                  (result.loses || 0) >
-                                                0
-                                                  ? (
-                                                      ((result.wins || 0) /
-                                                        ((result.wins || 0) +
-                                                          (result.loses ||
-                                                            0))) *
-                                                      100
-                                                    ).toFixed(1)
-                                                  : "0.0"}
-                                                %
-                                                <span className="text-gray-500 ml-1">
-                                                  ({result.wins || 0}/
+                                              {!result.tournament_manual && (
+                                                <div className="text-sm text-gray-500 mt-1">
+                                                  Win Rate:{" "}
                                                   {(result.wins || 0) +
-                                                    (result.loses || 0)}
-                                                  )
-                                                </span>
-                                              </div>
+                                                    (result.loses || 0) >
+                                                  0
+                                                    ? (
+                                                        ((result.wins || 0) /
+                                                          ((result.wins || 0) +
+                                                            (result.loses ||
+                                                              0))) *
+                                                        100
+                                                      ).toFixed(1)
+                                                    : "0.0"}
+                                                  %
+                                                  <span className="text-gray-500 ml-1">
+                                                    ({result.wins || 0}/
+                                                    {(result.wins || 0) +
+                                                      (result.loses || 0)}
+                                                    )
+                                                  </span>
+                                                </div>
+                                              )}
                                             </div>
                                           </div>
                                         ))}
@@ -460,11 +514,15 @@ const RatingTable: React.FC = () => {
                   player.player_id ||
                   `licensed_${player.licensed_name || player.player_name}`;
                 const winRate = calculateWinRate(player.all_results);
-                const totalWins = player.all_results.reduce(
+                // Фильтруем только турниры без manual режима для подсчета статистики
+                const nonManualResults = player.all_results.filter(
+                  (result) => !result.tournament_manual
+                );
+                const totalWins = nonManualResults.reduce(
                   (sum, r) => sum + (r.wins || 0),
                   0
                 );
-                const totalGames = player.all_results.reduce(
+                const totalGames = nonManualResults.reduce(
                   (sum, r) => sum + (r.wins || 0) + (r.loses || 0),
                   0
                 );
@@ -502,11 +560,15 @@ const RatingTable: React.FC = () => {
                             </h3>
                             <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
                               <span>Турниры: {player.all_results.length}</span>
-                              <span>•</span>
-                              <span>
-                                Win Rate: {winRate.toFixed(1)}% ({totalWins}/
-                                {totalGames})
-                              </span>
+                              {totalGames > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span>
+                                    Win Rate: {winRate.toFixed(1)}% ({totalWins}
+                                    /{totalGames})
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -580,22 +642,25 @@ const RatingTable: React.FC = () => {
                                   <div className="space-y-1 text-xs text-gray-600">
                                     <div className="flex items-center gap-2 flex-wrap"></div>
                                     <div>Команда: {result.team_players}</div>
-                                    <div>
-                                      Win Rate:{" "}
-                                      {(result.wins || 0) +
-                                        (result.loses || 0) >
-                                      0
-                                        ? (
-                                            ((result.wins || 0) /
-                                              ((result.wins || 0) +
-                                                (result.loses || 0))) *
-                                            100
-                                          ).toFixed(1)
-                                        : "0.0"}
-                                      % ({result.wins || 0}/
-                                      {(result.wins || 0) + (result.loses || 0)}
-                                      )
-                                    </div>
+                                    {!result.tournament_manual && (
+                                      <div>
+                                        Win Rate:{" "}
+                                        {(result.wins || 0) +
+                                          (result.loses || 0) >
+                                        0
+                                          ? (
+                                              ((result.wins || 0) /
+                                                ((result.wins || 0) +
+                                                  (result.loses || 0))) *
+                                              100
+                                            ).toFixed(1)
+                                          : "0.0"}
+                                        % ({result.wins || 0}/
+                                        {(result.wins || 0) +
+                                          (result.loses || 0)}
+                                        )
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}
