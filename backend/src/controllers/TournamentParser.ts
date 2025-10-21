@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { PlayerModel } from "../models/PlayerModel";
 import { Cup, CupPosition, Player, StageWithCells } from "../types";
+import { parseCupPosition, parseCupValue } from "../utils/cupValidators";
 import ExcelUtils from "../utils/excelUtils";
 
 const COMMAND_HEADER = "Команда";
@@ -9,13 +10,14 @@ export const SWISS_RESULTS_LIST = "Итоги швейцарки";
 export const GROUP_RESULTS_LIST_REGEXP = /группа [a-zа-я]/;
 export const BUTTING_MATCH_LIST = "Стык AB";
 export const BUTTING_MATCH_LIST_REGEXP = /стык [aа][bб]/;
+export const MANUAL_INPUT_LIST = "Ручной ввод";
 
 // Нормализация имени игрока для сравнения
 export function normalizeName(name: string): string {
   return name
     .toLowerCase()
     .replace(/,/g, "") // убираем запятые
-    .replace(/ё/g, "е") // меняем буквы ё на е
+    .replace(/[ёë]/g, "е") // меняем буквы ё на е
     .replace(/\s+/g, " ") // заменяем множественные пробелы на одинарные
     .replace(/[*.]/g, " ") // заменяем дефисы и точки на пробелы
     .replace(/\(.+\)/g, "") // убираем текст в скобках. Пример: (юн) / (юниор)
@@ -39,6 +41,14 @@ export type TeamPlayers = {
   players: Player[];
 };
 
+export type ManualInputTeam = {
+  orderNum: number;
+  players: Player[];
+  cup: string | null;
+  position: string | null;
+  points: number;
+};
+
 export function generateTeamDescription(team: TeamPlayers): string {
   return `Team #${team.orderNum + 1} (${team.players
     .map((player) => player.name)
@@ -51,6 +61,183 @@ export type TeamQualifyingResults = {
 };
 
 export class TournamentParser {
+  /**
+   * Парсинг листа "Ручной ввод" с результатами турнира
+   * @param workbook
+   * @returns массив команд с результатами
+   *
+   * Структура листа:
+   * Заголовки: Команда | Кубок | Позиция | Очки
+   * Пример: Африканов, Лямунов | A | 1/4 | 15
+   */
+  static async parseManualInputSheet(
+    workbook: XLSX.WorkBook
+  ): Promise<ManualInputTeam[]> {
+    console.log(`🖊️ Парсим лист "${MANUAL_INPUT_LIST}"`);
+
+    const sheet = ExcelUtils.findXlsSheet(workbook, MANUAL_INPUT_LIST);
+
+    if (!sheet) {
+      throw new Error(`Лист "${MANUAL_INPUT_LIST}" не найден`);
+    }
+
+    const errors: string[] = [];
+    const teams: ManualInputTeam[] = [];
+
+    // Ищем заголовки столбцов
+    const teamColumnCell = ExcelUtils.findCellByText(sheet, "Команда");
+    const cupColumnCell = ExcelUtils.findCellByText(sheet, "Кубок");
+    const positionColumnCell = ExcelUtils.findCellByText(sheet, "Позиция");
+    const pointsColumnCell = ExcelUtils.findCellByText(sheet, "Очки");
+
+    // Валидация заголовков
+    if (!teamColumnCell) {
+      errors.push('Не найден столбец "Команда"');
+    }
+    if (!cupColumnCell) {
+      errors.push('Не найден столбец "Кубок"');
+    }
+    if (!positionColumnCell) {
+      errors.push('Не найден столбец "Позиция"');
+    }
+    if (!pointsColumnCell) {
+      errors.push('Не найден столбец "Очки"');
+    }
+
+    if (errors.length > 0) {
+      throw new Error(
+        `#Ошибки на листе "${MANUAL_INPUT_LIST}"\n${errors.join("\n")}`
+      );
+    }
+
+    if (
+      teamColumnCell &&
+      cupColumnCell &&
+      positionColumnCell &&
+      pointsColumnCell
+    ) {
+      // Проходим по строкам с данными
+      let teamOrderNum = 0;
+      for (
+        let rowIndex = teamColumnCell.rowIndex + 1;
+        rowIndex < 1000;
+        rowIndex++
+      ) {
+        const teamCell = sheet[`${teamColumnCell.column}${rowIndex}`];
+
+        if (ExcelUtils.isCellEmpty(teamCell)) {
+          break; // Конец данных
+        }
+
+        // Парсим команду (список игроков через запятую)
+        const teamPlayersString = String(teamCell.v).trim();
+        const rawTeamPlayers: string[] = teamPlayersString.split(",");
+
+        const players: Player[] = [];
+        for (const rawTeamPlayer of rawTeamPlayers) {
+          const playerName = rawTeamPlayer.trim();
+          if (normalizeName(playerName) !== "") {
+            const foundedPlayer = await this.detectPlayer(playerName);
+            players.push(foundedPlayer);
+          }
+        }
+
+        if (players.length === 0) {
+          continue; // Пропускаем пустые команды
+        }
+
+        // Парсим кубок
+        const cupCell = sheet[`${cupColumnCell.column}${rowIndex}`];
+        let cup: Cup | null = null;
+
+        if (ExcelUtils.isCellEmpty(cupCell)) {
+          cup = null;
+        } else {
+          const cupValue = String(cupCell.v);
+          cup = parseCupValue(cupValue);
+          if (cup === null) {
+            errors.push(
+              `Строка ${rowIndex}: некорректное значение кубка: "${cupValue.trim()}". Ожидается A, B, C (латиница) или А, Б, С (кириллица)`
+            );
+          }
+        }
+
+        // Парсим позицию
+        const positionCell = sheet[`${positionColumnCell.column}${rowIndex}`];
+        let position: CupPosition | null = null;
+        if (ExcelUtils.isCellEmpty(positionCell)) {
+          position = null;
+        } else {
+          const positionValue = String(positionCell.v);
+          position = parseCupPosition(positionValue);
+          if (position === null) {
+            errors.push(
+              `Строка ${rowIndex}: некорректное значение позиции: "${positionValue.trim()}". Ожидается: 1, 2, 3, 1/2, 1/4, 1/8`
+            );
+          }
+        }
+
+        if ((cup && !position) || (!cup && position)) {
+          errors.push(
+            `Строка ${rowIndex}: некорректное значение кубка или позиции для команды`
+          );
+          continue;
+        }
+
+        // Парсим очки
+        const pointsCell = sheet[`${pointsColumnCell.column}${rowIndex}`];
+        if (ExcelUtils.isCellEmpty(pointsCell)) {
+          errors.push(`Строка ${rowIndex}: не указаны очки для команды`);
+          continue;
+        }
+        const points = Number(pointsCell.v);
+
+        if (points === null) {
+          errors.push(`Строка ${rowIndex}: не указаны очки для команды`);
+          continue;
+        }
+
+        // Создаем команду с результатами
+        teams.push({
+          orderNum: teamOrderNum,
+          players: players,
+          // Добавляем дополнительные поля для результатов (они будут использованы в TournamentController)
+          cup: cup,
+          position: position,
+          points: points,
+        });
+
+        console.log(
+          `✓ Команда #${teamOrderNum + 1}: [${players
+            .map((p) => p.name)
+            .join(", ")}], кубок: ${cup || "-"}, позиция: ${
+            position || "-"
+          }, очки: ${points}`
+        );
+
+        teamOrderNum++;
+      }
+
+      if (errors.length > 0) {
+        throw new Error(
+          `#Ошибки на листе "${MANUAL_INPUT_LIST}"\n${errors.join("\n")}`
+        );
+      }
+
+      if (teams.length === 0) {
+        throw new Error(
+          `На листе "${MANUAL_INPUT_LIST}" не найдено ни одной команды`
+        );
+      }
+    }
+
+    console.log(
+      `Найдено команд на листе "${MANUAL_INPUT_LIST}": ${teams.length}`
+    );
+
+    return teams;
+  }
+
   /**
    * Проверить игрока на наличие в составах команд с листа регистрации
    * @param player
@@ -471,11 +658,16 @@ export class TournamentParser {
               // Игра за третье место может отсутствовать
               if (stageInfo.position == CupPosition.THIRD_PLACE) {
                 continue;
-              } else {
-                errors.push(
-                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
-                );
               }
+
+              // Игроков может не хватать для полной сетки, и могут быть пустые ячейки
+              if (stageInfo.position == CupPosition.ROUND_OF_4) {
+                continue;
+              }
+
+              errors.push(
+                `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+              );
             } else {
               const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
               player = await this.detectPlayer(playerName);
@@ -567,11 +759,16 @@ export class TournamentParser {
               // Игра за третье место может отсутствовать
               if (stageInfo.position == CupPosition.THIRD_PLACE) {
                 continue;
-              } else {
-                errors.push(
-                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
-                );
               }
+
+              // Игроков может не хватать для полной сетки, и могут быть пустые ячейки
+              if (stageInfo.position == CupPosition.ROUND_OF_8) {
+                continue;
+              }
+
+              errors.push(
+                `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+              );
             } else {
               const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
               player = await this.detectPlayer(playerName);
@@ -686,11 +883,16 @@ export class TournamentParser {
               // Игра за третье место может отсутствовать
               if (stageInfo.position == CupPosition.THIRD_PLACE) {
                 continue;
-              } else {
-                errors.push(
-                  `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
-                );
               }
+
+              // Игроков может не хватать для полной сетки, и могут быть пустые ячейки
+              if (stageInfo.position == CupPosition.ROUND_OF_16) {
+                continue;
+              }
+
+              errors.push(
+                `Ячейка ${cellAddress} на листе "Кубок ${cup}" пустая или содержит некорректное значение`
+              );
             } else {
               const playerName = ExcelUtils.getCellText(worksheet[cellAddress]);
               player = await this.detectPlayer(playerName);

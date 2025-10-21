@@ -1,14 +1,13 @@
 import { Request, Response } from "express";
 import multer from "multer";
-import * as XLSX from "xlsx";
 import { RowDataPacket } from "mysql2/promise";
+import * as XLSX from "xlsx";
 import { pool } from "../config/database";
-import { TournamentModel } from "../models/TournamentModel";
-import { PlayerModel } from "../models/PlayerModel";
-import { SettingsModel } from "../models/SettingsModel";
 import { LicensedPlayerModel } from "../models/LicensedPlayerModel";
+import { PlayerModel } from "../models/PlayerModel";
+import { TournamentModel } from "../models/TournamentModel";
+import { LicensedPlayerUploadData, TournamentType } from "../types";
 import { TournamentController } from "./TournamentController";
-import { TournamentUploadData, LicensedPlayerUploadData } from "../types";
 
 // Настройка multer для загрузки файлов
 const storage = multer.memoryStorage();
@@ -320,10 +319,10 @@ export class AdminController {
         return;
       }
 
-      const { name, type, category, date } = req.body;
+      const { name, type, category, date, manual } = req.body;
 
       // Проверяем, что передан хотя бы один параметр для обновления
-      if (!name && !type && !category && !date) {
+      if (!name && !type && !category && !date && manual === undefined) {
         res.status(400).json({
           success: false,
           message: "Необходимо указать хотя бы один параметр для обновления",
@@ -348,7 +347,8 @@ export class AdminController {
         name,
         type,
         category,
-        date
+        date,
+        manual
       );
 
       if (success) {
@@ -384,9 +384,65 @@ export class AdminController {
         return;
       }
 
+      // Получаем информацию о турнире перед удалением
+      const [tournaments] = await pool.execute<RowDataPacket[]>(
+        "SELECT date, type FROM tournaments WHERE id = ?",
+        [tournamentId]
+      );
+
+      if (tournaments.length === 0) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      const tournamentDate = tournaments[0].date;
+      const tournamentType = tournaments[0].type as TournamentType;
+
       const success = await TournamentModel.deleteTournament(tournamentId);
 
       if (success) {
+        // Проверяем, нужно ли пересчитать парный турнир
+        const isDoublette =
+          tournamentType === TournamentType.DOUBLETTE_MALE ||
+          tournamentType === TournamentType.DOUBLETTE_FEMALE;
+
+        const isTetATet =
+          tournamentType === TournamentType.TET_A_TET_MALE ||
+          tournamentType === TournamentType.TET_A_TET_FEMALE;
+
+        if (isDoublette || isTetATet) {
+          // Определяем парный тип турнира
+          let pairType: TournamentType;
+          if (isDoublette) {
+            pairType =
+              tournamentType === TournamentType.DOUBLETTE_MALE
+                ? TournamentType.DOUBLETTE_FEMALE
+                : TournamentType.DOUBLETTE_MALE;
+          } else {
+            pairType =
+              tournamentType === TournamentType.TET_A_TET_MALE
+                ? TournamentType.TET_A_TET_FEMALE
+                : TournamentType.TET_A_TET_MALE;
+          }
+
+          // Ищем парный турнир в тот же день
+          const [pairTournaments] = await pool.execute<RowDataPacket[]>(
+            `SELECT id FROM tournaments WHERE date = ? AND type = ?`,
+            [tournamentDate, pairType]
+          );
+
+          if (pairTournaments.length > 0) {
+            console.log(
+              `🔄 Пересчитываем очки для парного турнира (${pairType}) после удаления турнира...`
+            );
+            const pairTournamentId = pairTournaments[0].id;
+            await TournamentModel.recalculateTournamentPoints(pairTournamentId);
+          }
+        }
+
         res.json({
           success: true,
           message: "Турнир успешно удален",

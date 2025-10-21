@@ -7,6 +7,8 @@ import {
   BUTTING_MATCH_LIST_REGEXP,
   generateTeamDescription,
   GROUP_RESULTS_LIST_REGEXP,
+  ManualInputTeam,
+  MANUAL_INPUT_LIST,
   normalizeName,
   REGISTRATION_LIST,
   SWISS_RESULTS_LIST,
@@ -41,27 +43,40 @@ export class TournamentController {
 
   /**
    * Получить эффективное количество команд для расчёта очков при загрузке турнира
-   * Если в этот день уже есть парный турнир (DOUBLETTE_MALE/FEMALE), суммируем команды
+   * Если в этот день уже есть парный турнир (DOUBLETTE_MALE/FEMALE или TET_A_TET_MALE/FEMALE), суммируем команды
    */
   private static async getEffectiveTeamsCountForNewTournament(
     tournamentDate: string,
     tournamentType: TournamentType,
     currentTeamsCount: number
   ): Promise<number> {
-    // Проверяем, является ли турнир DOUBLETTE_MALE или DOUBLETTE_FEMALE
-    if (
-      tournamentType !== TournamentType.DOUBLETTE_MALE &&
-      tournamentType !== TournamentType.DOUBLETTE_FEMALE
-    ) {
+    // Проверяем, является ли турнир DOUBLETTE_MALE/FEMALE или TET_A_TET_MALE/FEMALE
+    const isDoublette =
+      tournamentType === TournamentType.DOUBLETTE_MALE ||
+      tournamentType === TournamentType.DOUBLETTE_FEMALE;
+
+    const isTetATet =
+      tournamentType === TournamentType.TET_A_TET_MALE ||
+      tournamentType === TournamentType.TET_A_TET_FEMALE;
+
+    if (!isDoublette && !isTetATet) {
       // Для других типов турниров просто возвращаем количество команд
       return currentTeamsCount;
     }
 
-    // Ищем парный турнир в тот же день
-    const pairType =
-      tournamentType === TournamentType.DOUBLETTE_MALE
-        ? TournamentType.DOUBLETTE_FEMALE
-        : TournamentType.DOUBLETTE_MALE;
+    // Определяем парный тип турнира
+    let pairType: TournamentType;
+    if (isDoublette) {
+      pairType =
+        tournamentType === TournamentType.DOUBLETTE_MALE
+          ? TournamentType.DOUBLETTE_FEMALE
+          : TournamentType.DOUBLETTE_MALE;
+    } else {
+      pairType =
+        tournamentType === TournamentType.TET_A_TET_MALE
+          ? TournamentType.TET_A_TET_FEMALE
+          : TournamentType.TET_A_TET_MALE;
+    }
 
     const [pairTournaments] = await pool.execute<any[]>(
       `SELECT id FROM tournaments WHERE date = ? AND type = ?`,
@@ -230,7 +245,7 @@ export class TournamentController {
     }
 
     if (errors.length > 0) {
-      throw new Error(errors.join("\n"));
+      throw new Error(`#Ошибки структуры документа:\n${errors.join("\n")}`);
     }
   }
 
@@ -467,94 +482,146 @@ export class TournamentController {
         );
       }
 
-      // 1. Проверка наличия обязательных листов
-      this.validateDocumentStructure(workbook);
-      console.log("✓ Структура файла корректна");
-
-      // 2. Парсинг данных c листов
-      // Сбор данных о командах
-      const teams = await TournamentParser.parseTeamsFromRegistrationSheet(
-        workbook
-      );
-
-      // 3. Сбор данных об играх квалификационного этапа
-
-      const teamQualifyingResults =
-        await TournamentParser.parseQualifyingResults(workbook, teams);
-
-      const abButtingMatchResults =
-        await TournamentParser.parseABButtingMatchResults(workbook, teams);
-
-      const aCupTeamsResults = await TournamentParser.parseCupResults(
+      // 1. Проверяем наличие листа "Ручной ввод"
+      const manualInputSheet = ExcelUtils.findXlsSheet(
         workbook,
-        "A",
-        teams
-      );
-      const bCupTeamsResults = await TournamentParser.parseCupResults(
-        workbook,
-        "B",
-        teams
-      );
-      const cCupTeamsResults = await TournamentParser.parseCupResults(
-        workbook,
-        "C",
-        teams
+        MANUAL_INPUT_LIST
       );
 
-      // 4. Объединяем все результаты команд вместе
-      const teamResults: Map<number, TeamResults> = new Map(); // key = teamOrderNum
+      let teams: TeamPlayers[];
+      let teamResults: Map<number, TeamResults>;
+      let isManualInput = false; // Флаг для определения режима ручного ввода
 
-      // Привязка результатов квалификационного этапа - команде
-      for (const [teamOrderNum, qualifyingResults] of teamQualifyingResults) {
-        teamResults.set(teamOrderNum, {
-          qualifyingWins: qualifyingResults.wins,
-          wins: qualifyingResults.wins,
-          loses: qualifyingResults.loses,
-        });
-      }
+      if (manualInputSheet) {
+        // ====== РЕЖИМ: Ручной ввод ======
+        isManualInput = true;
+        console.log(
+          `📝 Обнаружен лист "${MANUAL_INPUT_LIST}" - используем режим ручного ввода`
+        );
 
-      // Привязка результатов стыковочных игр - команде
-      for (const [teamOrderNum, result] of abButtingMatchResults) {
-        let curTeamResults = teamResults.get(teamOrderNum);
-        if (!curTeamResults) {
-          throw new Error(
-            `Обработка стыковочных игр: Отсутствуют результаты квалификационного этапа для команды #${generateTeamDescription(
-              teams[teamOrderNum]
-            )}`
+        // Парсим лист с ручным вводом
+        const manualInputTeams: ManualInputTeam[] =
+          await TournamentParser.parseManualInputSheet(workbook);
+
+        // Создаем результаты из данных ручного ввода
+        teamResults = new Map<number, TeamResults>();
+        for (const team of manualInputTeams) {
+          // Преобразуем строковые значения в нужные типы
+          const cup = team.cup as Cup | undefined;
+          const cupPosition = team.position as CupPosition | undefined;
+
+          teamResults.set(team.orderNum, {
+            cup: cup,
+            cupPosition: cupPosition,
+            qualifyingWins: 0,
+            wins: 0,
+            loses: 0,
+            points: team.points,
+          });
+        }
+
+        // Конвертируем ManualInputTeam[] в TeamPlayers[] для дальнейшего использования
+        teams = manualInputTeams.map((t) => ({
+          orderNum: t.orderNum,
+          players: t.players,
+        }));
+
+        console.log(
+          `✓ Режим ручного ввода: обработано ${teams.length} команд(ы)`
+        );
+      } else {
+        // ====== РЕЖИМ: Стандартный парсинг ======
+        console.log(`📋 Используем стандартный режим парсинга турнира`);
+
+        // Проверка наличия обязательных листов
+        this.validateDocumentStructure(workbook);
+        console.log("✓ Структура файла корректна");
+
+        // 2. Парсинг данных c листов
+        // Сбор данных о командах
+        teams = await TournamentParser.parseTeamsFromRegistrationSheet(
+          workbook
+        );
+
+        // 3. Сбор данных об играх квалификационного этапа
+
+        const teamQualifyingResults =
+          await TournamentParser.parseQualifyingResults(workbook, teams);
+
+        const abButtingMatchResults =
+          await TournamentParser.parseABButtingMatchResults(workbook, teams);
+
+        const aCupTeamsResults = await TournamentParser.parseCupResults(
+          workbook,
+          "A",
+          teams
+        );
+        const bCupTeamsResults = await TournamentParser.parseCupResults(
+          workbook,
+          "B",
+          teams
+        );
+        const cCupTeamsResults = await TournamentParser.parseCupResults(
+          workbook,
+          "C",
+          teams
+        );
+
+        // 4. Объединяем все результаты команд вместе
+        teamResults = new Map<number, TeamResults>(); // key = teamOrderNum
+
+        // Привязка результатов квалификационного этапа - команде
+        for (const [teamOrderNum, qualifyingResults] of teamQualifyingResults) {
+          teamResults.set(teamOrderNum, {
+            qualifyingWins: qualifyingResults.wins,
+            wins: qualifyingResults.wins,
+            loses: qualifyingResults.loses,
+          });
+        }
+
+        // Привязка результатов стыковочных игр - команде
+        for (const [teamOrderNum, result] of abButtingMatchResults) {
+          let curTeamResults = teamResults.get(teamOrderNum);
+          if (!curTeamResults) {
+            throw new Error(
+              `Обработка стыковочных игр: Отсутствуют результаты квалификационного этапа для команды #${generateTeamDescription(
+                teams[teamOrderNum]
+              )}`
+            );
+          }
+          if (result) curTeamResults.wins++;
+          else {
+            curTeamResults.loses++;
+          }
+          teamResults.set(teamOrderNum, curTeamResults);
+        }
+
+        // Привязка результатов кубков - команде
+        // Кубок А
+        await this.modifyTeamResultsWithCupResults(
+          "A",
+          aCupTeamsResults,
+          teams,
+          teamResults
+        );
+
+        if (bCupTeamsResults) {
+          await this.modifyTeamResultsWithCupResults(
+            "B",
+            bCupTeamsResults,
+            teams,
+            teamResults
           );
         }
-        if (result) curTeamResults.wins++;
-        else {
-          curTeamResults.loses++;
+
+        if (cCupTeamsResults) {
+          await this.modifyTeamResultsWithCupResults(
+            "C",
+            cCupTeamsResults,
+            teams,
+            teamResults
+          );
         }
-        teamResults.set(teamOrderNum, curTeamResults);
-      }
-
-      // Привязка результатов кубков - команде
-      // Кубок А
-      await this.modifyTeamResultsWithCupResults(
-        "A",
-        aCupTeamsResults,
-        teams,
-        teamResults
-      );
-
-      if (bCupTeamsResults) {
-        await this.modifyTeamResultsWithCupResults(
-          "B",
-          bCupTeamsResults,
-          teams,
-          teamResults
-        );
-      }
-
-      if (cCupTeamsResults) {
-        await this.modifyTeamResultsWithCupResults(
-          "C",
-          cCupTeamsResults,
-          teams,
-          teamResults
-        );
       }
 
       // 5. Сохраняем данные в БД (в транзакции)
@@ -570,6 +637,7 @@ export class TournamentController {
           tournamentType,
           tournamentCategory,
           tournamentDate,
+          isManualInput,
           connection
         );
 
@@ -607,17 +675,26 @@ export class TournamentController {
 
           const results = teamResults.get(team.orderNum);
           if (!results) {
+            console.log(
+              `Не найдены результаты для команды #${generateTeamDescription(
+                team
+              )}`
+            );
             throw new Error("Не может такого быть ))");
           }
 
           // Рассчитываем количество рейтинговых очков
-          const points = getPoints(
-            tournamentCategory,
-            results.cup,
-            results.cupPosition,
-            effectiveTeamsCount,
-            results.qualifyingWins
-          );
+          // Для режима ручного ввода используем points из данных, для стандартного режима - рассчитываем
+          const points =
+            results.points !== undefined
+              ? results.points
+              : getPoints(
+                  tournamentCategory,
+                  results.cup,
+                  results.cupPosition,
+                  effectiveTeamsCount,
+                  results.qualifyingWins
+                );
 
           // Записываем результат команды в БД
           await TournamentModel.addTournamentResult(
@@ -636,21 +713,33 @@ export class TournamentController {
         await connection.commit();
         console.log("✅ Транзакция успешно завершена");
 
-        // Если это DOUBLETTE турнир и найден парный турнир, нужно пересчитать его очки
-        if (
-          (tournamentType === TournamentType.DOUBLETTE_MALE ||
-            tournamentType === TournamentType.DOUBLETTE_FEMALE) &&
-          effectiveTeamsCount > teams.length
-        ) {
+        // Если это DOUBLETTE или TET-A-TET турнир и найден парный турнир, нужно пересчитать его очки
+        const isDoublette =
+          tournamentType === TournamentType.DOUBLETTE_MALE ||
+          tournamentType === TournamentType.DOUBLETTE_FEMALE;
+
+        const isTetATet =
+          tournamentType === TournamentType.TET_A_TET_MALE ||
+          tournamentType === TournamentType.TET_A_TET_FEMALE;
+
+        if ((isDoublette || isTetATet) && effectiveTeamsCount > teams.length) {
           console.log(
             "🔄 Пересчитываем очки для парного турнира с учётом нового турнира..."
           );
 
           // Находим парный турнир
-          const pairType =
-            tournamentType === TournamentType.DOUBLETTE_MALE
-              ? TournamentType.DOUBLETTE_FEMALE
-              : TournamentType.DOUBLETTE_MALE;
+          let pairType: TournamentType;
+          if (isDoublette) {
+            pairType =
+              tournamentType === TournamentType.DOUBLETTE_MALE
+                ? TournamentType.DOUBLETTE_FEMALE
+                : TournamentType.DOUBLETTE_MALE;
+          } else {
+            pairType =
+              tournamentType === TournamentType.TET_A_TET_MALE
+                ? TournamentType.TET_A_TET_FEMALE
+                : TournamentType.TET_A_TET_MALE;
+          }
 
           const [pairTournaments] = await pool.execute<any[]>(
             `SELECT id FROM tournaments WHERE date = ? AND type = ? AND id != ?`,
