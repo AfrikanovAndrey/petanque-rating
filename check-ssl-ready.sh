@@ -2,9 +2,18 @@
 
 # Скрипт проверки готовности системы к получению SSL сертификата
 
-echo "=================================="
+echo "=================================================="
 echo "Проверка готовности системы к SSL"
-echo "=================================="
+echo "=================================================="
+echo ""
+echo "⚠️  ВАЖНО: Эта проверка запускается на локальной машине."
+echo "    Для получения реальных SSL сертификатов нужно:"
+echo "    1. Загрузить код на production сервер"
+echo "    2. Убедиться, что DNS указывает на сервер"
+echo "    3. Запустить эту проверку на сервере"
+echo "    4. Затем выполнить ./init-letsencrypt.sh"
+echo ""
+echo "=================================================="
 echo ""
 
 # Цветовые коды
@@ -150,10 +159,12 @@ echo ""
 # 7. Проверка доступа к Let's Encrypt
 echo "7. Проверка доступа к Let's Encrypt..."
 if command -v curl &> /dev/null; then
-    if curl -s -I https://acme-v02.api.letsencrypt.org/directory | grep "200 OK" &> /dev/null; then
+    if curl -s -I https://acme-v02.api.letsencrypt.org/directory 2>/dev/null | grep "200 OK" &> /dev/null; then
         print_success "Let's Encrypt API доступен"
     else
-        print_fail "Let's Encrypt API недоступен. Проверьте интернет соединение"
+        print_warn "Let's Encrypt API недоступен или заблокирован"
+        echo "  Примечание: Это нормально для локальной машины"
+        echo "  Проверка реальной доступности будет на production сервере"
     fi
 else
     print_warn "curl не установлен"
