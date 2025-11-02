@@ -7,6 +7,7 @@
 ### Для быстрого старта
 
 1. **[QUICK-START-SSL.md](QUICK-START-SSL.md)** ⚡
+
    - Пошаговая инструкция на 5 минут
    - Быстрая настройка SSL сертификатов
    - Решение типичных проблем
@@ -21,6 +22,7 @@
 ### Для детального изучения
 
 3. **[SSL-SETUP.md](SSL-SETUP.md)** 📖
+
    - Подробная документация
    - Объяснение всех настроек
    - Устранение проблем
@@ -53,17 +55,20 @@ curl -I https://rating.petanque.ru
 ## 📁 Созданные файлы
 
 ### Скрипты
+
 - `check-ssl-ready.sh` - проверка готовности системы к SSL
 - `init-letsencrypt.sh` - первичная настройка Let's Encrypt
 - `renew-certificates.sh` - обновление сертификатов
 
 ### Конфигурация
+
 - `nginx/default.conf` - nginx конфигурация с SSL (production)
 - `nginx/default.conf.initial` - временная конфигурация для получения сертификата
 - `docker-compose.yml` - обновлён (добавлены volumes для certbot)
 - `docker-compose.prod.yml` - production конфигурация с автообновлением
 
 ### Документация
+
 - `QUICK-START-SSL.md` - быстрый старт
 - `SSL-SETUP.md` - подробная документация
 - `SSL-COMMANDS.md` - шпаргалка команд
@@ -73,29 +78,36 @@ curl -I https://rating.petanque.ru
 ## 🎯 Что выбрать?
 
 ### Я хочу быстро настроить SSL
+
 👉 Читайте **QUICK-START-SSL.md** (5-10 минут)
 
 ### У меня возникла проблема
+
 👉 Смотрите раздел "Устранение проблем" в **SSL-SETUP.md**
 
 ### Мне нужна команда для...
+
 👉 Ищите в **SSL-COMMANDS.md** (Ctrl+F)
 
 ### Я делаю production деплой
+
 👉 Следуйте **DEPLOYMENT-CHECKLIST.md**
 
 ### Я хочу понять как всё работает
+
 👉 Читайте **SSL-SETUP.md** полностью
 
 ## ⚙️ Что было настроено
 
 ### ✅ Docker конфигурация
+
 - Добавлены volumes для Let's Encrypt сертификатов
 - Настроен certbot контейнер для получения сертификатов
 - Добавлен certbot-renew для автоматического обновления
 - Создан production compose файл
 
 ### ✅ Nginx конфигурация
+
 - Настроено перенаправление HTTP → HTTPS
 - Настроены SSL сертификаты Let's Encrypt
 - Добавлены security headers (HSTS, X-Frame-Options и др.)
@@ -103,12 +115,14 @@ curl -I https://rating.petanque.ru
 - Включён HTTP/2
 
 ### ✅ Автоматизация
+
 - Скрипт первичной настройки
 - Скрипт проверки готовности
 - Скрипт обновления сертификатов
 - Настройка через cron или Docker
 
 ### ✅ Безопасность
+
 - SSL/TLS A+ (SSLLabs)
 - Все современные security headers
 - Rate limiting для API
@@ -117,6 +131,7 @@ curl -I https://rating.petanque.ru
 ## 🔄 Типичный workflow
 
 ### Первая настройка
+
 ```bash
 1. ./check-ssl-ready.sh      # Проверка
 2. ./init-letsencrypt.sh      # Настройка
@@ -124,6 +139,7 @@ curl -I https://rating.petanque.ru
 ```
 
 ### Обновление сертификатов (автоматическое)
+
 ```bash
 # Настроено автоматически через:
 - Docker контейнер certbot-renew (рекомендуется)
@@ -131,6 +147,7 @@ curl -I https://rating.petanque.ru
 ```
 
 ### Обновление приложения
+
 ```bash
 git pull
 docker compose --profile production build
@@ -138,6 +155,7 @@ docker compose --profile production up -d
 ```
 
 ### Проверка и мониторинг
+
 ```bash
 docker compose --profile production ps
 docker compose logs -f nginx backend
@@ -149,18 +167,21 @@ docker compose run --rm certbot certificates
 ### Если что-то не работает
 
 1. **Проверьте логи**
+
    ```bash
    docker compose logs nginx --tail=100
    docker compose logs certbot --tail=100
    ```
 
 2. **Проверьте статус**
+
    ```bash
    docker compose --profile production ps
    ./check-ssl-ready.sh
    ```
 
 3. **Найдите решение**
+
    - Раздел "Устранение проблем" в SSL-SETUP.md
    - Поиск по ошибке в документации (Ctrl+F)
 
@@ -170,23 +191,27 @@ docker compose run --rm certbot certificates
 ## 🎓 Дополнительные ресурсы
 
 ### Проверка SSL
+
 - https://www.ssllabs.com/ssltest/ - тест SSL конфигурации
 - https://securityheaders.com/ - проверка security headers
 - https://observatory.mozilla.org/ - комплексная проверка безопасности
 
 ### Документация
+
 - https://letsencrypt.org/docs/ - Let's Encrypt
 - https://certbot.eff.org/docs/ - Certbot
 - https://nginx.org/ru/docs/ - Nginx
 - https://docs.docker.com/ - Docker
 
 ### Генераторы конфигураций
+
 - https://ssl-config.mozilla.org/ - SSL конфигурация
 - https://www.digicert.com/help/ - DigiCert инструменты
 
 ## 📊 Мониторинг
 
 ### Автоматические проверки
+
 ```bash
 # Проверка срока действия сертификата
 docker compose run --rm certbot certificates
@@ -201,6 +226,7 @@ echo | openssl s_client -servername rating.petanque.ru \
 ```
 
 ### Настройка мониторинга (опционально)
+
 - UptimeRobot - мониторинг доступности
 - Prometheus + Grafana - метрики
 - Sentry - отслеживание ошибок
@@ -209,6 +235,7 @@ echo | openssl s_client -servername rating.petanque.ru \
 ## 🎉 Готово!
 
 Теперь у вас есть:
+
 - ✅ Полностью настроенный HTTPS
 - ✅ Автоматическое обновление сертификатов
 - ✅ Оценка A+ на SSL Labs
@@ -217,6 +244,7 @@ echo | openssl s_client -servername rating.petanque.ru \
 - ✅ Скрипты автоматизации
 
 **Следующие шаги:**
+
 1. Добавьте сайт в мониторинг
 2. Настройте резервное копирование
 3. Обучите команду работе с системой
@@ -227,4 +255,3 @@ echo | openssl s_client -servername rating.petanque.ru \
 **Создано:** 2 ноября 2024  
 **Для сайта:** rating.petanque.ru  
 **Контакт:** afrikanov.andrey@gmail.com
-

@@ -312,6 +312,7 @@ alias petanque-backup='docker compose exec mysql mysqldump -u root -p petanque_r
 ```
 
 После добавления:
+
 ```bash
 source ~/.bashrc  # или source ~/.zshrc
 ```
@@ -319,4 +320,3 @@ source ~/.bashrc  # или source ~/.zshrc
 ---
 
 **Совет**: Сохраните эту шпаргалку в закладки для быстрого доступа к командам!
-

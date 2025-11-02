@@ -30,6 +30,7 @@ chmod +x init-letsencrypt.sh
 ```
 
 Скрипт выполнит следующие действия:
+
 1. Создаст временный (dummy) сертификат
 2. Запустит nginx с временной конфигурацией
 3. Получит настоящий сертификат от Let's Encrypt
@@ -84,20 +85,20 @@ crontab -e
 Можно использовать отдельный контейнер для автоматического обновления. Обновите docker-compose.yml:
 
 ```yaml
-  certbot-renew:
-    image: certbot/certbot
-    container_name: petanque-certbot-renew
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
-      - web-root:/var/www/html
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-    depends_on:
-      - nginx
-    networks:
-      - petanque-network
-    profiles:
-      - production
+certbot-renew:
+  image: certbot/certbot
+  container_name: petanque-certbot-renew
+  volumes:
+    - certbot-etc:/etc/letsencrypt
+    - certbot-var:/var/lib/letsencrypt
+    - web-root:/var/www/html
+  entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+  depends_on:
+    - nginx
+  networks:
+    - petanque-network
+  profiles:
+    - production
 ```
 
 Затем перезапустите с профилем production:
@@ -144,17 +145,20 @@ rate-scoring/
 ### Ошибка: "Couldn't obtain certificate"
 
 1. Проверьте DNS записи:
+
 ```bash
 nslookup rating.petanque.ru
 nslookup www.rating.petanque.ru
 ```
 
 2. Убедитесь, что порты 80 и 443 открыты:
+
 ```bash
 sudo netstat -tlnp | grep ':80\|:443'
 ```
 
 3. Проверьте логи certbot:
+
 ```bash
 docker compose logs certbot
 ```
@@ -195,13 +199,15 @@ docker compose --profile production exec nginx nginx -s reload
 
 ## Важные замечания
 
-1. **Лимиты Let's Encrypt**: 
+1. **Лимиты Let's Encrypt**:
+
    - 50 сертификатов на домен в неделю
    - 5 попыток для одного набора доменов в час
    - Используйте staging режим для тестирования!
 
 2. **Резервное копирование сертификатов**:
    Сертификаты хранятся в Docker volume `certbot-etc`. Рекомендуется делать резервные копии:
+
    ```bash
    docker run --rm -v petanque_certbot-etc:/etc/letsencrypt -v $(pwd):/backup alpine tar czf /backup/letsencrypt-backup.tar.gz -C /etc/letsencrypt .
    ```
@@ -220,4 +226,3 @@ docker compose --profile production exec nginx nginx -s reload
 ## Контакты
 
 При возникновении проблем обращайтесь к администратору: afrikanov.andrey@gmail.com
-
