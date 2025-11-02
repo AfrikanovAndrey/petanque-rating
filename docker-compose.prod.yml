@@ -1,0 +1,61 @@
+version: "3.8"
+
+# Production override для docker-compose.yml
+# Использование: docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production up -d
+
+services:
+  # MySQL с production настройками
+  mysql:
+    restart: always
+    environment:
+      # ⚠️ Измените пароли в production!
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-petanque_root_password}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-petanque_password}
+
+  # Backend с production настройками
+  backend:
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - FRONTEND_URL=https://rating.petanque.ru
+      # ⚠️ Измените секреты в production!
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    # В production не открываем порты напрямую, только через nginx
+    ports: []
+
+  # Frontend с production настройками
+  frontend:
+    restart: always
+    build:
+      args:
+        - VITE_API_URL=https://rating.petanque.ru/api
+    # В production не открываем порты напрямую, только через nginx
+    ports: []
+
+  # Nginx всегда активен в production
+  nginx:
+    restart: always
+
+  # Certbot для получения сертификатов
+  certbot:
+    restart: "no"
+
+  # Автоматическое обновление сертификатов
+  certbot-renew:
+    image: certbot/certbot
+    container_name: petanque-certbot-renew
+    restart: always
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - web-root:/var/www/html
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
+    depends_on:
+      - nginx
+    networks:
+      - petanque-network
+    profiles:
+      - production
+

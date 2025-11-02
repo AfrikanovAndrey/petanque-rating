@@ -81,15 +81,35 @@ cd petanque-rating
 ./docker-dev.sh
 ```
 
-#### Production режим с Nginx
+#### Production режим с Nginx и SSL
 
-Для запуска в production режиме с Nginx прокси:
+Для запуска в production режиме с Nginx прокси и HTTPS (Let's Encrypt):
+
+**Быстрый старт SSL:**
 
 ```bash
-# Запуск с nginx
-docker-compose --profile production up -d
+# 1. Проверка готовности системы
+./check-ssl-ready.sh
 
-# Приложение будет доступно на http://localhost:80
+# 2. Получение SSL сертификата
+./init-letsencrypt.sh
+
+# Приложение будет доступно на https://rating.petanque.ru
+```
+
+**Подробная документация:**
+- 📖 [Быстрый старт SSL](QUICK-START-SSL.md) - краткое руководство
+- 📚 [Полная документация SSL](SSL-SETUP.md) - подробная информация и устранение проблем
+
+**Автоматическое обновление сертификатов:**
+
+```bash
+# Настройка автообновления через cron
+crontab -e
+# Добавьте: 0 3 * * 0 cd /путь/к/проекту && ./renew-certificates.sh
+
+# Или используйте docker-compose.prod.yml для автообновления
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production up -d
 ```
 
 ### Вариант 2: Установка и запуск вручную
@@ -295,11 +315,13 @@ npm run lint
 
 ## Безопасность
 
-- Измените JWT_SECRET в production
-- Измените пароль администратора по умолчанию
-- Настройте CORS для production
-- Используйте HTTPS в production
-- Регулярно обновляйте зависимости
+- ✅ **SSL/HTTPS**: Настройте Let's Encrypt сертификаты (см. [QUICK-START-SSL.md](QUICK-START-SSL.md))
+- ✅ **JWT Secret**: Измените `JWT_SECRET` в production на случайную строку длиной минимум 32 символа
+- ✅ **Пароли**: Измените пароль администратора и MySQL в production
+- ✅ **CORS**: Настроен для production домена (rating.petanque.ru)
+- ✅ **Security Headers**: Настроены в nginx (HSTS, X-Frame-Options, CSP и др.)
+- ✅ **Rate Limiting**: Ограничение запросов к API (10 req/s)
+- 📦 **Обновления**: Регулярно обновляйте зависимости (`npm audit fix`)
 
 ## Поддержка
 
