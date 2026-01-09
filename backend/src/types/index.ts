@@ -67,6 +67,7 @@ export interface PlayerTournamentPoints {
 export interface RatingSetting {
   id: number;
   setting_name: string;
+  year: number;
   setting_value: string;
   description?: string;
   created_at: Date;

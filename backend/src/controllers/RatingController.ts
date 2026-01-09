@@ -7,13 +7,14 @@ export class RatingController {
   // Получить таблицу рейтинга (публичный доступ) по tournament_results, агрегируя по игрокам через их команды
   static async getRatingTable(req: Request, res: Response): Promise<void> {
     try {
-      const [settingsRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count"'
-      );
-      const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
-
       // Берем только активных лицензированных игроков текущего года
       const currentYear = new Date().getFullYear();
+
+      const [settingsRows] = await pool.execute<RowDataPacket[]>(
+        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count" AND year <= ? ORDER BY year DESC LIMIT 1',
+        [currentYear]
+      );
+      const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT p.id as player_id, p.name as player_name, p.gender, lp.license_date
          FROM players p
@@ -94,12 +95,13 @@ export class RatingController {
   // Получить полную таблицу рейтинга с детальными данными (публичный доступ)
   static async getFullRatingTable(req: Request, res: Response): Promise<void> {
     try {
+      const currentYear = new Date().getFullYear();
+
       const [settingsRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count"'
+        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count" AND year <= ? ORDER BY year DESC LIMIT 1',
+        [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
-
-      const currentYear = new Date().getFullYear();
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT p.id as player_id, p.name as player_name, lp.license_date
          FROM players p
@@ -200,8 +202,11 @@ export class RatingController {
       }
 
       // Деталка игрока по tournament_results
+      const currentYear = new Date().getFullYear();
+
       const [settingsRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count"'
+        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count" AND year <= ? ORDER BY year DESC LIMIT 1',
+        [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
 
@@ -285,12 +290,13 @@ export class RatingController {
   // Получить мужской рейтинг (публичный доступ)
   static async getMaleRatingTable(req: Request, res: Response): Promise<void> {
     try {
+      const currentYear = new Date().getFullYear();
+
       const [settingsRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count"'
+        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count" AND year <= ? ORDER BY year DESC LIMIT 1',
+        [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
-
-      const currentYear = new Date().getFullYear();
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT p.id as player_id, p.name as player_name
          FROM players p
@@ -387,12 +393,13 @@ export class RatingController {
     res: Response
   ): Promise<void> {
     try {
+      const currentYear = new Date().getFullYear();
+
       const [settingsRows] = await pool.execute<RowDataPacket[]>(
-        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count"'
+        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count" AND year <= ? ORDER BY year DESC LIMIT 1',
+        [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
-
-      const currentYear = new Date().getFullYear();
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT p.id as player_id, p.name as player_name
          FROM players p

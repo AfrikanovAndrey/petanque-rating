@@ -239,10 +239,12 @@ export class TeamController {
   static async getTeamRatings(req: Request, res: Response) {
     try {
       // Получаем количество лучших результатов из настроек
+      const currentYear = new Date().getFullYear();
       const [settingsRows] = await (
         await import("../config/database")
       ).pool.execute<any>(
-        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count"'
+        'SELECT setting_value FROM rating_settings WHERE setting_name = "best_results_count" AND year <= ? ORDER BY year DESC LIMIT 1',
+        [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
 

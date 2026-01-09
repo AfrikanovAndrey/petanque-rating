@@ -119,11 +119,14 @@ CREATE TABLE IF NOT EXISTS player_tournament_points (
 -- Таблица настроек рейтинга
 CREATE TABLE IF NOT EXISTS rating_settings (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  setting_name VARCHAR(50) NOT NULL UNIQUE,
+  setting_name VARCHAR(50) NOT NULL,
+  year INT NOT NULL,
   setting_value TEXT NOT NULL,
   description TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_setting_year (setting_name, year),
+  INDEX idx_year (year)
 );
 
 -- Таблица администраторов
@@ -202,6 +205,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- ========================================
 
 -- Настройки по умолчанию
-INSERT IGNORE INTO rating_settings (setting_name, setting_value, description) VALUES 
-  ('best_results_count', '8', 'Количество лучших результатов для подсчета рейтинга'),
-  ('current_season', '2025', 'Текущий сезон');
+INSERT IGNORE INTO rating_settings (setting_name, year, setting_value, description) VALUES 
+  ('best_results_count', 2025, '8', 'Количество лучших результатов для подсчета рейтинга'),
+  ('best_results_count', 2026, '10', 'Количество лучших результатов для подсчета рейтинга');

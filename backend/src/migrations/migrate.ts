@@ -103,17 +103,21 @@ export const runMigrations = async () => {
     await applyMigrations();
 
     // Проверяем наличие базовых настроек (они должны быть созданы в 01-init.sql, но на всякий случай проверим)
+    const currentYear = new Date().getFullYear();
     const [settings] = await pool.execute(
-      "SELECT COUNT(*) as count FROM rating_settings WHERE setting_name IN ('best_results_count', 'current_season')"
+      "SELECT COUNT(*) as count FROM rating_settings WHERE setting_name = 'best_results_count' AND year = ?",
+      [currentYear]
     );
 
-    if ((settings as any[])[0].count < 2) {
+    if ((settings as any[])[0].count < 1) {
       console.log("🌱 Добавление базовых настроек...");
-      await pool.execute(`
-        INSERT IGNORE INTO rating_settings (setting_name, setting_value, description) VALUES 
-          ('best_results_count', '8', 'Количество лучших результатов для подсчета рейтинга'),
-          ('current_season', '2025', 'Текущий сезон')
-      `);
+      await pool.execute(
+        `
+        INSERT IGNORE INTO rating_settings (setting_name, year, setting_value, description) VALUES 
+          ('best_results_count', ?, '8', 'Количество лучших результатов для подсчета рейтинга')
+      `,
+        [currentYear]
+      );
     }
 
     console.log("✅ БД готова к работе");

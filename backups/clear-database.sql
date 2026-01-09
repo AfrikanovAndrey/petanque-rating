@@ -60,9 +60,9 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- ========================================
 
 -- Восстанавливаем базовые настройки (если были удалены)
-INSERT IGNORE INTO rating_settings (setting_name, setting_value, description) VALUES 
-  ('best_results_count', '8', 'Количество лучших результатов для подсчета рейтинга'),
-  ('current_season', '2025', 'Текущий сезон');
+INSERT IGNORE INTO rating_settings (setting_name, year, setting_value, description) VALUES 
+  ('best_results_count', 2025, '8', 'Количество лучших результатов для подсчета рейтинга'),
+  ('best_results_count', 2026, '10', 'Количество лучших результатов для подсчета рейтинга');
 
 -- ========================================
 -- Вывод статуса
