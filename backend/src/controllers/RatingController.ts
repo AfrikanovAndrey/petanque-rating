@@ -7,7 +7,7 @@ export class RatingController {
   // Получить таблицу рейтинга (публичный доступ) по tournament_results, агрегируя по игрокам через их команды
   static async getRatingTable(req: Request, res: Response): Promise<void> {
     try {
-      // Берем только активных лицензированных игроков текущего года
+      // Берем всех игроков с хотя бы одной активной лицензией
       const currentYear = new Date().getFullYear();
 
       const [settingsRows] = await pool.execute<RowDataPacket[]>(
@@ -16,11 +16,11 @@ export class RatingController {
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
       const [playersRows] = await pool.execute<RowDataPacket[]>(
-        `SELECT p.id as player_id, p.name as player_name, p.gender, lp.license_date
+        `SELECT DISTINCT p.id as player_id, p.name as player_name, p.gender
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year = ? AND lp.is_active = TRUE
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
          ORDER BY p.name`,
-        [currentYear]
+        [currentYear, currentYear - 1]
       );
 
       // Вычисляем дату 365 дней назад от текущей даты
@@ -35,10 +35,10 @@ export class RatingController {
         const playerId = row.player_id;
         const playerName = row.player_name;
 
-        // Получаем все лицензии игрока (для разных лет)
+        // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE`,
-          [playerId]
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          [playerId, currentYear, currentYear - 1]
         );
 
         // Создаем условие для SQL: турнир должен быть после даты лицензии соответствующего года
@@ -102,12 +102,13 @@ export class RatingController {
         [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
+      // Берем всех игроков с активной лицензией за текущий или прошлый год
       const [playersRows] = await pool.execute<RowDataPacket[]>(
-        `SELECT p.id as player_id, p.name as player_name, lp.license_date
+        `SELECT DISTINCT p.id as player_id, p.name as player_name
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year = ? AND lp.is_active = TRUE
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
          ORDER BY p.name`,
-        [currentYear]
+        [currentYear, currentYear - 1]
       );
 
       // Вычисляем дату 365 дней назад от текущей даты
@@ -121,10 +122,10 @@ export class RatingController {
         const playerId = row.player_id;
         const playerName = row.player_name;
 
-        // Получаем все лицензии игрока (для разных лет)
+        // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE`,
-          [playerId]
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          [playerId, currentYear, currentYear - 1]
         );
 
         // Создаем условие для SQL: турнир должен быть после даты лицензии соответствующего года
@@ -225,10 +226,10 @@ export class RatingController {
       minDate.setDate(minDate.getDate() - 365);
       const minDateStr = minDate.toISOString().split("T")[0];
 
-      // Получаем все лицензии игрока (для разных лет)
+      // Получаем лицензии игрока за текущий и прошлый год
       const [licensesRows] = await pool.execute<RowDataPacket[]>(
-        `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE`,
-        [playerId]
+        `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+        [playerId, currentYear, currentYear - 1]
       );
 
       // Создаем условие для SQL: турнир должен быть после даты лицензии соответствующего года
@@ -297,13 +298,14 @@ export class RatingController {
         [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
+      // Берем всех мужчин с активной лицензией за текущий или прошлый год
       const [playersRows] = await pool.execute<RowDataPacket[]>(
-        `SELECT p.id as player_id, p.name as player_name
+        `SELECT DISTINCT p.id as player_id, p.name as player_name
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year = ? AND lp.is_active = TRUE
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
          WHERE p.gender = 'male'
          ORDER BY p.name`,
-        [currentYear]
+        [currentYear, currentYear - 1]
       );
 
       // Вычисляем дату 365 дней назад от текущей даты
@@ -317,10 +319,10 @@ export class RatingController {
         const playerId = row.player_id;
         const playerName = row.player_name;
 
-        // Получаем все лицензии игрока (для разных лет)
+        // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE`,
-          [playerId]
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          [playerId, currentYear, currentYear - 1]
         );
 
         // Создаем условие для SQL: турнир должен быть после даты лицензии соответствующего года
@@ -400,13 +402,14 @@ export class RatingController {
         [currentYear]
       );
       const bestResultsCount = parseInt(settingsRows[0]?.setting_value || "8");
+      // Берем всех женщин с активной лицензией за текущий или прошлый год
       const [playersRows] = await pool.execute<RowDataPacket[]>(
-        `SELECT p.id as player_id, p.name as player_name
+        `SELECT DISTINCT p.id as player_id, p.name as player_name
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year = ? AND lp.is_active = TRUE
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
          WHERE p.gender = 'female'
          ORDER BY p.name`,
-        [currentYear]
+        [currentYear, currentYear - 1]
       );
 
       // Вычисляем дату 365 дней назад от текущей даты
@@ -420,10 +423,10 @@ export class RatingController {
         const playerId = row.player_id;
         const playerName = row.player_name;
 
-        // Получаем все лицензии игрока (для разных лет)
+        // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE`,
-          [playerId]
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          [playerId, currentYear, currentYear - 1]
         );
 
         // Создаем условие для SQL: турнир должен быть после даты лицензии соответствующего года
