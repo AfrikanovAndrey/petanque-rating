@@ -30,11 +30,8 @@ const AdminLicensedPlayers: React.FC = () => {
     null
   );
   const [formData, setFormData] = useState({
-    license_number: "",
     player_name: "",
-    city: "",
     license_date: "",
-    year: new Date().getFullYear(),
   });
 
   useEffect(() => {
@@ -154,11 +151,8 @@ const AdminLicensedPlayers: React.FC = () => {
         setShowModal(false);
         setEditingPlayer(null);
         setFormData({
-          license_number: "",
           player_name: "",
-          city: "",
           license_date: "",
-          year: new Date().getFullYear(),
         });
         loadData();
         loadStatistics();
@@ -174,11 +168,8 @@ const AdminLicensedPlayers: React.FC = () => {
   const handleEdit = (player: LicensedPlayer) => {
     setEditingPlayer(player);
     setFormData({
-      license_number: player.license_number,
       player_name: player.player_name,
-      city: player.city,
       license_date: player.license_date.split("T")[0],
-      year: player.year,
     });
     setShowModal(true);
   };
@@ -227,7 +218,7 @@ const AdminLicensedPlayers: React.FC = () => {
           onClick={() => setShowModal(true)}
           className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
         >
-          Добавить игрока
+          Добавить лицензию
         </button>
       </div>
 
@@ -403,29 +394,12 @@ const AdminLicensedPlayers: React.FC = () => {
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {editingPlayer ? "Редактировать игрока" : "Добавить игрока"}
+                {editingPlayer ? "Редактировать лицензию" : "Добавить лицензию"}
               </h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
-                    № Лицензии
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.license_number}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        license_number: e.target.value,
-                      })
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    ФИО
+                    ФИО игрока
                   </label>
                   <input
                     type="text"
@@ -434,22 +408,15 @@ const AdminLicensedPlayers: React.FC = () => {
                       setFormData({ ...formData, player_name: e.target.value })
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    placeholder="Введите полное ФИО игрока"
+                    disabled={!!editingPlayer}
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Город
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) =>
-                      setFormData({ ...formData, city: e.target.value })
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    required
-                  />
+                  {!editingPlayer && (
+                    <p className="mt-1 text-sm text-gray-500">
+                      Игрок должен быть создан в разделе "Игроки"
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -462,27 +429,13 @@ const AdminLicensedPlayers: React.FC = () => {
                       setFormData({ ...formData, license_date: e.target.value })
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    min={`${new Date().getFullYear()}-01-01`}
+                    max={`${new Date().getFullYear()}-12-31`}
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Год
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.year}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        year: parseInt(e.target.value),
-                      })
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    min="2000"
-                    max="2100"
-                    required
-                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Можно указать дату только для текущего {new Date().getFullYear()} года
+                  </p>
                 </div>
               </div>
               <div className="flex justify-end space-x-2 mt-6">
@@ -491,11 +444,8 @@ const AdminLicensedPlayers: React.FC = () => {
                     setShowModal(false);
                     setEditingPlayer(null);
                     setFormData({
-                      license_number: "",
                       player_name: "",
-                      city: "",
                       license_date: "",
-                      year: new Date().getFullYear(),
                     });
                   }}
                   className="px-4 py-2 text-gray-500 hover:text-gray-700"

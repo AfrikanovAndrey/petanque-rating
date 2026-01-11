@@ -17,11 +17,13 @@ SET sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVIS
 CREATE TABLE IF NOT EXISTS players (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL UNIQUE,
+  license_number VARCHAR(20) NULL UNIQUE,
   gender ENUM('male', 'female') DEFAULT NULL,
   city VARCHAR(100) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_name (name),
+  INDEX idx_license_number (license_number),
   INDEX idx_gender (gender),
   INDEX idx_city (city)
 );
@@ -142,15 +144,12 @@ CREATE TABLE IF NOT EXISTS admins (
 CREATE TABLE IF NOT EXISTS licensed_players (
   id INT AUTO_INCREMENT PRIMARY KEY,
   player_id INT NOT NULL,
-  license_number VARCHAR(20) NOT NULL UNIQUE,
-  city VARCHAR(100) NOT NULL,
   license_date DATE NOT NULL,
   year INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
   INDEX idx_player_id (player_id),
-  INDEX idx_license_number (license_number),
   INDEX idx_year (year),
   UNIQUE KEY unique_player_year (player_id, year)
 );

@@ -38,10 +38,10 @@ export class PlayerModel {
     return rows.length ? rows : null;
   }
 
-  static async createPlayer(name: string, city?: string): Promise<number> {
+  static async createPlayer(name: string, city?: string, license_number?: string): Promise<number> {
     const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO players (name, city) VALUES (?, ?)",
-      [name, city || null]
+      "INSERT INTO players (name, city, license_number) VALUES (?, ?, ?)",
+      [name, city || null, license_number || null]
     );
     return result.insertId;
   }
@@ -50,11 +50,12 @@ export class PlayerModel {
     id: number,
     name: string,
     gender: string,
-    city?: string
+    city?: string,
+    license_number?: string
   ): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
-      "UPDATE players SET name = ?, gender = ?, city = ? WHERE id = ?",
-      [name, gender, city || null, id]
+      "UPDATE players SET name = ?, gender = ?, city = ?, license_number = ? WHERE id = ?",
+      [name, gender, city || null, license_number || null, id]
     );
     return result.affectedRows > 0;
   }

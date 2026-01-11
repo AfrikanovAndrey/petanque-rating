@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import multer from "multer";
-import { RowDataPacket } from "mysql2/promise";
+import { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import * as XLSX from "xlsx";
 import { pool } from "../config/database";
 import { LicensedPlayerModel } from "../models/LicensedPlayerModel";
@@ -482,7 +482,7 @@ export class AdminController {
   // Создать игрока (админ)
   static async createPlayer(req: Request, res: Response): Promise<void> {
     try {
-      const { name, gender, city } = req.body;
+      const { name, gender, city, license_number } = req.body;
 
       if (!name || !gender) {
         res.status(400).json({
@@ -529,10 +529,10 @@ export class AdminController {
       }
 
       // Создаем игрока
-      const playerId = await PlayerModel.createPlayer(cleanedName, city);
+      const playerId = await PlayerModel.createPlayer(cleanedName, city, license_number);
 
       // Обновляем пол и город
-      await PlayerModel.updatePlayer(playerId, cleanedName, gender, city);
+      await PlayerModel.updatePlayer(playerId, cleanedName, gender, city, license_number);
 
       res.json({
         success: true,
@@ -552,7 +552,7 @@ export class AdminController {
   static async updatePlayer(req: Request, res: Response): Promise<void> {
     try {
       const playerId = parseInt(req.params.playerId);
-      const { name, gender, city } = req.body;
+      const { name, gender, city, license_number } = req.body;
 
       if (isNaN(playerId) || !name || !gender) {
         res.status(400).json({
@@ -566,7 +566,8 @@ export class AdminController {
         playerId,
         name,
         gender,
-        city
+        city,
+        license_number
       );
 
       if (success) {
@@ -737,10 +738,9 @@ export class AdminController {
     res: Response
   ): Promise<void> {
     try {
-      const { license_number, player_name, city, license_date, year } =
-        req.body;
+      const { player_name, license_date } = req.body;
 
-      if (!license_number || !player_name || !city || !license_date || !year) {
+      if (!player_name || !license_date) {
         res.status(400).json({
           success: false,
           message: "Все поля обязательны для заполнения",
@@ -748,37 +748,71 @@ export class AdminController {
         return;
       }
 
-      // Проверяем существует ли игрок с таким номером лицензии
-      const existing =
-        await LicensedPlayerModel.getLicensedPlayerByLicenseNumber(
-          license_number
-        );
-      if (existing) {
+      // Автоматически вычисляем год из даты лицензии
+      const licenseYear = new Date(license_date).getFullYear();
+      const currentYear = new Date().getFullYear();
+
+      // Проверяем, что лицензия создается только на текущий год
+      if (licenseYear !== currentYear) {
         res.status(400).json({
           success: false,
-          message: "Игрок с таким номером лицензии уже существует",
+          message: `Можно добавить лицензию только на текущий ${currentYear} год. Указана дата для ${licenseYear} года.`,
         });
         return;
       }
 
-      const playerId = await LicensedPlayerModel.addLicensedPlayer({
-        license_number,
-        player_name,
-        city,
-        license_date,
-        year: parseInt(year),
-      });
+      // Проверяем существует ли игрок с таким именем
+      const existingPlayers = await PlayerModel.getPlayerByName(player_name.trim());
+      if (!existingPlayers || existingPlayers.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: `Игрок с именем "${player_name}" не найден. Сначала создайте игрока в разделе "Игроки"`,
+        });
+        return;
+      }
+
+      // Если найдено несколько игроков с похожим именем
+      if (existingPlayers.length > 1) {
+        res.status(400).json({
+          success: false,
+          message: `Найдено несколько игроков с похожим именем. Уточните ФИО.`,
+        });
+        return;
+      }
+
+      const player = existingPlayers[0];
+
+      // Проверяем, есть ли уже лицензия для этого игрока в этом году
+      const [existingLicense] = await pool.execute<RowDataPacket[]>(
+        "SELECT id FROM licensed_players WHERE player_id = ? AND year = ?",
+        [player.id, licenseYear]
+      );
+
+      if (existingLicense.length > 0) {
+        res.status(400).json({
+          success: false,
+          message: `У игрока "${player.name}" уже есть лицензия на ${licenseYear} год`,
+        });
+        return;
+      }
+
+      // Добавляем лицензию игроку (год вычисляется автоматически)
+      const [result] = await pool.execute<ResultSetHeader>(
+        `INSERT INTO licensed_players (player_id, license_date, year) 
+         VALUES (?, ?, ?)`,
+        [player.id, license_date, licenseYear]
+      );
 
       res.json({
         success: true,
-        message: "Лицензионный игрок успешно создан",
-        player_id: playerId,
+        message: "Лицензия успешно добавлена",
+        player_id: result.insertId,
       });
     } catch (error) {
-      console.error("Ошибка создания лицензионного игрока:", error);
+      console.error("Ошибка создания лицензии:", error);
       res.status(500).json({
         success: false,
-        message: "Ошибка при создании лицензионного игрока",
+        message: "Ошибка при создании лицензии",
       });
     }
   }
@@ -812,22 +846,21 @@ export class AdminController {
         return;
       }
 
-      // Если обновляется номер лицензии, проверяем уникальность
-      if (
-        updateData.license_number &&
-        updateData.license_number !== existing.license_number
-      ) {
-        const duplicate =
-          await LicensedPlayerModel.getLicensedPlayerByLicenseNumber(
-            updateData.license_number
-          );
-        if (duplicate && duplicate.id !== playerId) {
+      // Если обновляется дата лицензии, проверяем и пересчитываем год
+      if (updateData.license_date) {
+        const newLicenseYear = new Date(updateData.license_date).getFullYear();
+        const currentYear = new Date().getFullYear();
+
+        // Проверяем, что новая дата тоже для текущего года
+        if (newLicenseYear !== currentYear) {
           res.status(400).json({
             success: false,
-            message: "Игрок с таким номером лицензии уже существует",
+            message: `Можно указать дату лицензии только для текущего ${currentYear} года. Указана дата для ${newLicenseYear} года.`,
           });
           return;
         }
+
+        updateData.year = newLicenseYear;
       }
 
       const success = await LicensedPlayerModel.updateLicensedPlayer(
@@ -838,19 +871,19 @@ export class AdminController {
       if (success) {
         res.json({
           success: true,
-          message: "Лицензионный игрок успешно обновлен",
+          message: "Лицензия успешно обновлена",
         });
       } else {
         res.status(400).json({
           success: false,
-          message: "Не удалось обновить данные игрока",
+          message: "Не удалось обновить данные лицензии",
         });
       }
     } catch (error) {
-      console.error("Ошибка обновления лицензионного игрока:", error);
+      console.error("Ошибка обновления лицензии:", error);
       res.status(500).json({
         success: false,
-        message: "Ошибка при обновлении лицензионного игрока",
+        message: "Ошибка при обновлении лицензии",
       });
     }
   }

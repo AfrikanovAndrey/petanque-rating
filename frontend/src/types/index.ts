@@ -10,6 +10,7 @@ export interface ApiResponse<T = any> {
 export interface Player {
   id: number;
   name: string;
+  license_number?: string | null;
   gender: string;
   city?: string | null;
   created_at: string;

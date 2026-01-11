@@ -199,6 +199,7 @@ export const adminApi = {
   // Создать игрока
   createPlayer: (data: {
     name: string;
+    license_number?: string;
     gender: string;
     city?: string;
   }): Promise<AxiosResponse<ApiResponse<{ player_id: number }>>> =>
@@ -219,7 +220,7 @@ export const adminApi = {
   // Обновить игрока
   updatePlayer: (
     playerId: number,
-    data: { name: string; gender: string; city?: string }
+    data: { name: string; license_number?: string; gender: string; city?: string }
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/players/${playerId}`, data),
 

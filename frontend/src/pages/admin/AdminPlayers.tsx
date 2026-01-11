@@ -37,6 +37,7 @@ const formatGender = (gender: string | null | undefined): string => {
 
 interface EditPlayerForm {
   name: string;
+  license_number?: string;
   gender: string;
   city?: string;
 }
@@ -79,7 +80,7 @@ const AdminPlayers: React.FC = () => {
 
   // Мутация для создания игрока
   const createMutation = useMutation(
-    async (data: { name: string; gender: string; city?: string }) => {
+    async (data: { name: string; license_number?: string; gender: string; city?: string }) => {
       return await adminApi.createPlayer(data);
     },
     {
@@ -102,11 +103,13 @@ const AdminPlayers: React.FC = () => {
     async (data: {
       id: number;
       name: string;
+      license_number?: string;
       gender: string;
       city?: string;
     }) => {
       return await adminApi.updatePlayer(data.id, {
         name: data.name,
+        license_number: data.license_number,
         gender: data.gender,
         city: data.city,
       });
@@ -221,6 +224,7 @@ const AdminPlayers: React.FC = () => {
   const openEditModal = (player: Player) => {
     setEditingPlayer(player);
     setValue("name", player.name);
+    setValue("license_number", player.license_number || "");
     setValue("gender", player.gender);
     setValue("city", player.city || "");
     setIsEditModalOpen(true);
@@ -235,6 +239,7 @@ const AdminPlayers: React.FC = () => {
   const onSubmitCreate = (data: EditPlayerForm) => {
     createMutation.mutate({
       name: data.name.trim(),
+      license_number: data.license_number?.trim() || undefined,
       gender: data.gender,
       city: data.city?.trim() || undefined,
     });
@@ -245,6 +250,7 @@ const AdminPlayers: React.FC = () => {
       updateMutation.mutate({
         id: editingPlayer.id,
         name: data.name.trim(),
+        license_number: data.license_number?.trim() || undefined,
         gender: data.gender,
         city: data.city?.trim() || undefined,
       });
@@ -387,6 +393,9 @@ const AdminPlayers: React.FC = () => {
                     ФИО
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Номер лицензии
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Пол
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -430,6 +439,15 @@ const AdminPlayers: React.FC = () => {
                               {player.name}
                             </div>
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {player.license_number ? (
+                            <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                              {player.license_number}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {formatGender(player.gender)}
@@ -655,6 +673,21 @@ const AdminPlayers: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Номер лицензии
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Введите номер лицензии"
+                  {...register("license_number")}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Необязательное поле
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Пол
                 </label>
@@ -777,6 +810,21 @@ const AdminPlayers: React.FC = () => {
                     {errors.name.message}
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Номер лицензии
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Введите номер лицензии"
+                  {...register("license_number")}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Необязательное поле
+                </p>
               </div>
 
               <div>

@@ -1,6 +1,7 @@
 export interface Player {
   id: number;
   name: string;
+  license_number?: string | null;
   gender?: "male" | "female" | null;
   city?: string | null;
   created_at: Date;
@@ -207,8 +208,6 @@ export interface CupTeamResult {
 export interface LicensedPlayer {
   id: number;
   player_id: number;
-  license_number: string;
-  city: string;
   license_date: Date;
   year: number;
   created_at: Date;

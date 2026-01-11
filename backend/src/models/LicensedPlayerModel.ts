@@ -3,24 +3,24 @@ import { pool } from "../config/database";
 import { LicensedPlayer, LicensedPlayerUploadData } from "../types";
 
 export class LicensedPlayerModel {
-  // Получить всех лицензионных игроков с именами игроков
+  // Получить всех лицензионных игроков с именами игроков и номерами лицензий
   static async getAllLicensedPlayers(
     year?: number
-  ): Promise<(LicensedPlayer & { player_name: string })[]> {
+  ): Promise<(LicensedPlayer & { player_name: string; license_number: string | null; city: string | null })[]> {
     const query = year
-      ? `SELECT lp.*, p.name as player_name 
+      ? `SELECT lp.*, p.name as player_name, p.license_number, p.city 
          FROM licensed_players lp 
          LEFT JOIN players p ON lp.player_id = p.id 
          WHERE lp.year = ? 
          ORDER BY p.name`
-      : `SELECT lp.*, p.name as player_name 
+      : `SELECT lp.*, p.name as player_name, p.license_number, p.city 
          FROM licensed_players lp 
          LEFT JOIN players p ON lp.player_id = p.id 
          ORDER BY lp.year DESC, p.name`;
     const params = year ? [year] : [];
 
     const [rows] = await pool.execute<
-      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
+      (LicensedPlayer & { player_name: string; license_number: string | null; city: string | null })[] & RowDataPacket[]
     >(query, params);
     return rows;
   }
@@ -28,11 +28,11 @@ export class LicensedPlayerModel {
   // Получить лицензионных игроков текущего года
   static async getActiveLicensedPlayers(
     year: number = new Date().getFullYear()
-  ): Promise<(LicensedPlayer & { player_name: string })[]> {
+  ): Promise<(LicensedPlayer & { player_name: string; license_number: string | null; city: string | null })[]> {
     const [rows] = await pool.execute<
-      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
+      (LicensedPlayer & { player_name: string; license_number: string | null; city: string | null })[] & RowDataPacket[]
     >(
-      `SELECT lp.*, p.name as player_name 
+      `SELECT lp.*, p.name as player_name, p.license_number, p.city 
        FROM licensed_players lp 
        LEFT JOIN players p ON lp.player_id = p.id 
        WHERE lp.year = ? 
@@ -45,11 +45,11 @@ export class LicensedPlayerModel {
   // Получить лицензионного игрока по ID
   static async getLicensedPlayerById(
     id: number
-  ): Promise<(LicensedPlayer & { player_name: string }) | null> {
+  ): Promise<(LicensedPlayer & { player_name: string; license_number: string | null; city: string | null }) | null> {
     const [rows] = await pool.execute<
-      (LicensedPlayer & { player_name: string })[] & RowDataPacket[]
+      (LicensedPlayer & { player_name: string; license_number: string | null; city: string | null })[] & RowDataPacket[]
     >(
-      `SELECT lp.*, p.name as player_name 
+      `SELECT lp.*, p.name as player_name, p.license_number, p.city 
        FROM licensed_players lp 
        LEFT JOIN players p ON lp.player_id = p.id 
        WHERE lp.id = ?`,
@@ -76,30 +76,24 @@ export class LicensedPlayerModel {
 
       if (existingPlayer.length > 0) {
         playerId = existingPlayer[0].id;
-        // Обновляем город игрока
-        await connection.execute("UPDATE players SET city = ? WHERE id = ?", [
-          playerData.city,
-          playerId,
-        ]);
+        // Обновляем город и номер лицензии игрока
+        await connection.execute(
+          "UPDATE players SET city = ?, license_number = ? WHERE id = ?",
+          [playerData.city, playerData.license_number, playerId]
+        );
       } else {
         const [insertResult] = await connection.execute<ResultSetHeader>(
-          "INSERT INTO players (name, city) VALUES (?, ?)",
-          [playerData.player_name, playerData.city]
+          "INSERT INTO players (name, city, license_number) VALUES (?, ?, ?)",
+          [playerData.player_name, playerData.city, playerData.license_number]
         );
         playerId = insertResult.insertId;
       }
 
       // 2. Добавляем лицензионного игрока
       const [result] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO licensed_players (player_id, license_number, city, license_date, year) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          playerId,
-          playerData.license_number,
-          playerData.city,
-          playerData.license_date,
-          playerData.year,
-        ]
+        `INSERT INTO licensed_players (player_id, license_date, year) 
+         VALUES (?, ?, ?)`,
+        [playerId, playerData.license_date, playerData.year]
       );
 
       await connection.commit();
@@ -160,15 +154,24 @@ export class LicensedPlayerModel {
           if (playerUsage[0].count === 0) {
             // Можно обновить существующего игрока
             await connection.execute(
-              "UPDATE players SET name = ?, city = ? WHERE id = ?",
-              [playerData.player_name, playerData.city || null, currentPlayerId]
+              "UPDATE players SET name = ?, city = ?, license_number = ? WHERE id = ?",
+              [
+                playerData.player_name,
+                playerData.city || null,
+                playerData.license_number || null,
+                currentPlayerId,
+              ]
             );
             playerId = currentPlayerId;
           } else {
             // Нужно создать нового игрока
             const [insertResult] = await connection.execute<ResultSetHeader>(
-              "INSERT INTO players (name, city) VALUES (?, ?)",
-              [playerData.player_name, playerData.city || null]
+              "INSERT INTO players (name, city, license_number) VALUES (?, ?, ?)",
+              [
+                playerData.player_name,
+                playerData.city || null,
+                playerData.license_number || null,
+              ]
             );
             playerId = insertResult.insertId;
           }
@@ -182,14 +185,6 @@ export class LicensedPlayerModel {
       if (playerId !== undefined) {
         fields.push("player_id = ?");
         values.push(playerId);
-      }
-      if (playerData.license_number !== undefined) {
-        fields.push("license_number = ?");
-        values.push(playerData.license_number);
-      }
-      if (playerData.city !== undefined) {
-        fields.push("city = ?");
-        values.push(playerData.city);
       }
       if (playerData.license_date !== undefined) {
         fields.push("license_date = ?");
@@ -365,12 +360,12 @@ export class LicensedPlayerModel {
     }
   }
 
-  // Получить лицензионного игрока по номеру лицензии
-  static async getLicensedPlayerByLicenseNumber(
+  // Получить игрока по номеру лицензии
+  static async getPlayerByLicenseNumber(
     licenseNumber: string
-  ): Promise<LicensedPlayer | null> {
-    const [rows] = await pool.execute<LicensedPlayer[] & RowDataPacket[]>(
-      "SELECT * FROM licensed_players WHERE license_number = ?",
+  ): Promise<Player | null> {
+    const [rows] = await pool.execute<any[]>(
+      "SELECT * FROM players WHERE license_number = ?",
       [licenseNumber]
     );
     return rows[0] || null;
@@ -395,10 +390,11 @@ export class LicensedPlayerModel {
     );
 
     const [citiesRows] = await pool.execute<RowDataPacket[]>(
-      `SELECT city, COUNT(*) as count 
-       FROM licensed_players 
-       WHERE year = ? 
-       GROUP BY city 
+      `SELECT p.city, COUNT(*) as count 
+       FROM licensed_players lp
+       JOIN players p ON lp.player_id = p.id
+       WHERE lp.year = ? AND p.city IS NOT NULL
+       GROUP BY p.city 
        ORDER BY count DESC`,
       [year]
     );
