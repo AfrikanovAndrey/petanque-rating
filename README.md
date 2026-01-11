@@ -154,8 +154,7 @@ GOOGLE_SHEETS_API_KEY=your_google_sheets_api_key_here
 ##### Режим разработки (рекомендуется)
 
 ```bash
-# Из корневой папки проекта
-npm run dev
+./docker-dev.sh dev
 ```
 
 Приложение будет доступно по адресам:

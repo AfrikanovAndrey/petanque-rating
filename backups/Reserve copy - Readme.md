@@ -24,3 +24,12 @@ docker exec -i petanque-mysql mysql -u petanque_user -ppetanque_password petanqu
 # 2. Восстановить данные из резервной копии
 docker exec -i petanque-mysql mysql --default-character-set=utf8 -u petanque_user -ppetanque_password petanque_rating < ./backups/petanque_rating_dump.sql
 ```
+
+## Скачать резервную копию с удалённого сервера
+
+```bash
+sftp user@remote-host
+get /remote/file.txt  # скачать один файл
+get -r /remote/dir/   # скачать папку
+exit
+```

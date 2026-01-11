@@ -126,6 +126,7 @@ const AdminSettings: React.FC = () => {
                   required: "Количество обязательно",
                   min: { value: 1, message: "Минимум 1 результат" },
                   max: { value: 50, message: "Максимум 50 результатов" },
+                  valueAsNumber: true,
                 })}
               />
               {bestResultsForm.formState.errors.count && (
