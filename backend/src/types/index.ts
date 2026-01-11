@@ -211,7 +211,6 @@ export interface LicensedPlayer {
   city: string;
   license_date: Date;
   year: number;
-  is_active: boolean;
   created_at: Date;
   updated_at: Date;
 }

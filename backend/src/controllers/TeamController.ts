@@ -262,7 +262,7 @@ export class TeamController {
         JOIN players p ON tp.player_id = p.id
         WHERE EXISTS (
           SELECT 1 FROM licensed_players lp 
-          WHERE lp.year = YEAR(CURDATE()) AND lp.is_active = TRUE AND lp.player_id = p.id
+          WHERE lp.year = YEAR(CURDATE()) AND lp.player_id = p.id
         )
         GROUP BY t.id
         ORDER BY team_name

@@ -37,7 +37,7 @@ export class RatingController {
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT DISTINCT p.id as player_id, p.name as player_name, p.gender
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year IN (?, ?)
          ORDER BY p.name`,
         [currentYear, currentYear - 1]
       );
@@ -56,7 +56,7 @@ export class RatingController {
 
         // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND year IN (?, ?)`,
           [playerId, currentYear, currentYear - 1]
         );
 
@@ -119,11 +119,11 @@ export class RatingController {
         currentYear
       );
 
-      // Берем всех игроков с активной лицензией за текущий или прошлый год
+      // Берем всех игроков с лицензией за текущий или прошлый год
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT DISTINCT p.id as player_id, p.name as player_name
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year IN (?, ?)
          ORDER BY p.name`,
         [currentYear, currentYear - 1]
       );
@@ -141,7 +141,7 @@ export class RatingController {
 
         // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND year IN (?, ?)`,
           [playerId, currentYear, currentYear - 1]
         );
 
@@ -310,11 +310,11 @@ export class RatingController {
         currentYear
       );
 
-      // Берем всех мужчин с активной лицензией за текущий или прошлый год
+      // Берем всех мужчин с лицензией за текущий или прошлый год
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT DISTINCT p.id as player_id, p.name as player_name
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year IN (?, ?)
          WHERE p.gender = 'male'
          ORDER BY p.name`,
         [currentYear, currentYear - 1]
@@ -333,7 +333,7 @@ export class RatingController {
 
         // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND year IN (?, ?)`,
           [playerId, currentYear, currentYear - 1]
         );
 
@@ -412,11 +412,11 @@ export class RatingController {
         currentYear
       );
 
-      // Берем всех женщин с активной лицензией за текущий или прошлый год
+      // Берем всех женщин с лицензией за текущий или прошлый год
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT DISTINCT p.id as player_id, p.name as player_name
          FROM players p
-         JOIN licensed_players lp ON lp.player_id = p.id AND lp.is_active = TRUE AND lp.year IN (?, ?)
+         JOIN licensed_players lp ON lp.player_id = p.id AND lp.year IN (?, ?)
          WHERE p.gender = 'female'
          ORDER BY p.name`,
         [currentYear, currentYear - 1]
@@ -435,7 +435,7 @@ export class RatingController {
 
         // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
-          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+          `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND year IN (?, ?)`,
           [playerId, currentYear, currentYear - 1]
         );
 

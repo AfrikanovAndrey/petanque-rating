@@ -25,7 +25,7 @@ export class LicensedPlayerModel {
     return rows;
   }
 
-  // Получить активных лицензионных игроков текущего года
+  // Получить лицензионных игроков текущего года
   static async getActiveLicensedPlayers(
     year: number = new Date().getFullYear()
   ): Promise<(LicensedPlayer & { player_name: string })[]> {
@@ -35,7 +35,7 @@ export class LicensedPlayerModel {
       `SELECT lp.*, p.name as player_name 
        FROM licensed_players lp 
        LEFT JOIN players p ON lp.player_id = p.id 
-       WHERE lp.year = ? AND lp.is_active = TRUE 
+       WHERE lp.year = ? 
        ORDER BY p.name`,
       [year]
     );
@@ -91,15 +91,14 @@ export class LicensedPlayerModel {
 
       // 2. Добавляем лицензионного игрока
       const [result] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO licensed_players (player_id, license_number, city, license_date, year, is_active) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO licensed_players (player_id, license_number, city, license_date, year) 
+         VALUES (?, ?, ?, ?, ?)`,
         [
           playerId,
           playerData.license_number,
           playerData.city,
           playerData.license_date,
           playerData.year,
-          true,
         ]
       );
 
@@ -302,7 +301,7 @@ export class LicensedPlayerModel {
               // Обновляем существующую лицензию
               await connection.execute(
                 `UPDATE licensed_players 
-                 SET player_id = ?, city = ?, license_date = ?, year = ?, is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+                 SET player_id = ?, city = ?, license_date = ?, year = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE license_number = ?`,
                 [
                   playerId,
@@ -324,8 +323,8 @@ export class LicensedPlayerModel {
           } else {
             // Добавляем нового лицензионного игрока
             await connection.execute(
-              `INSERT INTO licensed_players (player_id, license_number, city, license_date, year, is_active) 
-               VALUES (?, ?, ?, ?, ?, TRUE)`,
+              `INSERT INTO licensed_players (player_id, license_number, city, license_date, year) 
+               VALUES (?, ?, ?, ?, ?)`,
               [
                 playerId,
                 player.license_number,
@@ -388,7 +387,6 @@ export class LicensedPlayerModel {
   // Получить статистику по лицензионным игрокам
   static async getStatistics(year: number = new Date().getFullYear()): Promise<{
     total: number;
-    active: number;
     cities: { city: string; count: number }[];
   }> {
     const [totalRows] = await pool.execute<RowDataPacket[]>(
@@ -396,15 +394,10 @@ export class LicensedPlayerModel {
       [year]
     );
 
-    const [activeRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT COUNT(*) as count FROM licensed_players WHERE year = ? AND is_active = TRUE",
-      [year]
-    );
-
     const [citiesRows] = await pool.execute<RowDataPacket[]>(
       `SELECT city, COUNT(*) as count 
        FROM licensed_players 
-       WHERE year = ? AND is_active = TRUE 
+       WHERE year = ? 
        GROUP BY city 
        ORDER BY count DESC`,
       [year]
@@ -412,7 +405,6 @@ export class LicensedPlayerModel {
 
     return {
       total: (totalRows[0] as any).count,
-      active: (activeRows[0] as any).count,
       cities: citiesRows as { city: string; count: number }[],
     };
   }

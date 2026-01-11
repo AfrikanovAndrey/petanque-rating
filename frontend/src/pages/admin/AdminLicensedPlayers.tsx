@@ -7,14 +7,12 @@ interface LicensedPlayer {
   city: string;
   license_date: string;
   year: number;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
 interface Statistics {
   total: number;
-  active: number;
   cities: { city: string; count: number }[];
 }
 
@@ -235,18 +233,12 @@ const AdminLicensedPlayers: React.FC = () => {
 
       {/* Статистика */}
       {statistics && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-blue-600">
               {statistics.total}
             </div>
             <div className="text-gray-600">Всего игроков</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">
-              {statistics.active}
-            </div>
-            <div className="text-gray-600">Активных игроков</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-purple-600">
@@ -357,9 +349,6 @@ const AdminLicensedPlayers: React.FC = () => {
                   Год
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Статус
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
                 </th>
               </tr>
@@ -381,17 +370,6 @@ const AdminLicensedPlayers: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {player.year}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        player.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {player.is_active ? "Активен" : "Неактивен"}
-                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button

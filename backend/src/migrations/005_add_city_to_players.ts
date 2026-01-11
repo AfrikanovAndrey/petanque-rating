@@ -35,7 +35,7 @@ export async function up(pool: Pool): Promise<void> {
     console.log("✓ Миграция 005: добавлена колонка city в таблицу players");
 
     // Копируем данные о городах из licensed_players в players
-    // Берем самую последнюю активную лицензию для каждого игрока
+    // Берем самую последнюю лицензию для каждого игрока
     await pool.execute(`
       UPDATE players p
       INNER JOIN (
@@ -49,10 +49,8 @@ export async function up(pool: Pool): Promise<void> {
             player_id, 
             MAX(year) as max_year
           FROM licensed_players
-          WHERE is_active = TRUE
           GROUP BY player_id
         ) latest ON lp.player_id = latest.player_id AND lp.year = latest.max_year
-        WHERE lp.is_active = TRUE
       ) latest_license ON p.id = latest_license.player_id
       SET p.city = latest_license.city
     `);

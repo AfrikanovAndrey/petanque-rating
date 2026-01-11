@@ -146,13 +146,12 @@ CREATE TABLE IF NOT EXISTS licensed_players (
   city VARCHAR(100) NOT NULL,
   license_date DATE NOT NULL,
   year INT NOT NULL,
-  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
   INDEX idx_player_id (player_id),
   INDEX idx_license_number (license_number),
-  INDEX idx_year_active (year, is_active),
+  INDEX idx_year (year),
   UNIQUE KEY unique_player_year (player_id, year)
 );
 
