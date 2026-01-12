@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 interface LicensedPlayer {
   id: number;
@@ -14,6 +14,12 @@ interface LicensedPlayer {
 interface Statistics {
   total: number;
   cities: { city: string; count: number }[];
+}
+
+interface Player {
+  id: number;
+  name: string;
+  city: string | null;
 }
 
 const AdminLicensedPlayers: React.FC = () => {
@@ -34,11 +40,43 @@ const AdminLicensedPlayers: React.FC = () => {
     license_date: "",
   });
 
+  // Состояния для автодополнения
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
+  const [filteredPlayers, setFilteredPlayers] = useState<Player[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadData();
     loadYears();
     loadStatistics();
   }, [selectedYear]);
+
+  useEffect(() => {
+    if (showModal && !editingPlayer) {
+      loadAllPlayers();
+    }
+  }, [showModal]);
+
+  // Закрытие списка при клике вне его
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("admin_token");
@@ -46,6 +84,20 @@ const AdminLicensedPlayers: React.FC = () => {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     };
+  };
+
+  const loadAllPlayers = async () => {
+    try {
+      const response = await fetch("/api/admin/players", {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAllPlayers(data.data);
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки игроков:", error);
+    }
   };
 
   const loadData = async () => {
@@ -133,6 +185,12 @@ const AdminLicensedPlayers: React.FC = () => {
   };
 
   const handleSave = async () => {
+    // Валидация: игрок должен быть выбран из списка
+    if (!editingPlayer && !selectedPlayerId) {
+      alert("Пожалуйста, выберите игрока из списка");
+      return;
+    }
+
     try {
       const url = editingPlayer
         ? `/api/admin/licensed-players/${editingPlayer.id}`
@@ -154,6 +212,12 @@ const AdminLicensedPlayers: React.FC = () => {
           player_name: "",
           license_date: "",
         });
+        // Очищаем состояние автодополнения
+        setShowSuggestions(false);
+        setFilteredPlayers([]);
+        setActiveSuggestionIndex(0);
+        setSelectedPlayerId(null);
+        setSearchQuery("");
         loadData();
         loadStatistics();
       } else {
@@ -196,6 +260,56 @@ const AdminLicensedPlayers: React.FC = () => {
     }
   };
 
+  // Обработчик изменения поля ФИО с автодополнением
+  const handlePlayerNameChange = (value: string) => {
+    setSearchQuery(value);
+    setSelectedPlayerId(null); // Сбрасываем выбор при изменении
+    setFormData({ ...formData, player_name: "" }); // Очищаем имя
+
+    if (value.trim().length > 0) {
+      const filtered = allPlayers.filter((player) =>
+        player.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredPlayers(filtered);
+      setShowSuggestions(filtered.length > 0);
+      setActiveSuggestionIndex(0);
+    } else {
+      setShowSuggestions(false);
+      setFilteredPlayers([]);
+    }
+  };
+
+  // Выбор игрока из списка
+  const handleSelectPlayer = (player: Player) => {
+    setFormData({ ...formData, player_name: player.name });
+    setSearchQuery(player.name);
+    setSelectedPlayerId(player.id);
+    setShowSuggestions(false);
+    setFilteredPlayers([]);
+  };
+
+  // Обработка клавиш для навигации по списку
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSuggestionIndex((prev) =>
+        prev < filteredPlayers.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSuggestionIndex((prev) => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredPlayers[activeSuggestionIndex]) {
+        handleSelectPlayer(filteredPlayers[activeSuggestionIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ru-RU");
   };
@@ -215,7 +329,11 @@ const AdminLicensedPlayers: React.FC = () => {
           Лицензированные игроки
         </h1>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setShowModal(true);
+            setSearchQuery("");
+            setSelectedPlayerId(null);
+          }}
           className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
         >
           Добавить лицензию
@@ -397,26 +515,70 @@ const AdminLicensedPlayers: React.FC = () => {
                 {editingPlayer ? "Редактировать лицензию" : "Добавить лицензию"}
               </h3>
               <div className="space-y-4">
-                <div>
+                <div className="relative" ref={suggestionsRef}>
                   <label className="block text-sm font-medium text-gray-700">
                     ФИО игрока
                   </label>
                   <input
                     type="text"
-                    value={formData.player_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, player_name: e.target.value })
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Введите полное ФИО игрока"
+                    value={searchQuery}
+                    onChange={(e) => handlePlayerNameChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                      if (searchQuery && filteredPlayers.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    className={`mt-1 block w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      selectedPlayerId
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-300"
+                    }`}
+                    placeholder="Начните вводить ФИО игрока"
                     disabled={!!editingPlayer}
                     required
+                    autoComplete="off"
                   />
-                  {!editingPlayer && (
-                    <p className="mt-1 text-sm text-gray-500">
-                      Игрок должен быть создан в разделе "Игроки"
+                  {!editingPlayer && !selectedPlayerId && (
+                    <p className="mt-1 text-sm text-red-500">
+                      ⚠️ Выберите игрока из списка
                     </p>
                   )}
+                  {!editingPlayer && selectedPlayerId && (
+                    <p className="mt-1 text-sm text-green-600">
+                      ✓ Игрок выбран
+                    </p>
+                  )}
+                  <p className="mt-1 text-sm text-gray-500">
+                    Можно выбрать существующего игрока. В случае отсутствия -
+                    игрока нужно предварительно создать в разделе "Игроки"
+                  </p>
+
+                  {/* Список автодополнения */}
+                  {showSuggestions &&
+                    !editingPlayer &&
+                    filteredPlayers.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {filteredPlayers.map((player, index) => (
+                          <div
+                            key={player.id}
+                            onClick={() => handleSelectPlayer(player)}
+                            className={`px-3 py-2 cursor-pointer ${
+                              index === activeSuggestionIndex
+                                ? "bg-blue-100 text-blue-900"
+                                : "hover:bg-gray-100"
+                            }`}
+                          >
+                            <div className="font-medium">{player.name}</div>
+                            {player.city && (
+                              <div className="text-xs text-gray-500">
+                                {player.city}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -434,7 +596,8 @@ const AdminLicensedPlayers: React.FC = () => {
                     required
                   />
                   <p className="mt-1 text-sm text-gray-500">
-                    Можно указать дату только для текущего {new Date().getFullYear()} года
+                    Можно указать дату только для текущего{" "}
+                    {new Date().getFullYear()} года
                   </p>
                 </div>
               </div>
@@ -447,6 +610,12 @@ const AdminLicensedPlayers: React.FC = () => {
                       player_name: "",
                       license_date: "",
                     });
+                    // Очищаем состояние автодополнения
+                    setShowSuggestions(false);
+                    setFilteredPlayers([]);
+                    setActiveSuggestionIndex(0);
+                    setSelectedPlayerId(null);
+                    setSearchQuery("");
                   }}
                   className="px-4 py-2 text-gray-500 hover:text-gray-700"
                 >
