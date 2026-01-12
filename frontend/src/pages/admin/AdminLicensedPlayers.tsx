@@ -235,6 +235,7 @@ const AdminLicensedPlayers: React.FC = () => {
       player_name: player.player_name,
       license_date: player.license_date.split("T")[0],
     });
+    setSearchQuery(player.player_name); // Устанавливаем имя игрока в поле поиска
     setShowModal(true);
   };
 
