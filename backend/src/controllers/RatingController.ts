@@ -242,7 +242,7 @@ export class RatingController {
 
       // Получаем лицензии игрока за текущий и прошлый год
       const [licensesRows] = await pool.execute<RowDataPacket[]>(
-        `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND is_active = TRUE AND year IN (?, ?)`,
+        `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND year IN (?, ?)`,
         [playerId, currentYear, currentYear - 1]
       );
 
