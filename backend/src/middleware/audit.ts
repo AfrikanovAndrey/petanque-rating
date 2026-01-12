@@ -20,6 +20,13 @@ export const auditLog = (options: {
       return next();
     }
 
+    // Проверяем, не был ли уже установлен audit listener для этого запроса
+    // Это предотвращает дублирование записей в аудите
+    if ((req as any).__auditListenerSet) {
+      return next();
+    }
+    (req as any).__auditListenerSet = true;
+
     // Сохраняем оригинальные методы res
     const originalJson = res.json.bind(res);
     const originalSend = res.send.bind(res);
@@ -277,6 +284,13 @@ export const auditChanges = (options: {
       return next();
     }
 
+    // Проверяем, не был ли уже установлен audit listener для этого запроса
+    // Это предотвращает дублирование записей в аудите
+    if ((req as any).__auditChangesListenerSet) {
+      return next();
+    }
+    (req as any).__auditChangesListenerSet = true;
+
     // Получаем старое значение до выполнения операции
     let oldValue: any = null;
     if (options.getOldValue) {
@@ -359,6 +373,13 @@ export const auditLogDelete = (options: {
     if (!req.userId || !req.username || !req.userRole) {
       return next();
     }
+
+    // Проверяем, не был ли уже установлен audit listener для этого запроса
+    // Это предотвращает дублирование записей в аудите
+    if ((req as any).__auditDeleteListenerSet) {
+      return next();
+    }
+    (req as any).__auditDeleteListenerSet = true;
 
     try {
       // Получаем ID сущности
