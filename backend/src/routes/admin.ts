@@ -284,10 +284,10 @@ router.put(
   AdminController.updateLicensedPlayer
 );
 
-// DELETE /api/admin/licensed-players/:playerId - удалить лицензионного игрока (только ADMIN)
+// DELETE /api/admin/licensed-players/:playerId - удалить лицензионного игрока (ADMIN и MANAGER)
 router.delete(
   "/licensed-players/:playerId",
-  requireAdmin,
+  authenticateAdmin,
   auditLogDelete({
     action: "DELETE_PLAYER",
     entityType: "licensed_player",
