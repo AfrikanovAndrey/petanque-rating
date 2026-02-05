@@ -18,7 +18,13 @@ const router = Router();
 // GET /api/admin/test-google-sheets-api - тестирование Google Sheets API ключа
 router.get(
   "/test-google-sheets-api",
-  TournamentController.testGoogleSheetsApiKey
+  TournamentController.testGoogleSheetsApiKey,
+);
+
+// GET /api/admin/settings/best-results-count - получить количество лучших результатов (публичный доступ)
+router.get(
+  "/settings/best-results-count",
+  SettingsController.getBestResultsCount,
 );
 
 // Применяем middleware авторизации ко всем остальным админским роутам
@@ -42,7 +48,7 @@ router.post(
     getDescription: (req) =>
       `Создание пользователя ${req.body.name || req.body.username}`,
   }),
-  UserController.createUser
+  UserController.createUser,
 );
 
 // PUT /api/admin/users/:userId - обновить пользователя
@@ -56,7 +62,7 @@ router.put(
     getEntityName: (req) => req.body.username || null,
     getDescription: (req) => `Обновление пользователя ID ${req.params.userId}`,
   }),
-  UserController.updateUser
+  UserController.updateUser,
 );
 
 // DELETE /api/admin/users/:userId - удалить пользователя
@@ -70,7 +76,7 @@ router.delete(
     getDescription: (req, entityName) =>
       `Удаление пользователя ${entityName || "ID " + req.params.userId}`,
   }),
-  UserController.deleteUser
+  UserController.deleteUser,
 );
 
 // === УПРАВЛЕНИЕ ТУРНИРАМИ ===
@@ -88,7 +94,7 @@ router.post(
         req.body.tournament_name || "без названия"
       }" из файла`,
   }),
-  AdminController.uploadTournament
+  AdminController.uploadTournament,
 );
 
 // POST /api/admin/tournaments/upload-from-google-sheets - загрузка турнира из Google Sheets
@@ -101,13 +107,13 @@ router.post(
     getDescription: (req) =>
       `Загрузка турнира из Google Sheets: ${req.body.tournament_name}`,
   }),
-  AdminController.uploadTournamentFromGoogleSheets
+  AdminController.uploadTournamentFromGoogleSheets,
 );
 
 // POST /api/admin/tournaments/check-google-sheets - проверка доступности Google таблицы
 router.post(
   "/tournaments/check-google-sheets",
-  TournamentController.checkGoogleSheetsAccess
+  TournamentController.checkGoogleSheetsAccess,
 );
 
 // GET /api/admin/tournaments - получить все турниры
@@ -126,7 +132,7 @@ router.put(
     // entity_name будет получено автоматически из БД через getEntityNameFromDB
     getDescription: (req) => `Обновление турнира ID ${req.params.tournamentId}`,
   }),
-  AdminController.updateTournament
+  AdminController.updateTournament,
 );
 
 // DELETE /api/admin/tournaments/:tournamentId - удалить турнир (ADMIN и MANAGER)
@@ -139,7 +145,7 @@ router.delete(
     getDescription: (req, entityName) =>
       `Удаление турнира "${entityName || "ID " + req.params.tournamentId}"`,
   }),
-  AdminController.deleteTournament
+  AdminController.deleteTournament,
 );
 
 // DELETE /api/admin/tournaments/results/:resultId - удалить результат (турнир/кубок) (только ADMIN)
@@ -155,7 +161,7 @@ router.delete(
         entityName || "ID " + req.params.resultId
       }"`,
   }),
-  TournamentController.deleteTournamentResult
+  TournamentController.deleteTournamentResult,
 );
 
 // === УПРАВЛЕНИЕ ИГРОКАМИ ===
@@ -172,7 +178,7 @@ router.post(
     getEntityName: (req) => req.body.name || null,
     getDescription: (req) => `Создание игрока ${req.body.name}`,
   }),
-  AdminController.createPlayer
+  AdminController.createPlayer,
 );
 
 // POST /api/admin/players/upload-text - массовая загрузка игроков из текстового файла
@@ -184,7 +190,7 @@ router.post(
     entityType: "player",
     getDescription: (req) => `Массовая загрузка игроков из файла`,
   }),
-  AdminController.uploadPlayersFromText
+  AdminController.uploadPlayersFromText,
 );
 
 // PUT /api/admin/players/:playerId - обновить игрока
@@ -197,7 +203,7 @@ router.put(
     getEntityName: (req) => req.body.name || null,
     getDescription: (req) => `Обновление игрока ID ${req.params.playerId}`,
   }),
-  AdminController.updatePlayer
+  AdminController.updatePlayer,
 );
 
 // DELETE /api/admin/players/:playerId - удалить игрока (ADMIN и MANAGER, если игрок не участвовал в турнирах)
@@ -210,17 +216,10 @@ router.delete(
     getDescription: (req, entityName) =>
       `Удаление игрока ${entityName || "ID " + req.params.playerId}`,
   }),
-  AdminController.deletePlayer
+  AdminController.deletePlayer,
 );
 
 // === НАСТРОЙКИ РЕЙТИНГА (только для ADMIN) ===
-
-// GET /api/admin/settings/best-results-count - получить количество лучших результатов
-router.get(
-  "/settings/best-results-count",
-  requireAdmin,
-  SettingsController.getBestResultsCount
-);
 
 // PUT /api/admin/settings/best-results-count - обновить количество лучших результатов
 router.put(
@@ -232,7 +231,7 @@ router.put(
     getDescription: (req) =>
       `Изменение количества лучших результатов: ${req.body.count}`,
   }),
-  SettingsController.setBestResultsCount
+  SettingsController.setBestResultsCount,
 );
 
 // GET /api/admin/settings - получить все настройки
@@ -246,7 +245,7 @@ router.get("/licensed-players", AdminController.getLicensedPlayers);
 // GET /api/admin/licensed-players/active - получить активных лицензионных игроков
 router.get(
   "/licensed-players/active",
-  AdminController.getActiveLicensedPlayers
+  AdminController.getActiveLicensedPlayers,
 );
 
 // GET /api/admin/licensed-players/years - получить доступные годы
@@ -255,7 +254,7 @@ router.get("/licensed-players/years", AdminController.getLicensedPlayersYears);
 // GET /api/admin/licensed-players/statistics - получить статистику
 router.get(
   "/licensed-players/statistics",
-  AdminController.getLicensedPlayersStatistics
+  AdminController.getLicensedPlayersStatistics,
 );
 
 // POST /api/admin/licensed-players - создать лицензионного игрока
@@ -268,7 +267,7 @@ router.post(
     getDescription: (req) =>
       `Создание лицензионного игрока ${req.body.player_name}`,
   }),
-  AdminController.createLicensedPlayer
+  AdminController.createLicensedPlayer,
 );
 
 // PUT /api/admin/licensed-players/:playerId - обновить лицензионного игрока
@@ -281,7 +280,7 @@ router.put(
     getDescription: (req) =>
       `Обновление лицензионного игрока ID ${req.params.playerId}`,
   }),
-  AdminController.updateLicensedPlayer
+  AdminController.updateLicensedPlayer,
 );
 
 // DELETE /api/admin/licensed-players/:playerId - удалить лицензионного игрока (ADMIN и MANAGER)
@@ -297,7 +296,7 @@ router.delete(
         entityName || "ID " + req.params.playerId
       }`,
   }),
-  AdminController.deleteLicensedPlayer
+  AdminController.deleteLicensedPlayer,
 );
 
 // POST /api/admin/licensed-players/upload - загрузка списка из Excel файла
@@ -309,7 +308,7 @@ router.post(
     entityType: "licensed_player",
     getDescription: (req) => `Загрузка лицензионных игроков из файла`,
   }),
-  AdminController.uploadLicensedPlayers
+  AdminController.uploadLicensedPlayers,
 );
 
 // === ПЕРЕСЧЁТ РЕЙТИНГА ===
@@ -317,7 +316,7 @@ router.post(
 router.post(
   "/tournaments/recalculate-points",
   requireAdmin,
-  AdminController.recalculateTournamentPoints
+  AdminController.recalculateTournamentPoints,
 );
 
 // POST /api/admin/tournaments/:tournamentId/recalculate-points - пересчитать очки конкретного турнира (только ADMIN)
@@ -349,7 +348,7 @@ router.post(
         message: "Ошибка пересчёта очков: " + (error as Error).message,
       });
     }
-  }
+  },
 );
 
 // === ЛОГИ АУДИТА (только для ADMIN) ===
@@ -360,49 +359,49 @@ router.get("/audit-logs", requireAdmin, AdminAuditController.getAuditLogs);
 router.get(
   "/audit-logs/statistics",
   requireAdmin,
-  AdminAuditController.getStatistics
+  AdminAuditController.getStatistics,
 );
 
 // GET /api/admin/audit-logs/actions - получить список доступных действий
 router.get(
   "/audit-logs/actions",
   requireAdmin,
-  AdminAuditController.getAvailableActions
+  AdminAuditController.getAvailableActions,
 );
 
 // GET /api/admin/audit-logs/entity-types - получить список типов сущностей
 router.get(
   "/audit-logs/entity-types",
   requireAdmin,
-  AdminAuditController.getEntityTypes
+  AdminAuditController.getEntityTypes,
 );
 
 // GET /api/admin/audit-logs/user/:userId - получить историю действий пользователя
 router.get(
   "/audit-logs/user/:userId",
   requireAdmin,
-  AdminAuditController.getUserAuditHistory
+  AdminAuditController.getUserAuditHistory,
 );
 
 // GET /api/admin/audit-logs/entity/:entityType/:entityId - получить историю изменений сущности
 router.get(
   "/audit-logs/entity/:entityType/:entityId",
   requireAdmin,
-  AdminAuditController.getEntityAuditHistory
+  AdminAuditController.getEntityAuditHistory,
 );
 
 // GET /api/admin/audit-logs/:id - получить конкретную запись аудита
 router.get(
   "/audit-logs/:id",
   requireAdmin,
-  AdminAuditController.getAuditLogById
+  AdminAuditController.getAuditLogById,
 );
 
 // DELETE /api/admin/audit-logs/cleanup - удалить старые записи
 router.delete(
   "/audit-logs/cleanup",
   requireAdmin,
-  AdminAuditController.cleanup
+  AdminAuditController.cleanup,
 );
 
 export default router;
