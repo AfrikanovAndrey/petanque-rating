@@ -1,6 +1,10 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { TrophyIcon, ChartBarIcon } from "@heroicons/react/24/outline";
+import {
+  TrophyIcon,
+  ChartBarIcon,
+  DocumentTextIcon,
+} from "@heroicons/react/24/outline";
 import { cn } from "../utils";
 
 const PublicNavigation: React.FC = () => {
@@ -18,6 +22,12 @@ const PublicNavigation: React.FC = () => {
       href: "/tournaments",
       icon: TrophyIcon,
       current: location.pathname === "/tournaments",
+    },
+    {
+      name: "Правила расчёта рейтинга",
+      href: "/rating-rules",
+      icon: DocumentTextIcon,
+      current: location.pathname === "/rating-rules",
     },
   ];
 
@@ -53,7 +63,7 @@ const PublicNavigation: React.FC = () => {
                     "inline-flex items-center px-1 py-1 pt-1 border-b-2 text-xs md:text-sm font-medium transition-colors duration-200",
                     item.current
                       ? "border-primary-500 text-gray-900"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700",
                   )}
                 >
                   <Icon className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2" />
@@ -75,7 +85,7 @@ const PublicNavigation: React.FC = () => {
                     "inline-flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200",
                     item.current
                       ? "bg-primary-100 text-primary-700"
-                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -100,7 +110,7 @@ const PublicNavigation: React.FC = () => {
                   "flex items-center pl-3 pr-4 py-2 text-sm font-medium transition-colors duration-200",
                   item.current
                     ? "bg-primary-50 border-r-4 border-primary-500 text-primary-700"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-800",
                 )}
               >
                 <Icon className="h-5 w-5 mr-3" />
