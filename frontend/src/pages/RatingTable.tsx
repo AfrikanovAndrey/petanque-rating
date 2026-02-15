@@ -115,6 +115,19 @@ const RatingTable: React.FC = () => {
     });
   }, [ratingData, searchTerm]);
 
+  // Дата последнего внесённого турнира (максимальная tournament_date по всем результатам)
+  const lastTournamentDate = useMemo(() => {
+    if (!ratingData || ratingData.length === 0) return null;
+    let latest: string | null = null;
+    for (const player of ratingData) {
+      for (const result of player.all_results || []) {
+        const d = result.tournament_date;
+        if (d && (!latest || d > latest)) latest = d;
+      }
+    }
+    return latest;
+  }, [ratingData]);
+
   const clearSearch = () => {
     setSearchTerm("");
   };
@@ -219,7 +232,8 @@ const RatingTable: React.FC = () => {
           {ratingData?.length || 0} игроков)
         </p>
         <p className="text-xs sm:text-sm text-gray-500 mt-1 px-2">
-          Последнее обновление: {new Date().toLocaleString("ru-RU")}
+          Последнее обновление рейтинга:{" "}
+          {lastTournamentDate ? formatDate(lastTournamentDate) : "—"}
         </p>
 
         {/* Поле поиска */}
