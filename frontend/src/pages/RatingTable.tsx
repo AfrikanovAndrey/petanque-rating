@@ -312,7 +312,8 @@ const RatingTable: React.FC = () => {
                   {filteredRatingData.map(
                     (player: PlayerRating, index: number) => {
                       const isExpanded = expandedPlayers.has(player.player_id);
-                      const rank = index + 1;
+                      // При фильтрации показываем реальное место в рейтинге, а не позицию в отфильтрованном списке
+                      const rank = player.rank ?? index + 1;
                       const playerKey =
                         player.player_id ||
                         `licensed_${
@@ -509,7 +510,8 @@ const RatingTable: React.FC = () => {
             <div className="md:hidden divide-y divide-gray-200">
               {filteredRatingData.map((player: PlayerRating, index: number) => {
                 const isExpanded = expandedPlayers.has(player.player_id);
-                const rank = index + 1;
+                // При фильтрации показываем реальное место в рейтинге
+                const rank = player.rank ?? index + 1;
                 const playerKey =
                   player.player_id ||
                   `licensed_${player.licensed_name || player.player_name}`;
