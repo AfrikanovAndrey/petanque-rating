@@ -346,9 +346,9 @@ function getPlayersRange(
 
   if (playersCount <= 60) {
     return "36-60";
-  } else if (totalTeams <= 84) {
+  } else if (playersCount <= 84) {
     return "61-84";
-  } else if (totalTeams <= 108) {
+  } else if (playersCount <= 108) {
     return "85-108";
   } else {
     return "109+";
