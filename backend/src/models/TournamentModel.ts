@@ -236,7 +236,6 @@ export class TournamentModel {
       `
       SELECT 
         tr.id, 
-        tr.type,
         tr.cup_position, 
         tr.cup, 
         tr.team_id, 
