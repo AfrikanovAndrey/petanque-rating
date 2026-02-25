@@ -253,9 +253,15 @@ export const adminApi = {
 
   // === ПЕРЕСЧЁТ РЕЙТИНГА ===
 
-  // Пересчитать очки для всех турниров
+  // Пересчитать очки всех турниров текущего календарного года
   recalculateTournamentPoints: (): Promise<AxiosResponse<ApiResponse>> =>
     api.post("/admin/tournaments/recalculate-points"),
+
+  // Пересчитать очки конкретного турнира
+  recalculateTournamentPointsById: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.post(`/admin/tournaments/${tournamentId}/recalculate-points`),
 
   // === ЛОГИ АУДИТА (только для ADMIN) ===
   // Получить логи аудита с фильтрацией

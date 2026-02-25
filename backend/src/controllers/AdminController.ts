@@ -1249,7 +1249,7 @@ export class AdminController {
 
   // ==== ПЕРЕСЧЁТ РЕЙТИНГА ====
 
-  // Пересчитать очки для всех турниров
+  // Пересчитать очки всех турниров текущего календарного года
   static async recalculateTournamentPoints(
     req: Request,
     res: Response

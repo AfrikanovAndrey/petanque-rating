@@ -312,7 +312,7 @@ router.post(
 );
 
 // === ПЕРЕСЧЁТ РЕЙТИНГА ===
-// POST /api/admin/tournaments/recalculate-points - пересчитать очки всех турниров (только ADMIN)
+// POST /api/admin/tournaments/recalculate-points - пересчитать очки всех турниров текущего календарного года (только ADMIN)
 router.post(
   "/tournaments/recalculate-points",
   requireAdmin,

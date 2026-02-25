@@ -1,4 +1,5 @@
 import {
+  ArrowPathIcon,
   CalendarIcon,
   DocumentArrowUpIcon,
   PencilIcon,
@@ -253,6 +254,24 @@ const AdminTournaments: React.FC = () => {
     }
   );
 
+  // Мутация для пересчёта очков конкретного турнира
+  const recalculateMutation = useMutation(
+    async (tournamentId: number) => {
+      return await adminApi.recalculateTournamentPointsById(tournamentId);
+    },
+    {
+      onSuccess: (_, tournamentId) => {
+        toast.success("Очки турнира пересчитаны!");
+        queryClient.invalidateQueries("tournaments");
+        queryClient.invalidateQueries("fullRating");
+        queryClient.invalidateQueries("dashboardRating");
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
   // Мутация для получения деталей турнира
   const detailsMutation = useMutation(
     async (tournamentId: number) => {
@@ -417,9 +436,14 @@ const AdminTournaments: React.FC = () => {
                       <div className="flex items-center">
                         <TrophyIcon className="h-6 w-6 text-gray-400 mr-3" />
                         <div className="flex items-center">
-                          <div className="text-sm font-medium text-gray-900">
+                          <button
+                            onClick={() => handleViewDetails(tournament.id)}
+                            disabled={detailsMutation.isLoading}
+                            className="text-sm font-medium text-gray-900 hover:text-primary-600 hover:underline text-left cursor-pointer"
+                            title="Просмотр результатов"
+                          >
                             {tournament.name}
-                          </div>
+                          </button>
                           {getTournamentTypeIcons(tournament.type)}
                         </div>
                       </div>
@@ -459,12 +483,33 @@ const AdminTournaments: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         <button
-                          onClick={() => handleViewDetails(tournament.id)}
-                          disabled={detailsMutation.isLoading}
-                          className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 text-sm font-medium"
-                          title="Просмотр результатов"
+                          onClick={() =>
+                            recalculateMutation.mutate(tournament.id)
+                          }
+                          disabled={
+                            tournament.manual ||
+                            (recalculateMutation.isLoading &&
+                              recalculateMutation.variables === tournament.id)
+                          }
+                          className={`p-1 rounded ${
+                            tournament.manual
+                              ? "text-gray-300 cursor-not-allowed"
+                              : "text-amber-600 hover:text-amber-900 hover:bg-amber-50"
+                          }`}
+                          title={
+                            tournament.manual
+                              ? "Недоступно для турниров с ручным вводом"
+                              : "Пересчитать очки турнира"
+                          }
                         >
-                          Результаты
+                          <ArrowPathIcon
+                            className={`h-4 w-4 ${
+                              recalculateMutation.isLoading &&
+                              recalculateMutation.variables === tournament.id
+                                ? "animate-spin"
+                                : ""
+                            }`}
+                          />
                         </button>
                         <button
                           onClick={() => handleOpenEditModal(tournament)}

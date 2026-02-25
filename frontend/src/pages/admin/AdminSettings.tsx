@@ -24,7 +24,7 @@ const AdminSettings: React.FC = () => {
     async () => {
       const response = await adminApi.getBestResultsCount();
       return response.data.data?.best_results_count || 8;
-    }
+    },
   );
 
   // Устанавливаем значение по умолчанию для формы
@@ -49,7 +49,7 @@ const AdminSettings: React.FC = () => {
       onError: (error) => {
         toast.error(handleApiError(error));
       },
-    }
+    },
   );
 
   const recalculatePointsMutation = useMutation(
@@ -67,7 +67,7 @@ const AdminSettings: React.FC = () => {
       onError: (error) => {
         toast.error(handleApiError(error));
       },
-    }
+    },
   );
 
   const onSubmitBestResults = (data: BestResultsForm) => {
@@ -157,8 +157,9 @@ const AdminSettings: React.FC = () => {
             </h2>
           </div>
           <p className="text-gray-600 mb-6">
-            Пересчитать очки для всех турниров на основе текущей логики расчёта.
-            Используйте эту функцию, если изменилась формула расчёта очков.
+            Пересчет очков всех турниров текущего календарного года на основе
+            текущей логики расчёта. Используйте эту функцию, если изменилась
+            формула расчёта очков.
           </p>
 
           {!showRecalculateConfirm ? (
@@ -172,8 +173,8 @@ const AdminSettings: React.FC = () => {
           ) : (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <p className="text-amber-900 font-medium mb-4">
-                Вы уверены? Это действие пересчитает очки для всех результатов
-                всех турниров.
+                Вы уверены? Это действие пересчитает очки для всех турниров
+                текущего календарного года.
               </p>
               <div className="flex gap-3">
                 <button
