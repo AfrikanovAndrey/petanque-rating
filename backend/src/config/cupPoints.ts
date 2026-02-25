@@ -1,250 +1,165 @@
-import { Cup, CupPosition, TournamentCategoryEnum } from "../types";
+import {
+  Cup,
+  CupPosition,
+  TournamentCategoryEnum,
+  TournamentType,
+} from "../types";
 
 // Структура для хранения очков за кубки согласно таблице РФП
 // Ключ: "category-cup_type-teams_range"
 // Значение: Map<позиция, очки>
 
-type TeamsRange = "8-12" | "13-18" | "19-24" | "25-30" | "31-36" | "36+";
-type CupPointsKey = `${TournamentCategoryEnum}-${string}-${TeamsRange}`;
+type PlayersRange = "36-60" | "61-84" | "85-108" | "109+";
+type CupPointsKey = `${TournamentCategoryEnum}-${string}-${PlayersRange}`;
 
 export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
   // ТУРНИРЫ 1 КАТЕГОРИИ
 
-  // Кубок A, 8-12 команд
+  // Кубок A, 61-84 участников
   [
-    "1-A-8-12",
-    new Map([
-      [CupPosition.WINNER, 10], // П
-      [CupPosition.RUNNER_UP, 8], // Ф
-      [CupPosition.ROUND_OF_4, 6], // 1/2
-      [CupPosition.ROUND_OF_8, 5], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 13-18 команд
-  [
-    "1-A-13-18",
-    new Map([
-      [CupPosition.WINNER, 11], // П
-      [CupPosition.RUNNER_UP, 9], // Ф
-      [CupPosition.ROUND_OF_4, 7], // 1/2
-      [CupPosition.ROUND_OF_8, 6], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 19-24 команды
-  [
-    "1-A-19-24",
-    new Map([
-      [CupPosition.WINNER, 12], // П
-      [CupPosition.RUNNER_UP, 10], // Ф
-      [CupPosition.ROUND_OF_4, 8], // 1/2
-      [CupPosition.ROUND_OF_8, 7], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 25-30 команд
-  [
-    "1-A-25-30",
+    "1-A-61-84",
     new Map([
       [CupPosition.WINNER, 13], // П
       [CupPosition.RUNNER_UP, 11], // Ф
-      [CupPosition.ROUND_OF_4, 9], // 1/2
-      [CupPosition.ROUND_OF_8, 8], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 31-36 команд
-  [
-    "1-A-31-36",
-    new Map([
-      [CupPosition.WINNER, 14], // П
-      [CupPosition.RUNNER_UP, 12], // Ф
       [CupPosition.ROUND_OF_4, 10], // 1/2
       [CupPosition.ROUND_OF_8, 9], // 1/4
     ]),
   ],
 
-  // Кубок A, >36 команд
+  // Кубок A, 85-108 участников
   [
-    "1-A-36+",
+    "1-A-85-108",
     new Map([
-      [CupPosition.WINNER, 16], // П
-      [CupPosition.RUNNER_UP, 14], // Ф
-      [CupPosition.ROUND_OF_4, 12], // 1/2
-      [CupPosition.ROUND_OF_8, 11], // 1/4
+      [CupPosition.WINNER, 15], // П
+      [CupPosition.RUNNER_UP, 13], // Ф
+      [CupPosition.ROUND_OF_4, 11], // 1/2
+      [CupPosition.ROUND_OF_8, 10], // 1/4
+      [CupPosition.ROUND_OF_16, 9], // 1/8
     ]),
   ],
 
-  // Кубок Б, 13-18 команд (начинается с 13 команд)
+  // Кубок A, > 109 участников
   [
-    "1-B-13-18",
+    "1-A-109+",
     new Map([
-      [CupPosition.WINNER, 5], // П
-      [CupPosition.RUNNER_UP, 4], // Ф
+      [CupPosition.WINNER, 17], // П
+      [CupPosition.RUNNER_UP, 15], // Ф
+      [CupPosition.ROUND_OF_4, 13], // 1/2
+      [CupPosition.ROUND_OF_8, 11], // 1/4
+      [CupPosition.ROUND_OF_16, 10], // 1/8
+    ]),
+  ],
+
+  // Кубок Б
+  [
+    "1-B-61-84",
+    new Map([
+      [CupPosition.WINNER, 9], // П
+      [CupPosition.RUNNER_UP, 8], // Ф
+      [CupPosition.ROUND_OF_4, 7], // 1/2
+      [CupPosition.ROUND_OF_8, 6], // 1/4
     ]),
   ],
 
   // Кубок Б, 19-24 команды
   [
-    "1-B-19-24",
-    new Map([
-      [CupPosition.WINNER, 6], // П
-      [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.ROUND_OF_4, 4], // 1/2
-    ]),
-  ],
-
-  // Кубок Б, 25-30 команд
-  [
-    "1-B-25-30",
-    new Map([
-      [CupPosition.WINNER, 7], // П
-      [CupPosition.RUNNER_UP, 6], // Ф
-      [CupPosition.ROUND_OF_4, 5], // 1/2
-      [CupPosition.ROUND_OF_8, 4], // 1/4
-    ]),
-  ],
-
-  // Кубок Б, 31-36 команд
-  [
-    "1-B-31-36",
-    new Map([
-      [CupPosition.WINNER, 8], // П
-      [CupPosition.RUNNER_UP, 7], // Ф
-      [CupPosition.ROUND_OF_4, 6], // 1/2
-      [CupPosition.ROUND_OF_8, 5], // 1/4
-    ]),
-  ],
-
-  // Кубок Б, >36 команд
-  [
-    "1-B-36+",
-    new Map([
-      [CupPosition.WINNER, 9], // П
-      [CupPosition.RUNNER_UP, 8], // Ф
-      [CupPosition.ROUND_OF_4, 7], // 1/2
-      [CupPosition.ROUND_OF_8, 6], // 1/4
-    ]),
-  ],
-
-  // ТУРНИРЫ 2 КАТЕГОРИИ
-
-  // Кубок A, 8-12 команд
-  [
-    "2-A-8-12",
-    new Map([
-      [CupPosition.WINNER, 6], // П
-      [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.ROUND_OF_4, 4], // 1/2
-      [CupPosition.ROUND_OF_8, 3], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 13-18 команд
-  [
-    "2-A-13-18",
-    new Map([
-      [CupPosition.WINNER, 7], // П
-      [CupPosition.RUNNER_UP, 6], // Ф
-      [CupPosition.ROUND_OF_4, 5], // 1/2
-      [CupPosition.ROUND_OF_8, 4], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 19-24 команды
-  [
-    "2-A-19-24",
-    new Map([
-      [CupPosition.WINNER, 8], // П
-      [CupPosition.RUNNER_UP, 7], // Ф
-      [CupPosition.ROUND_OF_4, 6], // 1/2
-      [CupPosition.ROUND_OF_8, 5], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 25-30 команд
-  [
-    "2-A-25-30",
-    new Map([
-      [CupPosition.WINNER, 9], // П
-      [CupPosition.RUNNER_UP, 8], // Ф
-      [CupPosition.ROUND_OF_4, 7], // 1/2
-      [CupPosition.ROUND_OF_8, 6], // 1/4
-    ]),
-  ],
-
-  // Кубок A, 31-36 команд
-  [
-    "2-A-31-36",
+    "1-B-85-108",
     new Map([
       [CupPosition.WINNER, 10], // П
       [CupPosition.RUNNER_UP, 9], // Ф
       [CupPosition.ROUND_OF_4, 8], // 1/2
       [CupPosition.ROUND_OF_8, 7], // 1/4
+      [CupPosition.ROUND_OF_16, 6], // 1/8
     ]),
   ],
 
-  // Кубок A, >36 команд
+  // Кубок Б
   [
-    "2-A-36+",
+    "1-B-109+",
     new Map([
-      [CupPosition.WINNER, 12], // П
+      [CupPosition.WINNER, 11], // П
+      [CupPosition.RUNNER_UP, 10], // Ф
+      [CupPosition.ROUND_OF_4, 9], // 1/2
+      [CupPosition.ROUND_OF_8, 8], // 1/4
+      [CupPosition.ROUND_OF_16, 7], // 1/8
+    ]),
+  ],
+
+  // ##### ТУРНИРЫ 2 КАТЕГОРИИ #####
+
+  [
+    "2-A-36-60",
+    new Map([
+      [CupPosition.WINNER, 9], // П
+      [CupPosition.RUNNER_UP, 7], // Ф
+      [CupPosition.ROUND_OF_4, 6], // 1/2
+    ]),
+  ],
+  [
+    "2-A-61-84",
+    new Map([
+      [CupPosition.WINNER, 11], // П
+      [CupPosition.RUNNER_UP, 9], // Ф
+      [CupPosition.ROUND_OF_4, 8], // 1/2
+      [CupPosition.ROUND_OF_8, 7], // 1/4
+    ]),
+  ],
+  [
+    "2-A-85-108",
+    new Map([
+      [CupPosition.WINNER, 13], // П
       [CupPosition.RUNNER_UP, 11], // Ф
       [CupPosition.ROUND_OF_4, 10], // 1/2
       [CupPosition.ROUND_OF_8, 9], // 1/4
+      [CupPosition.ROUND_OF_16, 8], // 1/8
     ]),
   ],
 
-  // Кубок Б, 13-18 команды (начинается с 13 для 2 категории)
+  // Кубок A, > 109 участников
   [
-    "2-B-13-18",
+    "2-A-109+",
     new Map([
-      [CupPosition.WINNER, 4], // П
-      [CupPosition.RUNNER_UP, 3], // Ф
+      [CupPosition.WINNER, 15], // П
+      [CupPosition.RUNNER_UP, 13], // Ф
+      [CupPosition.ROUND_OF_4, 11], // 1/2
+      [CupPosition.ROUND_OF_8, 10], // 1/4
+      [CupPosition.ROUND_OF_16, 9], // 1/8
     ]),
   ],
 
-  // Кубок Б, 19-24 команды (начинается с 19 для 2 категории)
+  // Кубок Б
   [
-    "2-B-19-24",
+    "2-B-36-60",
     new Map([
       [CupPosition.WINNER, 5], // П
       [CupPosition.RUNNER_UP, 4], // Ф
-      [CupPosition.ROUND_OF_4, 3], // 1/2
     ]),
   ],
-
-  // Кубок Б, 25-30 команд
   [
-    "2-B-25-30",
-    new Map([
-      [CupPosition.WINNER, 6], // П
-      [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.ROUND_OF_4, 4], // 1/2
-      [CupPosition.ROUND_OF_8, 3], // 1/4
-    ]),
-  ],
-
-  // Кубок Б, 31-36 команд
-  [
-    "2-B-31-36",
-    new Map([
-      [CupPosition.WINNER, 6], // П
-      [CupPosition.RUNNER_UP, 5], // Ф
-      [CupPosition.ROUND_OF_4, 4], // 1/2
-      [CupPosition.ROUND_OF_8, 3], // 1/4
-    ]),
-  ],
-
-  // Кубок Б, >36 команд
-  [
-    "2-B-36+",
+    "2-B-61-84",
     new Map([
       [CupPosition.WINNER, 7], // П
       [CupPosition.RUNNER_UP, 6], // Ф
       [CupPosition.ROUND_OF_4, 5], // 1/2
-      [CupPosition.ROUND_OF_8, 4], // 1/4
+    ]),
+  ],
+  [
+    "2-B-85-108",
+    new Map([
+      [CupPosition.WINNER, 9], // П
+      [CupPosition.RUNNER_UP, 8], // Ф
+      [CupPosition.ROUND_OF_4, 7], // 1/2
+      [CupPosition.ROUND_OF_8, 6], // 1/4
+    ]),
+  ],
+  [
+    "2-B-109+",
+    new Map([
+      [CupPosition.WINNER, 1101], // П
+      [CupPosition.RUNNER_UP, 9], // Ф
+      [CupPosition.ROUND_OF_4, 8], // 1/2
+      [CupPosition.ROUND_OF_8, 7], // 1/4
+      [CupPosition.ROUND_OF_16, 6], // 1/8
     ]),
   ],
 ]);
@@ -278,11 +193,12 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
  * @returns количество рейтинговых очков
  */
 export function getPoints(
+  tournamentType: TournamentType,
   category: TournamentCategoryEnum,
   cup: Cup | undefined,
   position: CupPosition | undefined,
   totalTeams: number,
-  qualifyingWins: number = 0
+  qualifyingWins: number = 0,
 ): number {
   // ПРАВИЛО 1: Расчет очков за квалификационный этап
   // (для игроков, не вышедших в плей-офф)
@@ -307,11 +223,12 @@ export function getPoints(
   // ПРАВИЛА 2 и 4: Кубки А и Б
   // Игроки получают очки по таблице, но если их нет - квалификационные очки
   return calculateCupABPoints(
+    tournamentType,
     category,
     cup,
     position,
     totalTeams,
-    qualifyingPoints
+    qualifyingPoints,
   );
 }
 
@@ -321,7 +238,7 @@ export function getPoints(
  */
 function calculateQualifyingPoints(
   category: TournamentCategoryEnum,
-  qualifyingWins: number
+  qualifyingWins: number,
 ): number {
   if (qualifyingWins >= 3) {
     // 3 и более побед
@@ -341,7 +258,7 @@ function calculateQualifyingPoints(
  */
 function calculateCupCPoints(
   qualifyingPoints: number,
-  position: CupPosition
+  position: CupPosition,
 ): number {
   if (position === CupPosition.WINNER || position === CupPosition.RUNNER_UP) {
     // Финалисты кубка С: +2 очка к квалификационным
@@ -365,21 +282,22 @@ function calculateCupCPoints(
  * Если для позиции нет очков в таблице, возвращаются квалификационные очки
  */
 function calculateCupABPoints(
+  tournamentType: TournamentType,
   category: TournamentCategoryEnum,
   cup: Cup,
   position: CupPosition,
   totalTeams: number,
-  qualifyingPoints: number
+  qualifyingPoints: number,
 ): number {
   // Определяем диапазон количества команд для выбора таблицы
-  const teamsRange = getTeamsRange(totalTeams);
+  const teamsRange = getPlayersRange(totalTeams, tournamentType);
   const key: CupPointsKey = `${category}-${cup}-${teamsRange}`;
 
   const cupPointsMap = CUP_POINTS.get(key);
 
   if (!cupPointsMap) {
     throw new Error(
-      `Рассчет очков: ❌ Не найдена конфигурация очков для кубка ${cup} категории ${category} с ${totalTeams} командами (ключ: ${key})`
+      `Рассчет очков: ❌ Не найдена конфигурация очков для кубка ${cup} категории ${category} с ${totalTeams} командами (ключ: ${key})`,
     );
   }
 
@@ -409,21 +327,31 @@ function calculateCupABPoints(
 }
 
 /**
- * Определяет диапазон количества команд для выбора таблицы очков
+ * Определяет диапазон количества игроков для выбора таблицы очков
  */
-function getTeamsRange(totalTeams: number): TeamsRange {
-  if (totalTeams <= 12) {
-    return "8-12";
-  } else if (totalTeams <= 18) {
-    return "13-18";
-  } else if (totalTeams <= 24) {
-    return "19-24";
-  } else if (totalTeams <= 30) {
-    return "25-30";
-  } else if (totalTeams <= 36) {
-    return "31-36";
+function getPlayersRange(
+  totalTeams: number,
+  tournamentType: TournamentType,
+): PlayersRange {
+  let playersCount = totalTeams;
+
+  if (
+    tournamentType === TournamentType.DOUBLETTE_MALE ||
+    tournamentType === TournamentType.DOUBLETTE_FEMALE
+  ) {
+    playersCount = totalTeams * 2;
+  } else if (tournamentType === TournamentType.TRIPLETTE) {
+    playersCount = totalTeams * 3;
+  }
+
+  if (playersCount <= 60) {
+    return "36-60";
+  } else if (totalTeams <= 84) {
+    return "61-84";
+  } else if (totalTeams <= 108) {
+    return "85-108";
   } else {
-    return "36+";
+    return "109+";
   }
 }
 

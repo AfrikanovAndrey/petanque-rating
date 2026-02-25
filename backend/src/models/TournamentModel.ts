@@ -35,7 +35,7 @@ export class TournamentModel {
       FROM tournaments t
       LEFT JOIN tournament_results tr ON t.id = tr.tournament_id
       GROUP BY t.id
-      ORDER BY t.date DESC`
+      ORDER BY t.date DESC`,
     );
     return rows;
   }
@@ -43,7 +43,7 @@ export class TournamentModel {
   static async getTournamentById(id: number): Promise<Tournament | null> {
     const [rows] = await pool.execute<Tournament[] & RowDataPacket[]>(
       "SELECT * FROM tournaments WHERE id = ?",
-      [id]
+      [id],
     );
     return rows[0] || null;
   }
@@ -51,7 +51,7 @@ export class TournamentModel {
   static async getTournamentTeamsCount(tournamentId: number): Promise<number> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       "SELECT COUNT(DISTINCT team_id) as teams_count FROM tournament_results WHERE tournament_id = ?",
-      [tournamentId]
+      [tournamentId],
     );
     return (rows[0]?.teams_count as number) || 0;
   }
@@ -62,12 +62,12 @@ export class TournamentModel {
     category: TournamentCategoryEnum,
     date: string,
     manual: boolean = false,
-    connection?: PoolConnection
+    connection?: PoolConnection,
   ): Promise<number> {
     const executor = connection || pool;
     const [result] = await executor.execute<ResultSetHeader>(
       "INSERT INTO tournaments (name, type, category, date, manual) VALUES (?, ?, ?, ?, ?)",
-      [name, type, TournamentCategoryEnum[category], date, manual]
+      [name, type, TournamentCategoryEnum[category], date, manual],
     );
     return result.insertId;
   }
@@ -78,7 +78,7 @@ export class TournamentModel {
     type?: TournamentType,
     category?: TournamentCategoryEnum,
     date?: string,
-    manual?: boolean
+    manual?: boolean,
   ): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
@@ -111,7 +111,7 @@ export class TournamentModel {
     values.push(id);
     const [result] = await pool.execute<ResultSetHeader>(
       `UPDATE tournaments SET ${updates.join(", ")} WHERE id = ?`,
-      values
+      values,
     );
 
     return result.affectedRows > 0;
@@ -125,13 +125,13 @@ export class TournamentModel {
       // Удаляем все результаты турнира
       await connection.execute(
         "DELETE FROM tournament_results WHERE tournament_id = ?",
-        [id]
+        [id],
       );
 
       // Удаляем сам турнир
       const [result] = await connection.execute<ResultSetHeader>(
         "DELETE FROM tournaments WHERE id = ?",
-        [id]
+        [id],
       );
 
       await connection.commit();
@@ -145,7 +145,7 @@ export class TournamentModel {
   }
 
   static async getTournamentResults(
-    tournamentId: number
+    tournamentId: number,
   ): Promise<TournamentResult[]> {
     const [rows] = await pool.execute<TournamentResult[] & RowDataPacket[]>(
       `
@@ -164,7 +164,7 @@ export class TournamentModel {
       GROUP BY tr.id, t.name, t.date
       ORDER BY tr.cup_position ASC
     `,
-      [tournamentId]
+      [tournamentId],
     );
     return rows;
   }
@@ -182,7 +182,7 @@ export class TournamentModel {
     cup?: Cup,
     qualifying_wins?: number,
     points?: number,
-    connection?: PoolConnection
+    connection?: PoolConnection,
   ): Promise<number> {
     const executor = connection || pool;
     const [result] = await executor.execute<ResultSetHeader>(
@@ -196,7 +196,7 @@ export class TournamentModel {
         TournamentModel.ensureValue(wins, 0),
         TournamentModel.ensureValue(loses, 0),
         TournamentModel.ensureValue(points, 0),
-      ]
+      ],
     );
     return result.insertId;
   }
@@ -204,7 +204,7 @@ export class TournamentModel {
   static async deleteTournamentResult(id: number): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
       "DELETE FROM tournament_results WHERE id = ?",
-      [id]
+      [id],
     );
     return result.affectedRows > 0;
   }
@@ -213,7 +213,7 @@ export class TournamentModel {
    * Пересчитать очки для конкретного турнира
    */
   static async recalculateTournamentPoints(
-    tournamentId: number
+    tournamentId: number,
   ): Promise<void> {
     console.log(`🔄 Пересчитываю очки для турнира ID ${tournamentId}`);
 
@@ -226,7 +226,7 @@ export class TournamentModel {
     // Пропускаем турниры с ручным вводом данных
     if (tournament.manual) {
       console.log(
-        `⏭️  Пропускаю турнир #${tournamentId} "${tournament.name}" - результаты введены вручную`
+        `⏭️  Пропускаю турнир #${tournamentId} "${tournament.name}" - результаты введены вручную`,
       );
       return;
     }
@@ -236,6 +236,7 @@ export class TournamentModel {
       `
       SELECT 
         tr.id, 
+        tr.type,
         tr.cup_position, 
         tr.cup, 
         tr.team_id, 
@@ -244,8 +245,11 @@ export class TournamentModel {
       FROM tournament_results tr
       WHERE tr.tournament_id = ?
       `,
-      [tournamentId]
+      [tournamentId],
     );
+
+    const tournamentType: TournamentType =
+      TournamentType[tournament.type as keyof typeof TournamentType];
 
     // Получаем эффективное количество команд
     // Нормализуем дату для корректного поиска парного турнира
@@ -253,7 +257,7 @@ export class TournamentModel {
     const totalTeams = await TournamentModel.getEffectiveTeamsCount(
       tournamentId,
       normalizedDate,
-      tournament.type as TournamentType
+      tournament.type,
     );
 
     const categoryEnum =
@@ -297,17 +301,18 @@ export class TournamentModel {
       }
 
       newPoints = getPoints(
+        tournamentType,
         categoryEnum,
         result.cup,
         cupPosition,
         totalTeams,
-        result.qualifying_wins
+        result.qualifying_wins,
       );
 
       // Обновляем очки в базе tournament_results
       await pool.execute(
         "UPDATE tournament_results SET points = ? WHERE id = ?",
-        [newPoints, result.id]
+        [newPoints, result.id],
       );
     }
 
@@ -321,7 +326,7 @@ export class TournamentModel {
   static async getEffectiveTeamsCount(
     tournamentId: number,
     tournamentDate: string,
-    tournamentType: TournamentType
+    tournamentType: TournamentType,
   ): Promise<number> {
     // Получаем количество команд текущего турнира
     const currentTournamentTeams =
@@ -358,19 +363,18 @@ export class TournamentModel {
     const [pairTournaments] = await pool.execute<RowDataPacket[]>(
       `SELECT id FROM tournaments 
        WHERE date = ? AND type = ? AND id != ?`,
-      [tournamentDate, pairType, tournamentId]
+      [tournamentDate, pairType, tournamentId],
     );
 
     if (pairTournaments.length > 0) {
       // Найден парный турнир, суммируем команды
       const pairTournamentId = pairTournaments[0].id;
-      const pairTournamentTeams = await TournamentModel.getTournamentTeamsCount(
-        pairTournamentId
-      );
+      const pairTournamentTeams =
+        await TournamentModel.getTournamentTeamsCount(pairTournamentId);
       const totalTeams = currentTournamentTeams + pairTournamentTeams;
 
       console.log(
-        `   🔗 Найден парный турнир (${pairType}) в тот же день. Суммируем команды: ${currentTournamentTeams} + ${pairTournamentTeams} = ${totalTeams}`
+        `   🔗 Найден парный турнир (${pairType}) в тот же день. Суммируем команды: ${currentTournamentTeams} + ${pairTournamentTeams} = ${totalTeams}`,
       );
 
       return totalTeams;
@@ -383,18 +387,16 @@ export class TournamentModel {
   // Функция для пересчета очков всех турниров текущего календарного года
   static async recalculatePoints(): Promise<void> {
     const currentYear = new Date().getFullYear();
-    console.log(
-      `🔄 Начинаю пересчет очков для турниров ${currentYear} года`
-    );
+    console.log(`🔄 Начинаю пересчет очков для турниров ${currentYear} года`);
 
     // Получаем только турниры текущего календарного года
     const [tournamentRows] = await pool.execute<RowDataPacket[]>(
       "SELECT id, name, manual FROM tournaments WHERE YEAR(date) = ? ORDER BY id",
-      [currentYear]
+      [currentYear],
     );
 
     console.log(
-      `📊 Найдено ${tournamentRows.length} турниров ${currentYear} года для пересчета`
+      `📊 Найдено ${tournamentRows.length} турниров ${currentYear} года для пересчета`,
     );
 
     let skippedCount = 0;
@@ -408,13 +410,13 @@ export class TournamentModel {
       };
 
       console.log(
-        `\n📝 Обрабатываю турнир ID ${tournament.id}: "${tournament.name}"`
+        `\n📝 Обрабатываю турнир ID ${tournament.id}: "${tournament.name}"`,
       );
 
       // Пропускаем турниры с ручным вводом
       if (tournament.manual) {
         console.log(
-          `   ⏭️  Пропускаю турнир "${tournament.name}" - результаты введены вручную`
+          `   ⏭️  Пропускаю турнир "${tournament.name}" - результаты введены вручную`,
         );
         skippedCount++;
         continue;
@@ -425,12 +427,12 @@ export class TournamentModel {
       processedCount++;
 
       console.log(
-        `   ✅ Пересчет очков для турнира "${tournament.name}" завершен`
+        `   ✅ Пересчет очков для турнира "${tournament.name}" завершен`,
       );
     }
 
     console.log(
-      `\n🎉 Пересчет очков за ${currentYear} год завершен! Обработано: ${processedCount}, пропущено: ${skippedCount}`
+      `\n🎉 Пересчет очков за ${currentYear} год завершен! Обработано: ${processedCount}, пропущено: ${skippedCount}`,
     );
   }
 
@@ -464,13 +466,13 @@ export class TournamentModel {
       WHERE tr.cup IS NOT NULL
       GROUP BY tr.id, t.name, t.date
       ORDER BY t.date DESC, tr.cup, tr.cup_position
-      `
+      `,
     );
     return rows;
   }
 
   static async getCupResultsByTournament(
-    tournamentId: number
+    tournamentId: number,
   ): Promise<TournamentResult[]> {
     const [rows] = await pool.execute<TournamentResult[] & RowDataPacket[]>(
       `
@@ -489,14 +491,14 @@ export class TournamentModel {
       GROUP BY tr.id, t.name, t.date
       ORDER BY tr.cup, tr.cup_position
       `,
-      [tournamentId]
+      [tournamentId],
     );
     return rows;
   }
 
   static async getCupResultsByCup(
     tournamentId: number,
-    cup: string
+    cup: string,
   ): Promise<TournamentResult[]> {
     const [rows] = await pool.execute<TournamentResult[] & RowDataPacket[]>(
       `
@@ -512,7 +514,7 @@ export class TournamentModel {
       GROUP BY tr.id
       ORDER BY tr.cup_position
       `,
-      [tournamentId, cup]
+      [tournamentId, cup],
     );
     return rows;
   }

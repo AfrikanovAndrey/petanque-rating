@@ -689,6 +689,7 @@ export class TournamentController {
             results.points !== undefined
               ? results.points
               : getPoints(
+                tournamentType,
                   tournamentCategory,
                   results.cup,
                   results.cupPosition,
