@@ -319,10 +319,10 @@ router.post(
   AdminController.recalculateTournamentPoints,
 );
 
-// POST /api/admin/tournaments/:tournamentId/recalculate-points - пересчитать очки конкретного турнира (только ADMIN)
+// POST /api/admin/tournaments/:tournamentId/recalculate-points - пересчитать очки конкретного турнира
 router.post(
   "/tournaments/:tournamentId/recalculate-points",
-  requireAdmin,
+  authenticateAdmin,
   async (req, res) => {
     try {
       const tournamentId = parseInt(req.params.tournamentId);
