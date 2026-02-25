@@ -380,16 +380,22 @@ export class TournamentModel {
     return currentTournamentTeams;
   }
 
-  // Функция для пересчета очков всех турниров
+  // Функция для пересчета очков всех турниров текущего календарного года
   static async recalculatePoints(): Promise<void> {
-    console.log(`🔄 Начинаю пересчет очков для всех турниров`);
-
-    // Получаем все турниры
-    const [tournamentRows] = await pool.execute<RowDataPacket[]>(
-      "SELECT id, name, manual FROM tournaments ORDER BY id"
+    const currentYear = new Date().getFullYear();
+    console.log(
+      `🔄 Начинаю пересчет очков для турниров ${currentYear} года`
     );
 
-    console.log(`📊 Найдено ${tournamentRows.length} турниров для пересчета`);
+    // Получаем только турниры текущего календарного года
+    const [tournamentRows] = await pool.execute<RowDataPacket[]>(
+      "SELECT id, name, manual FROM tournaments WHERE YEAR(date) = ? ORDER BY id",
+      [currentYear]
+    );
+
+    console.log(
+      `📊 Найдено ${tournamentRows.length} турниров ${currentYear} года для пересчета`
+    );
 
     let skippedCount = 0;
     let processedCount = 0;
@@ -424,7 +430,7 @@ export class TournamentModel {
     }
 
     console.log(
-      `\n🎉 Пересчет очков завершен! Обработано: ${processedCount}, пропущено: ${skippedCount}`
+      `\n🎉 Пересчет очков за ${currentYear} год завершен! Обработано: ${processedCount}, пропущено: ${skippedCount}`
     );
   }
 
