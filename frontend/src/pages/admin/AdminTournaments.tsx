@@ -260,7 +260,7 @@ const AdminTournaments: React.FC = () => {
       return await adminApi.recalculateTournamentPointsById(tournamentId);
     },
     {
-      onSuccess: (_, tournamentId) => {
+      onSuccess: () => {
         toast.success("Очки турнира пересчитаны!");
         queryClient.invalidateQueries("tournaments");
         queryClient.invalidateQueries("fullRating");
