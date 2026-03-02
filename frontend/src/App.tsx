@@ -12,6 +12,7 @@ import { Toaster } from "react-hot-toast";
 import RatingTable from "./pages/RatingTable";
 import TournamentsList from "./pages/TournamentsList";
 import RatingRules from "./pages/RatingRules";
+import Licenses from "./pages/Licenses";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTournaments from "./pages/admin/AdminTournaments";
@@ -70,6 +71,15 @@ function App() {
               element={
                 <Layout>
                   <RatingRules />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/licenses"
+              element={
+                <Layout>
+                  <Licenses />
                 </Layout>
               }
             />

@@ -23,6 +23,9 @@ router.get("/by-gender", RatingController.getRatingsByGender);
 // GET /api/rating/player/:playerId - получить детали игрока (публичный доступ)
 router.get("/player/:playerId", RatingController.getPlayerDetails);
 
+// GET /api/rating/licenses - действующие лицензии на текущий год (публичный доступ)
+router.get("/licenses", RatingController.getActiveLicenses);
+
 // === ТУРНИРЫ ===
 // GET /api/rating/tournaments - получить список всех турниров (публичный доступ)
 router.get("/tournaments", TournamentController.getAllTournaments);

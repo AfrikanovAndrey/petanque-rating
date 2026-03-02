@@ -4,6 +4,7 @@ import {
   TrophyIcon,
   ChartBarIcon,
   DocumentTextIcon,
+  IdentificationIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "../utils";
 
@@ -28,6 +29,12 @@ const PublicNavigation: React.FC = () => {
       href: "/rating-rules",
       icon: DocumentTextIcon,
       current: location.pathname === "/rating-rules",
+    },
+    {
+      name: "Лицензии",
+      href: "/licenses",
+      icon: IdentificationIcon,
+      current: location.pathname === "/licenses",
     },
   ];
 

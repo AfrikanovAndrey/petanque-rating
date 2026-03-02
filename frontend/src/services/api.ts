@@ -57,6 +57,20 @@ export const ratingApi = {
     gender?: string
   ): Promise<AxiosResponse<ApiResponse<any>>> =>
     api.get("/rating/by-gender" + (gender ? `?gender=${gender}` : "")),
+
+  // Действующие лицензии на текущий календарный год
+  getActiveLicenses: (): Promise<
+    AxiosResponse<
+      ApiResponse<
+        {
+          player_name: string;
+          license_date: string;
+          license_number: string | null;
+          city: string | null;
+        }[]
+      >
+    >
+  > => api.get("/rating/licenses"),
 };
 
 export const tournamentsApi = {

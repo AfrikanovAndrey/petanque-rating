@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { pool } from "../config/database";
 import { RowDataPacket } from "mysql2";
+import { LicensedPlayerModel } from "../models/LicensedPlayerModel";
 import { RatingTableRow } from "../types";
 
 export class RatingController {
@@ -528,6 +529,29 @@ export class RatingController {
       res.status(500).json({
         success: false,
         message: "Ошибка получения рейтингов по полу",
+      });
+    }
+  }
+
+  // GET /api/rating/licenses — действующие лицензии на текущий календарный год (публичный доступ)
+  static async getActiveLicenses(req: Request, res: Response): Promise<void> {
+    try {
+      const year = new Date().getFullYear();
+      const players = await LicensedPlayerModel.getActiveLicensedPlayers(year);
+      res.json({
+        success: true,
+        data: players.map((p) => ({
+          player_name: p.player_name,
+          license_date: p.license_date,
+          license_number: p.license_number,
+          city: p.city,
+        })),
+      });
+    } catch (error) {
+      console.error("Ошибка получения действующих лицензий:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка получения списка лицензий",
       });
     }
   }
