@@ -17,7 +17,7 @@ const Licenses: React.FC = () => {
       const response = await ratingApi.getActiveLicenses();
       return response.data.data ?? [];
     },
-    { staleTime: 5 * 60 * 1000 }
+    { staleTime: 5 * 60 * 1000 },
   );
 
   if (isLoading) {
@@ -46,8 +46,11 @@ const Licenses: React.FC = () => {
           Действующие лицензии
         </h1>
       </div>
-      <p className="text-gray-600 mb-6">
+      <p className="text-gray-600 mb-2">
         Список лицензий на {currentYear} календарный год.
+      </p>
+      <p className="text-gray-700 font-medium mb-6">
+        Всего: {(licenses ?? []).length} лицензий.
       </p>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
