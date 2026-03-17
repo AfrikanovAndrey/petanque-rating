@@ -337,7 +337,8 @@ function getPlayersRange(
 
   if (
     tournamentType === TournamentType.DOUBLETTE_MALE ||
-    tournamentType === TournamentType.DOUBLETTE_FEMALE
+    tournamentType === TournamentType.DOUBLETTE_FEMALE ||
+    tournamentType === TournamentType.DOUBLETTE_MIXT
   ) {
     playersCount = totalTeams * 2;
   } else if (tournamentType === TournamentType.TRIPLETTE) {
