@@ -242,7 +242,7 @@ function calculateQualifyingPoints(
 ): number {
   if (qualifyingWins >= 3) {
     // 3 и более побед
-    return category === TournamentCategoryEnum.FEDERAL ? 3 : 2;
+    return category === TournamentCategoryEnum.FEDERAL ? 4 : 3;
   } else if (qualifyingWins >= 1) {
     // 1-2 победы
     return category === TournamentCategoryEnum.FEDERAL ? 2 : 1;
