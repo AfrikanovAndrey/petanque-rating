@@ -1,0 +1,55 @@
+{
+    "questions": [
+        {
+            "question": "What is the capital of France?",
+            "answer": [
+                {
+                    "answer": "Paris",
+                    "is_correct": true
+                },
+                {
+                    "answer": "London",
+                    "is_correct": false
+                },
+                {
+                    "answer": "Berlin",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question": "What is the capital of Germany?",
+            "answer": [
+                {
+                    "answer": "Berlin",
+                    "is_correct": true
+                },
+                {
+                    "answer": "Munich",
+                    "is_correct": false
+                },
+                {
+                    "answer": "Hamburg",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question": "What is the capital of Japan?",
+            "answer": [
+                {
+                    "answer": "Tokyo",
+                    "is_correct": true
+                },
+                {
+                    "answer": "Kyoto",
+                    "is_correct": false
+                },
+                {
+                    "answer": "Osaka",
+                    "is_correct": false
+                }
+            ]
+        }
+    ]
+}

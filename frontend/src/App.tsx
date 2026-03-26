@@ -13,6 +13,7 @@ import RatingTable from "./pages/RatingTable";
 import TournamentsList from "./pages/TournamentsList";
 import RatingRules from "./pages/RatingRules";
 import Licenses from "./pages/Licenses";
+import RulesQuiz from "./pages/RulesQuiz";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTournaments from "./pages/admin/AdminTournaments";
@@ -80,6 +81,15 @@ function App() {
               element={
                 <Layout>
                   <Licenses />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/rules-quiz"
+              element={
+                <Layout>
+                  <RulesQuiz />
                 </Layout>
               }
             />
