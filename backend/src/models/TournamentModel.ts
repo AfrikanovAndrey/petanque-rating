@@ -240,7 +240,8 @@ export class TournamentModel {
         tr.cup, 
         tr.team_id, 
         tr.qualifying_wins,
-        tr.points as old_points
+        tr.points as old_points,
+        (SELECT COUNT(*) FROM team_players tp WHERE tp.team_id = tr.team_id) AS team_player_count
       FROM tournament_results tr
       WHERE tr.tournament_id = ?
       `,
@@ -306,6 +307,7 @@ export class TournamentModel {
         cupPosition,
         totalTeams,
         result.qualifying_wins,
+        Number(result.team_player_count),
       );
 
       // Обновляем очки в базе tournament_results

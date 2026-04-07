@@ -694,7 +694,8 @@ export class TournamentController {
                   results.cup,
                   results.cupPosition,
                   effectiveTeamsCount,
-                  results.qualifyingWins
+                  results.qualifyingWins,
+                  team.players.length
                 );
 
           // Записываем результат команды в БД

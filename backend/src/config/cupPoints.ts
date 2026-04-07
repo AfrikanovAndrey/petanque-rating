@@ -190,6 +190,7 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
  * @param position - позиция в кубке
  * @param totalTeams - общее количество команд в турнире
  * @param qualifyingWins - количество побед в квалификационном этапе
+ * @param teamPlayerCount - число игроков в команде (для TRIPLETTE из 4 человек применяется коэффициент 0,75 с округлением вверх)
  * @returns количество рейтинговых очков
  */
 export function getPoints(
@@ -199,37 +200,45 @@ export function getPoints(
   position: CupPosition | undefined,
   totalTeams: number,
   qualifyingWins: number = 0,
+  teamPlayerCount?: number,
 ): number {
   // ПРАВИЛО 1: Расчет очков за квалификационный этап
   // (для игроков, не вышедших в плей-офф)
   const qualifyingPoints = calculateQualifyingPoints(category, qualifyingWins);
 
+  let points: number;
+
   // Если игрок не вышел в плей-офф (нет кубка), возвращаем только квалификационные очки
   if (!cup) {
-    return qualifyingPoints;
-  }
-
-  // Игрок вышел в плей-офф, проверяем наличие позиции
-  if (!position) {
+    points = qualifyingPoints;
+  } else if (!position) {
+    // Игрок вышел в плей-офф, проверяем наличие позиции
     throw new Error(`Рассчет очков: Не задана позиция в кубке ${cup}`);
+  } else if (cup === "C") {
+    // ПРАВИЛО 3: Кубок С (утешительный турнир)
+    // Игроки получают квалификационные очки + бонус за позицию
+    points = calculateCupCPoints(qualifyingPoints, position);
+  } else {
+    // ПРАВИЛА 2 и 4: Кубки А и Б
+    // Игроки получают очки по таблице, но если их нет - квалификационные очки
+    points = calculateCupABPoints(
+      tournamentType,
+      category,
+      cup,
+      position,
+      totalTeams,
+      qualifyingPoints,
+    );
   }
 
-  // ПРАВИЛО 3: Кубок С (утешительный турнир)
-  // Игроки получают квалификационные очки + бонус за позицию
-  if (cup === "C") {
-    return calculateCupCPoints(qualifyingPoints, position);
+  if (
+    tournamentType === TournamentType.TRIPLETTE &&
+    teamPlayerCount === 4
+  ) {
+    return Math.ceil(points * 0.75);
   }
 
-  // ПРАВИЛА 2 и 4: Кубки А и Б
-  // Игроки получают очки по таблице, но если их нет - квалификационные очки
-  return calculateCupABPoints(
-    tournamentType,
-    category,
-    cup,
-    position,
-    totalTeams,
-    qualifyingPoints,
-  );
+  return points;
 }
 
 /**
