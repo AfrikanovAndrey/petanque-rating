@@ -12,12 +12,17 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { adminApi } from "../../services/api";
-import { getCupPositionText, TournamentType } from "../../types";
+import {
+  getCupPositionText,
+  TournamentStatus,
+  TournamentType,
+} from "../../types";
 import {
   formatDate,
   formatDateForInput,
   formatDateTime,
   getTornamentCategoryText,
+  getTournamentStatusText,
   getTournamentTypeIcons,
   handleApiError,
 } from "../../utils";
@@ -36,6 +41,7 @@ interface TournamentEditForm {
   date: string;
   type: TournamentType;
   category: string;
+  status: TournamentStatus;
 }
 
 const AdminTournaments: React.FC = () => {
@@ -219,6 +225,7 @@ const AdminTournaments: React.FC = () => {
         type: data.updateData.type,
         category: data.updateData.category,
         date: data.updateData.date,
+        status: data.updateData.status,
       });
     },
     {
@@ -333,6 +340,7 @@ const AdminTournaments: React.FC = () => {
       type: tournament.type,
       category: tournament.category === "FEDERAL" ? "1" : "2",
       date: formatDateForInput(tournament.date),
+      status: tournament.status ?? TournamentStatus.FINISHED,
     });
     setIsEditModalOpen(true);
   };
@@ -416,6 +424,9 @@ const AdminTournaments: React.FC = () => {
                     Категория
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Статус
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Режим загрузки
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -457,6 +468,22 @@ const AdminTournaments: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
                         {getTornamentCategoryText(tournament.category)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center justify-center">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            tournament.status === TournamentStatus.REGISTRATION
+                              ? "bg-amber-100 text-amber-900"
+                              : tournament.status ===
+                                  TournamentStatus.IN_PROGRESS
+                                ? "bg-sky-100 text-sky-900"
+                                : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {getTournamentStatusText(tournament.status)}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -1069,6 +1096,35 @@ const AdminTournaments: React.FC = () => {
                 {errorsEdit.category && (
                   <p className="mt-1 text-sm text-red-600">
                     {errorsEdit.category.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Статус турнира
+                </label>
+                <select
+                  className={`input-field ${
+                    errorsEdit.status ? "border-red-300" : ""
+                  }`}
+                  {...registerEdit("status", {
+                    required: "Статус турнира обязателен",
+                  })}
+                >
+                  <option value={TournamentStatus.FINISHED}>
+                    {getTournamentStatusText(TournamentStatus.FINISHED)}
+                  </option>
+                  <option value={TournamentStatus.REGISTRATION}>
+                    {getTournamentStatusText(TournamentStatus.REGISTRATION)}
+                  </option>
+                  <option value={TournamentStatus.IN_PROGRESS}>
+                    {getTournamentStatusText(TournamentStatus.IN_PROGRESS)}
+                  </option>
+                </select>
+                {errorsEdit.status && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsEdit.status.message}
                   </p>
                 )}
               </div>

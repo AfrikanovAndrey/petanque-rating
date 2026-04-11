@@ -8,6 +8,7 @@ import {
   Tournament,
   TournamentCategoryEnum,
   TournamentResult,
+  TournamentStatus,
   TournamentType,
 } from "../types";
 
@@ -79,6 +80,7 @@ export class TournamentModel {
     category?: TournamentCategoryEnum,
     date?: string,
     manual?: boolean,
+    status?: TournamentStatus,
   ): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
@@ -102,6 +104,10 @@ export class TournamentModel {
     if (manual !== undefined) {
       updates.push("manual = ?");
       values.push(manual);
+    }
+    if (status !== undefined) {
+      updates.push("status = ?");
+      values.push(status);
     }
 
     if (updates.length === 0) {

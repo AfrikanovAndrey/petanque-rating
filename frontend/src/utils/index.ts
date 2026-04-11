@@ -1,4 +1,8 @@
-import { TournamentCategory, TournamentType } from "@/types";
+import {
+  TournamentCategory,
+  TournamentStatus,
+  TournamentType,
+} from "@/types";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -42,6 +46,21 @@ export function getTornamentCategoryText(category: TournamentCategory) {
     return "Рейтинговый РФП";
   } else if (category === "REGIONAL") {
     return "Региональный рейтинговый";
+  }
+}
+
+export function getTournamentStatusText(
+  status: TournamentStatus | string | undefined
+): string {
+  const key = status ?? TournamentStatus.FINISHED;
+  switch (key) {
+    case TournamentStatus.REGISTRATION:
+      return "Регистрация";
+    case TournamentStatus.IN_PROGRESS:
+      return "В процессе";
+    case TournamentStatus.FINISHED:
+    default:
+      return "Завершён";
   }
 }
 

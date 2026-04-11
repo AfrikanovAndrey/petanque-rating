@@ -10,6 +10,7 @@ import {
   User,
   CreateUserRequest,
   UpdateUserRequest,
+  TournamentStatus,
   TournamentType,
 } from "../types";
 
@@ -195,6 +196,7 @@ export const adminApi = {
       type?: TournamentType;
       category?: string;
       date?: string;
+      status?: TournamentStatus;
     }
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/tournaments/${tournamentId}`, data),

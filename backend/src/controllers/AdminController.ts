@@ -6,7 +6,11 @@ import { pool } from "../config/database";
 import { LicensedPlayerModel } from "../models/LicensedPlayerModel";
 import { PlayerModel } from "../models/PlayerModel";
 import { TournamentModel } from "../models/TournamentModel";
-import { LicensedPlayerUploadData, TournamentType } from "../types";
+import {
+  LicensedPlayerUploadData,
+  TournamentStatus,
+  TournamentType,
+} from "../types";
 import { TournamentController } from "./TournamentController";
 
 // Настройка multer для загрузки файлов
@@ -319,15 +323,33 @@ export class AdminController {
         return;
       }
 
-      const { name, type, category, date, manual } = req.body;
+      const { name, type, category, date, manual, status } = req.body;
 
       // Проверяем, что передан хотя бы один параметр для обновления
-      if (!name && !type && !category && !date && manual === undefined) {
+      if (
+        !name &&
+        !type &&
+        !category &&
+        !date &&
+        manual === undefined &&
+        status === undefined
+      ) {
         res.status(400).json({
           success: false,
           message: "Необходимо указать хотя бы один параметр для обновления",
         });
         return;
+      }
+
+      if (status !== undefined) {
+        const allowed = Object.values(TournamentStatus) as string[];
+        if (typeof status !== "string" || !allowed.includes(status)) {
+          res.status(400).json({
+            success: false,
+            message: "Неверный статус турнира",
+          });
+          return;
+        }
       }
 
       // Проверяем, существует ли турнир
@@ -348,7 +370,8 @@ export class AdminController {
         type,
         category,
         date,
-        manual
+        manual,
+        status as TournamentStatus | undefined,
       );
 
       if (success) {

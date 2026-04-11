@@ -47,7 +47,7 @@ services:
       - VITE_API_URL=http://localhost:3001/api
     # Переопределяем порты для Vite dev server
     ports:
-      - "3002:5173" # Используем порт 3002 для dev-режима чтобы избежать конфликтов
+      - "3002:5173"
     # Переопределяем команду запуска
     command: npm run dev -- --host 0.0.0.0 --port 5173
     stdin_open: true

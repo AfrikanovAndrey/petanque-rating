@@ -27,6 +27,12 @@ export enum TournamentType {
   TET_A_TET_FEMALE = "TET_A_TET_FEMALE",
 }
 
+export enum TournamentStatus {
+  FINISHED = "FINISHED",
+  REGISTRATION = "REGISTRATION",
+  IN_PROGRESS = "IN_PROGRESS",
+}
+
 // Турнир
 export interface Tournament {
   id: number;
@@ -35,6 +41,7 @@ export interface Tournament {
   category: TournamentCategory;
   date: string;
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
+  status: TournamentStatus;
   created_at: string;
   updated_at: string;
   teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров

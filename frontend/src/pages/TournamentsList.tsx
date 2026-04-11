@@ -8,10 +8,15 @@ import {
 import React, { useState } from "react";
 import { useQuery } from "react-query";
 import { tournamentsApi } from "../services/api";
-import { TournamentResult, TournamentWithResults } from "../types";
+import {
+  TournamentResult,
+  TournamentStatus,
+  TournamentWithResults,
+} from "../types";
 import {
   formatDate,
   getTornamentCategoryText,
+  getTournamentStatusText,
   getTournamentTypeIcons,
   handleApiError,
 } from "../utils";
@@ -170,6 +175,21 @@ const TournamentsList: React.FC = () => {
                           </div>
                           <div className="flex items-center">
                             {getTornamentCategoryText(tournament.category)}
+                          </div>
+                          <div className="flex items-center">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                tournament.status ===
+                                TournamentStatus.REGISTRATION
+                                  ? "bg-amber-100 text-amber-900"
+                                  : tournament.status ===
+                                      TournamentStatus.IN_PROGRESS
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {getTournamentStatusText(tournament.status)}
+                            </span>
                           </div>
                           <div className="flex items-center">
                             <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
