@@ -8,6 +8,7 @@ import { PlayerModel } from "../models/PlayerModel";
 import { TournamentModel } from "../models/TournamentModel";
 import {
   LicensedPlayerUploadData,
+  TournamentCategoryEnum,
   TournamentStatus,
   TournamentType,
 } from "../types";
@@ -265,6 +266,92 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Ошибка получения турниров",
+      });
+    }
+  }
+
+  /**
+   * Создать турнир без загрузки результатов (ручной турнир с регламентом).
+   * Доступно для ADMIN и MANAGER.
+   */
+  static async createTournament(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, date, type, category, regulations } = req.body;
+
+      if (!name || typeof name !== "string" || !name.trim()) {
+        res.status(400).json({
+          success: false,
+          message: "Название турнира обязательно",
+        });
+        return;
+      }
+
+      if (!date || typeof date !== "string") {
+        res.status(400).json({
+          success: false,
+          message: "Дата проведения обязательна",
+        });
+        return;
+      }
+
+      if (!type || typeof type !== "string") {
+        res.status(400).json({
+          success: false,
+          message: "Тип турнира обязателен",
+        });
+        return;
+      }
+
+      const allowedTypes = Object.values(TournamentType) as string[];
+      if (!allowedTypes.includes(type)) {
+        res.status(400).json({
+          success: false,
+          message: "Недопустимый тип турнира",
+        });
+        return;
+      }
+
+      const categoryEnum =
+        category === "1" || category === 1
+          ? TournamentCategoryEnum.FEDERAL
+          : category === "2" || category === 2
+            ? TournamentCategoryEnum.REGIONAL
+            : null;
+
+      if (categoryEnum === null) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите категорию турнира (1 или 2)",
+        });
+        return;
+      }
+
+      const regulationsText =
+        regulations !== undefined && regulations !== null
+          ? String(regulations).trim() || null
+          : null;
+
+      const tournamentId = await TournamentModel.createTournament(
+        name.trim(),
+        type as TournamentType,
+        categoryEnum,
+        date,
+        true,
+        undefined,
+        regulationsText,
+        TournamentStatus.REGISTRATION,
+      );
+
+      res.status(201).json({
+        success: true,
+        message: "Турнир создан",
+        data: { id: tournamentId },
+      });
+    } catch (error) {
+      console.error("Ошибка создания турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка создания турнира",
       });
     }
   }

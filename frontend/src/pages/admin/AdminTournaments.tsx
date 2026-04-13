@@ -11,11 +11,12 @@ import React, { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
-import { adminApi } from "../../services/api";
+import { adminApi, createBlankTournament } from "../../services/api";
 import {
   getCupPositionText,
   TournamentStatus,
   TournamentType,
+  UserRole,
 } from "../../types";
 import {
   formatDate,
@@ -44,7 +45,16 @@ interface TournamentEditForm {
   status: TournamentStatus;
 }
 
+interface TournamentCreateBlankForm {
+  name: string;
+  date: string;
+  type: string;
+  category: string;
+  regulations: string;
+}
+
 const AdminTournaments: React.FC = () => {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTournament, setSelectedTournament] = useState<any>(null);
@@ -84,6 +94,21 @@ const AdminTournaments: React.FC = () => {
     formState: { errors: errorsEdit },
     reset: resetEdit,
   } = useForm<TournamentEditForm>();
+
+  const {
+    register: registerCreate,
+    handleSubmit: handleSubmitCreate,
+    formState: { errors: errorsCreate },
+    reset: resetCreate,
+  } = useForm<TournamentCreateBlankForm>({
+    defaultValues: {
+      name: "",
+      date: "",
+      type: "",
+      category: "1",
+      regulations: "",
+    },
+  });
 
   // Отслеживаем выбранный файл и URL Google Sheets
   const selectedFile = watch("tournament_file");
@@ -150,6 +175,19 @@ const AdminTournaments: React.FC = () => {
     }
   };
 
+  const { data: currentUser } = useQuery(
+    "adminCurrentUser",
+    async () => {
+      const response = await adminApi.getCurrentUser();
+      return response.data.data ?? null;
+    },
+    { staleTime: 60_000 }
+  );
+
+  const canCreateBlankTournament =
+    currentUser?.role === UserRole.ADMIN ||
+    currentUser?.role === UserRole.MANAGER;
+
   // Загружаем список турниров
   const {
     data: tournaments,
@@ -163,6 +201,31 @@ const AdminTournaments: React.FC = () => {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   });
+
+  const createBlankMutation = useMutation(
+    async (data: TournamentCreateBlankForm) => {
+      return await createBlankTournament({
+        name: data.name,
+        date: data.date,
+        type: data.type as TournamentType,
+        category: data.category,
+        regulations: data.regulations,
+      });
+    },
+    {
+      onSuccess: (response) => {
+        toast.success(response.data.message || "Турнир создан");
+        queryClient.invalidateQueries("tournaments");
+        queryClient.invalidateQueries("fullRating");
+        queryClient.invalidateQueries("dashboardRating");
+        setIsCreateModalOpen(false);
+        resetCreate();
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
 
   // Мутация для загрузки турнира
   const uploadMutation = useMutation(
@@ -353,6 +416,21 @@ const AdminTournaments: React.FC = () => {
     });
   };
 
+  const handleOpenCreateModal = () => {
+    setIsCreateModalOpen(true);
+    resetCreate({
+      name: "",
+      date: "",
+      type: "",
+      category: "1",
+      regulations: "",
+    });
+  };
+
+  const onSubmitCreateBlank = (data: TournamentCreateBlankForm) => {
+    createBlankMutation.mutate(data);
+  };
+
   const handleOpenUploadModal = () => {
     setIsUploadModalOpen(true);
     setFileError(""); // Сбрасываем ошибку при открытии модального окна
@@ -390,21 +468,34 @@ const AdminTournaments: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Заголовок и кнопка добавления */}
-      <div className="flex justify-between items-center">
+      {/* Кнопки всегда на отдельной строке под заголовком */}
+      <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Турниры</h1>
           <p className="mt-2 text-gray-600">
             Управление турнирами и результатами
           </p>
         </div>
-        <button
-          onClick={handleOpenUploadModal}
-          className="btn-primary flex items-center"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Загрузить турнир
-        </button>
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          {canCreateBlankTournament && (
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="btn-secondary inline-flex shrink-0 items-center"
+            >
+              <PlusIcon className="h-5 w-5 mr-2 shrink-0" />
+              Создать новый турнир
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleOpenUploadModal}
+            className="btn-primary inline-flex shrink-0 items-center"
+          >
+            <PlusIcon className="h-5 w-5 mr-2 shrink-0" />
+            Загрузить турнир
+          </button>
+        </div>
       </div>
 
       {/* Список турниров */}
@@ -571,12 +662,180 @@ const AdminTournaments: React.FC = () => {
             <p className="text-gray-500 mb-6">
               Загрузите первый турнир для начала работы с рейтингом
             </p>
-            <button onClick={handleOpenUploadModal} className="btn-primary">
-              Загрузить турнир
-            </button>
+            <div className="flex flex-wrap gap-3 justify-center">
+              {canCreateBlankTournament && (
+                <button
+                  type="button"
+                  onClick={handleOpenCreateModal}
+                  className="btn-secondary"
+                >
+                  Создать новый турнир
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleOpenUploadModal}
+                className="btn-primary"
+              >
+                Загрузить турнир
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Создание турнира без загрузки результатов */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Создать новый турнир
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSubmitCreate(onSubmitCreateBlank)}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Название
+                </label>
+                <input
+                  type="text"
+                  className={`input-field ${
+                    errorsCreate.name ? "border-red-300" : ""
+                  }`}
+                  placeholder="Введите название турнира"
+                  {...registerCreate("name", {
+                    required: "Название обязательно",
+                  })}
+                />
+                {errorsCreate.name && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsCreate.name.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Дата проведения
+                </label>
+                <input
+                  type="date"
+                  className={`input-field ${
+                    errorsCreate.date ? "border-red-300" : ""
+                  }`}
+                  {...registerCreate("date", {
+                    required: "Дата обязательна",
+                  })}
+                />
+                {errorsCreate.date && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsCreate.date.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Тип турнира
+                </label>
+                <select
+                  className={`input-field ${
+                    errorsCreate.type ? "border-red-300" : ""
+                  }`}
+                  {...registerCreate("type", {
+                    required: "Тип турнира обязателен",
+                  })}
+                >
+                  <option value="">Выберите тип турнира</option>
+                  <option value={TournamentType.TRIPLETTE}>Триплеты</option>
+                  <option value={TournamentType.DOUBLETTE_MALE}>
+                    Дуплеты мужские
+                  </option>
+                  <option value={TournamentType.DOUBLETTE_FEMALE}>
+                    Дуплеты женские
+                  </option>
+                  <option value={TournamentType.DOUBLETTE_MIXT}>
+                    Дуплеты микст
+                  </option>
+                  <option value={TournamentType.TET_A_TET_MALE}>
+                    Тет-а-тет мужской
+                  </option>
+                  <option value={TournamentType.TET_A_TET_FEMALE}>
+                    Тет-а-тет женский
+                  </option>
+                </select>
+                {errorsCreate.type && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsCreate.type.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Категория турнира
+                </label>
+                <select
+                  className="input-field"
+                  {...registerCreate("category", {
+                    required: "Категория обязательна",
+                  })}
+                >
+                  <option value="1">1-я категория</option>
+                  <option value="2">2-я категория</option>
+                </select>
+                {errorsCreate.category && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errorsCreate.category.message}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Регламент
+                </label>
+                <textarea
+                  rows={5}
+                  className="input-field"
+                  placeholder="Текст регламента (необязательно)"
+                  {...registerCreate("regulations")}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="btn-secondary"
+                  disabled={createBlankMutation.isLoading}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={createBlankMutation.isLoading}
+                >
+                  {createBlankMutation.isLoading ? "Создание..." : "Создать"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Модальное окно загрузки турнира */}
       {isUploadModalOpen && (

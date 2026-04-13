@@ -42,6 +42,7 @@ export interface Tournament {
   date: string;
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
   status: TournamentStatus;
+  regulations?: string | null;
   created_at: string;
   updated_at: string;
   teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров

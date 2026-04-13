@@ -2,7 +2,7 @@ import {
   TournamentCategory,
   TournamentStatus,
   TournamentType,
-} from "@/types";
+} from "../types";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 

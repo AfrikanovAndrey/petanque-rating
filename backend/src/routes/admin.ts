@@ -119,6 +119,19 @@ router.post(
 // GET /api/admin/tournaments - получить все турниры
 router.get("/tournaments", AdminController.getTournaments);
 
+// POST /api/admin/tournaments - создать турнир без загрузки результатов (ADMIN и MANAGER)
+router.post(
+  "/tournaments",
+  auditLog({
+    action: "CREATE_TOURNAMENT",
+    entityType: "tournament",
+    getEntityName: (req) => req.body.name || null,
+    getDescription: (req) =>
+      `Создание турнира "${req.body.name || "без названия"}"`,
+  }),
+  AdminController.createTournament,
+);
+
 // GET /api/admin/tournaments/:tournamentId - получить турнир с результатами
 router.get("/tournaments/:tournamentId", AdminController.getTournamentDetails);
 

@@ -64,11 +64,21 @@ export class TournamentModel {
     date: string,
     manual: boolean = false,
     connection?: PoolConnection,
+    regulations: string | null = null,
+    tournamentStatus: TournamentStatus = TournamentStatus.FINISHED,
   ): Promise<number> {
     const executor = connection || pool;
     const [result] = await executor.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, type, category, date, manual) VALUES (?, ?, ?, ?, ?)",
-      [name, type, TournamentCategoryEnum[category], date, manual],
+      "INSERT INTO tournaments (name, type, category, date, manual, status, regulations) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [
+        name,
+        type,
+        TournamentCategoryEnum[category],
+        date,
+        manual,
+        tournamentStatus,
+        regulations,
+      ],
     );
     return result.insertId;
   }

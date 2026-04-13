@@ -23,6 +23,20 @@ const api = axios.create({
   },
 });
 
+/** Создание турнира без загрузки результатов (POST /admin/tournaments) */
+export type CreateBlankTournamentBody = {
+  name: string;
+  date: string;
+  type: TournamentType;
+  category: string;
+  regulations?: string;
+};
+
+export const createBlankTournament = (
+  data: CreateBlankTournamentBody
+): Promise<AxiosResponse<ApiResponse<{ id: number }>>> =>
+  api.post("/admin/tournaments", data);
+
 // Интерцептор для добавления токена к запросам
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem("admin_token");
@@ -181,6 +195,9 @@ export const adminApi = {
   // Получить все турниры
   getTournaments: (): Promise<AxiosResponse<ApiResponse<Tournament[]>>> =>
     api.get("/admin/tournaments"),
+
+  // Создать турнир (без загрузки результатов)
+  createTournament: createBlankTournament,
 
   // Получить турнир с результатами
   getTournamentDetails: (
