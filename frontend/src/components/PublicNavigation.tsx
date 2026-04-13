@@ -22,7 +22,7 @@ const PublicNavigation: React.FC = () => {
       name: "Турниры",
       href: "/tournaments",
       icon: TrophyIcon,
-      current: location.pathname === "/tournaments",
+      current: location.pathname.startsWith("/tournaments"),
     },
     {
       name: "Правила расчёта рейтинга",

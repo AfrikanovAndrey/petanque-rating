@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { RowDataPacket } from "mysql2";
 import * as XLSX from "xlsx";
 import { getAllCupPointsConfig, getPoints } from "../config/cupPoints";
 import { pool } from "../config/database";
@@ -18,12 +19,14 @@ import {
 } from "../controllers/TournamentParser";
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
+import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
 import {
   Cup,
   CupPosition,
   TeamResults,
   TournamentCategoryEnum,
+  TournamentStatus,
   TournamentType,
 } from "../types";
 import ExcelUtils from "../utils/excelUtils";
@@ -328,6 +331,291 @@ export class TournamentController {
       res
         .status(500)
         .json({ success: false, message: "Внутренняя ошибка сервера" });
+    }
+  }
+
+  /**
+   * Публичная страница регистрации: турнир в статусе REGISTRATION + записанные команды (без авторизации).
+   */
+  static async getPublicTournamentRegistration(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const tournamentId = parseInt(req.params.id);
+
+    if (isNaN(tournamentId)) {
+      res.status(400).json({ success: false, message: "Неверный ID турнира" });
+      return;
+    }
+
+    try {
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({ success: false, message: "Турнир не найден" });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.REGISTRATION) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Страница доступна только для турниров в статусе «Регистрация»",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+        );
+
+      res.json({
+        success: true,
+        data: {
+          tournament,
+          teams,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка публичной страницы регистрации турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /** Проверка состава команды по типу турнира (игроки уже загружены из БД). */
+  private static validateTeamRegistrationRoster(
+    type: TournamentType,
+    players: { id: number; gender: string | null }[]
+  ): string | null {
+    const n = players.length;
+    const ge = (i: number) => players[i]?.gender;
+
+    switch (type) {
+      case TournamentType.TRIPLETTE:
+        if (n < 3 || n > 4) {
+          return "В триплете укажите от 3 до 4 игроков.";
+        }
+        return null;
+      case TournamentType.TET_A_TET_MALE:
+        if (n !== 1) return "Тет-а-тет: нужен один игрок.";
+        if (ge(0) !== "male") {
+          return ge(0)
+            ? "Нужен игрок мужского пола."
+            : "У выбранного игрока не указан пол в базе.";
+        }
+        return null;
+      case TournamentType.TET_A_TET_FEMALE:
+        if (n !== 1) return "Тет-а-тет: нужен один игрок.";
+        if (ge(0) !== "female") {
+          return ge(0)
+            ? "Нужен игрок женского пола."
+            : "У выбранного игрока не указан пол в базе.";
+        }
+        return null;
+      case TournamentType.DOUBLETTE_MALE:
+        if (n !== 2) return "Дуплет: укажите двух игроков.";
+        if (players.some((p) => p.gender !== "male")) {
+          return "Оба игрока должны быть мужского пола (пол указан в карточке игрока).";
+        }
+        return null;
+      case TournamentType.DOUBLETTE_FEMALE:
+        if (n !== 2) return "Дуплет: укажите двух игроков.";
+        if (players.some((p) => p.gender !== "female")) {
+          return "Оба игрока должны быть женского пола (пол указан в карточке игрока).";
+        }
+        return null;
+      case TournamentType.DOUBLETTE_MIXT:
+        if (n !== 2) return "Дуплет микст: укажите двух игроков.";
+        if (players.some((p) => !p.gender)) {
+          return "У обоих игроков должен быть указан пол в базе.";
+        }
+        {
+          const hasM = players.some((p) => p.gender === "male");
+          const hasF = players.some((p) => p.gender === "female");
+          if (!hasM || !hasF) {
+            return "Микст: один игрок мужского и один женского пола.";
+          }
+        }
+        return null;
+      default:
+        return "Неизвестный тип турнира.";
+    }
+  }
+
+  /**
+   * Публичная регистрация команды на турнир в статусе REGISTRATION.
+   * Тело: { player_ids: number[] } — только существующие id, без повторов.
+   */
+  static async registerPublicTeam(req: Request, res: Response): Promise<void> {
+    const tournamentId = parseInt(req.params.id, 10);
+    if (Number.isNaN(tournamentId)) {
+      res.status(400).json({ success: false, message: "Неверный ID турнира" });
+      return;
+    }
+
+    const body = req.body as { player_ids?: unknown };
+    if (!Array.isArray(body.player_ids)) {
+      res.status(400).json({
+        success: false,
+        message: "Ожидается массив player_ids",
+      });
+      return;
+    }
+
+    const nums: number[] = [];
+    for (const item of body.player_ids) {
+      const n =
+        typeof item === "number" && Number.isInteger(item)
+          ? item
+          : parseInt(String(item), 10);
+      if (!Number.isFinite(n) || n <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Некорректный идентификатор игрока",
+        });
+        return;
+      }
+      nums.push(n);
+    }
+    const playerIds = [...new Set(nums)];
+    if (playerIds.length !== nums.length) {
+      res.status(400).json({
+        success: false,
+        message: "Один игрок указан дважды",
+      });
+      return;
+    }
+
+    const tournament = await TournamentModel.getTournamentById(tournamentId);
+    if (!tournament) {
+      res.status(404).json({ success: false, message: "Турнир не найден" });
+      return;
+    }
+    if (tournament.status !== TournamentStatus.REGISTRATION) {
+      res.status(400).json({
+        success: false,
+        message: "Регистрация на этот турнир закрыта",
+      });
+      return;
+    }
+
+    if (playerIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: "Укажите хотя бы одного игрока",
+      });
+      return;
+    }
+
+    let lockKey = "";
+    let lockAcquired = false;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      lockKey = `tr_reg:${playerIds
+        .slice()
+        .sort((a, b) => a - b)
+        .join(":")}`.substring(0, 60);
+      const [lockRows] = await connection.query<RowDataPacket[]>(
+        "SELECT GET_LOCK(?, 20) AS got",
+        [lockKey]
+      );
+      const got = (lockRows[0] as { got?: number })?.got;
+      if (got !== 1) {
+        await connection.rollback();
+        res.status(503).json({
+          success: false,
+          message: "Сервер занят, повторите попытку через несколько секунд",
+        });
+        return;
+      }
+      lockAcquired = true;
+
+      const [playerRows] = await connection.execute<RowDataPacket[]>(
+        `SELECT id, gender FROM players WHERE id IN (${playerIds
+          .map(() => "?")
+          .join(",")})`,
+        playerIds
+      );
+      if (playerRows.length !== playerIds.length) {
+        await connection.rollback();
+        res.status(400).json({
+          success: false,
+          message: "Один или несколько игроков не найдены",
+        });
+        return;
+      }
+
+      const players = playerIds.map((id) => {
+        const row = playerRows.find((r: RowDataPacket) => (r as any).id === id) as
+          | { gender?: string | null }
+          | undefined;
+        const g = row?.gender;
+        return {
+          id,
+          gender: g === "male" || g === "female" ? g : null,
+        };
+      });
+
+      const rosterError = TournamentController.validateTeamRegistrationRoster(
+        tournament.type as TournamentType,
+        players
+      );
+      if (rosterError) {
+        await connection.rollback();
+        res.status(400).json({ success: false, message: rosterError });
+        return;
+      }
+
+      let team = await TeamModel.findExistingTeam(playerIds, connection);
+      let teamId: number;
+      if (team) {
+        teamId = team.id;
+      } else {
+        teamId = await TeamModel.createTeam(playerIds, connection);
+      }
+
+      const already =
+        await TournamentRegistrationModel.isTeamRegistered(
+          tournamentId,
+          teamId,
+          connection
+        );
+      if (already) {
+        await connection.rollback();
+        res.status(409).json({
+          success: false,
+          message: "Эта команда уже зарегистрирована на турнир",
+        });
+        return;
+      }
+
+      await TournamentRegistrationModel.addRegistration(
+        tournamentId,
+        teamId,
+        connection
+      );
+      await connection.commit();
+      res.json({ success: true, message: "Команда успешно зарегистрирована" });
+    } catch (error) {
+      await connection.rollback();
+      console.error("Ошибка публичной регистрации команды:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    } finally {
+      if (lockAcquired && lockKey) {
+        try {
+          await connection.query("SELECT RELEASE_LOCK(?)", [lockKey]);
+        } catch (e) {
+          console.error("RELEASE_LOCK:", e);
+        }
+      }
+      connection.release();
     }
   }
 

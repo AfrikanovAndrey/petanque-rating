@@ -8,6 +8,7 @@ import {
   TournamentRegistrationPageData,
   TournamentWithResults,
   Player,
+  PlayerSearchResult,
   User,
   CreateUserRequest,
   UpdateUserRequest,
@@ -87,7 +88,31 @@ export const ratingApi = {
       >
     >
   > => api.get("/rating/licenses"),
+
+  /** Поиск игроков по имени (публичный, для регистрации) */
+  searchPlayers: (params: {
+    q: string;
+    gender?: "male" | "female";
+    limit?: number;
+  }): Promise<AxiosResponse<ApiResponse<PlayerSearchResult[]>>> =>
+    api.get("/rating/players/search", { params }),
 };
+
+/** Публичная страница регистрации (GET /rating/tournaments/:id/registration) */
+export const getPublicTournamentRegistration = (
+  tournamentId: number
+): Promise<
+  AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
+> => api.get(`/rating/tournaments/${tournamentId}/registration`);
+
+/** Публичная заявка команды на турнир (статус REGISTRATION) */
+export const registerTeamForTournamentPublic = (
+  tournamentId: number,
+  player_ids: number[]
+): Promise<AxiosResponse<ApiResponse<unknown>>> =>
+  api.post(`/rating/tournaments/${tournamentId}/register-team`, {
+    player_ids,
+  });
 
 export const tournamentsApi = {
   // Получить список всех турниров
@@ -99,6 +124,8 @@ export const tournamentsApi = {
     tournamentId: number
   ): Promise<AxiosResponse<ApiResponse<TournamentWithResults>>> =>
     api.get(`/rating/tournaments/${tournamentId}`),
+
+  getTournamentRegistrationPublic: getPublicTournamentRegistration,
 };
 
 // === API АВТОРИЗАЦИИ ===

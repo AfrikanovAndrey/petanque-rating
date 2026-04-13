@@ -11,6 +11,7 @@ import { Toaster } from "react-hot-toast";
 // Pages
 import RatingTable from "./pages/RatingTable";
 import TournamentsList from "./pages/TournamentsList";
+import TournamentRegistrationPublic from "./pages/TournamentRegistrationPublic";
 import RatingRules from "./pages/RatingRules";
 import Licenses from "./pages/Licenses";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -54,6 +55,15 @@ function App() {
               element={
                 <Layout>
                   <RatingTable />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/tournaments/:tournamentId/registration"
+              element={
+                <Layout>
+                  <TournamentRegistrationPublic />
                 </Layout>
               }
             />

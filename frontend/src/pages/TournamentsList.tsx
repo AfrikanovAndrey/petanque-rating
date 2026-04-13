@@ -7,6 +7,7 @@ import {
 } from "@heroicons/react/24/outline";
 import React, { useState } from "react";
 import { useQuery } from "react-query";
+import { Link } from "react-router-dom";
 import { tournamentsApi } from "../services/api";
 import {
   TournamentResult,
@@ -197,7 +198,16 @@ const TournamentsList: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3">
+                        {tournament.status === TournamentStatus.REGISTRATION && (
+                          <Link
+                            to={`/tournaments/${tournament.id}/registration`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm font-medium text-primary-600 hover:text-primary-800 whitespace-nowrap"
+                          >
+                            Страница регистрации
+                          </Link>
+                        )}
                         {isExpanded ? (
                           <ChevronUpIcon className="h-5 w-5 text-gray-400" />
                         ) : (

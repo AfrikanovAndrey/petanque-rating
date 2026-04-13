@@ -1,9 +1,10 @@
 import { ArrowLeftIcon, ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "react-query";
 import { Link, useParams } from "react-router-dom";
-import { adminApi } from "../../services/api";
-import { TournamentStatus } from "../../types";
+import { RegisterTeamModal } from "../components/RegisterTeamModal";
+import { getPublicTournamentRegistration } from "../services/api";
+import { TournamentStatus } from "../types";
 import {
   formatDate,
   formatDateTime,
@@ -13,20 +14,19 @@ import {
   getTournamentTypeText,
   handleApiError,
   regulationsForDisplay,
-} from "../../utils";
+} from "../utils";
 
-const AdminTournamentRegistration: React.FC = () => {
+const TournamentRegistrationPublic: React.FC = () => {
   const { tournamentId: tournamentIdParam } = useParams<{
     tournamentId: string;
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery(
-    ["tournamentRegistration", tournamentId],
+    ["publicTournamentRegistration", tournamentId],
     async () => {
-      const response = await adminApi.getTournamentRegistrationPage(
-        tournamentId
-      );
+      const response = await getPublicTournamentRegistration(tournamentId);
       if (!response.data.success || !response.data.data) {
         throw new Error(response.data.message || "Не удалось загрузить данные");
       }
@@ -42,7 +42,7 @@ const AdminTournamentRegistration: React.FC = () => {
     return (
       <div className="space-y-4">
         <p className="text-red-600">Некорректный идентификатор турнира.</p>
-        <Link to="/admin/tournaments" className="text-primary-600 hover:underline">
+        <Link to="/tournaments" className="text-primary-600 hover:underline">
           ← К списку турниров
         </Link>
       </div>
@@ -53,7 +53,7 @@ const AdminTournamentRegistration: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[320px]">
         <div className="text-center">
-          <div className="loading-spinner mb-4 mx-auto" />
+          <div className="animate-spin h-8 w-8 border-2 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
           <p className="text-gray-600">Загрузка…</p>
         </div>
       </div>
@@ -67,7 +67,7 @@ const AdminTournamentRegistration: React.FC = () => {
           {handleApiError(error)}
         </div>
         <Link
-          to="/admin/tournaments"
+          to="/tournaments"
           className="inline-flex items-center text-primary-600 hover:underline"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -87,7 +87,7 @@ const AdminTournamentRegistration: React.FC = () => {
     <div className="space-y-6">
       <div>
         <Link
-          to="/admin/tournaments"
+          to="/tournaments"
           className="inline-flex items-center text-sm text-primary-600 hover:text-primary-800 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -96,7 +96,7 @@ const AdminTournamentRegistration: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <ClipboardDocumentListIcon className="h-9 w-9 text-primary-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               Регистрация на турнир
             </h1>
             <p className="mt-1 text-gray-600">{tournament.name}</p>
@@ -104,7 +104,7 @@ const AdminTournamentRegistration: React.FC = () => {
         </div>
       </div>
 
-      <div className="card p-6 space-y-6">
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6 space-y-6">
         <h2 className="text-lg font-semibold text-gray-900">
           Сведения о турнире
         </h2>
@@ -167,17 +167,25 @@ const AdminTournamentRegistration: React.FC = () => {
         </dl>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Зарегистрированные команды
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Всего: {teams.length}
-          </p>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="border-b border-gray-200 px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Зарегистрированные команды
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">Всего: {teams.length}</p>
+          </div>
+          {/* Страница с данными с сервера доступна только в фазе регистрации */}
+          <button
+            type="button"
+            onClick={() => setRegisterOpen(true)}
+            className="inline-flex justify-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+          >
+            Зарегистрировать команду
+          </button>
         </div>
         {teams.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-500">
+          <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
             Пока нет зарегистрированных команд.
           </div>
         ) : (
@@ -185,13 +193,13 @@ const AdminTournamentRegistration: React.FC = () => {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     №
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Состав команды
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Дата записи
                   </th>
                 </tr>
@@ -199,13 +207,13 @@ const AdminTournamentRegistration: React.FC = () => {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {teams.map((team, index) => (
                   <tr key={team.team_id}>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
                       {index + 1}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
                       {team.players.join(", ")}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                       {formatDateTime(team.registered_at)}
                     </td>
                   </tr>
@@ -215,8 +223,16 @@ const AdminTournamentRegistration: React.FC = () => {
           </div>
         )}
       </div>
+
+      {registerOpen && (
+        <RegisterTeamModal
+          tournamentId={tournamentId}
+          tournament={tournament}
+          onClose={() => setRegisterOpen(false)}
+        />
+      )}
     </div>
   );
 };
 
-export default AdminTournamentRegistration;
+export default TournamentRegistrationPublic;

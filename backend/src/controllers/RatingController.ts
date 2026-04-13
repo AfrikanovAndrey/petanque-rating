@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { pool } from "../config/database";
 import { RowDataPacket } from "mysql2";
 import { LicensedPlayerModel } from "../models/LicensedPlayerModel";
+import { PlayerModel } from "../models/PlayerModel";
 import { RatingTableRow } from "../types";
 
 export class RatingController {
@@ -552,6 +553,48 @@ export class RatingController {
       res.status(500).json({
         success: false,
         message: "Ошибка получения списка лицензий",
+      });
+    }
+  }
+
+  /** GET /api/rating/players/search — публичный поиск игроков по имени (автодополнение) */
+  static async searchPlayers(req: Request, res: Response): Promise<void> {
+    try {
+      const q = String(req.query.q ?? "").trim();
+      const limitRaw = parseInt(String(req.query.limit ?? "20"), 10);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(limitRaw, 1), 50)
+        : 20;
+      const genderRaw = req.query.gender;
+      if (
+        genderRaw !== undefined &&
+        genderRaw !== "" &&
+        genderRaw !== "male" &&
+        genderRaw !== "female"
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Параметр gender должен быть male или female",
+        });
+        return;
+      }
+      const gender =
+        genderRaw === "male" || genderRaw === "female" ? genderRaw : undefined;
+      if (q.length < 2) {
+        res.json({ success: true, data: [] });
+        return;
+      }
+      const data = await PlayerModel.searchPlayersForAutocomplete(
+        q,
+        limit,
+        gender
+      );
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error("Ошибка поиска игроков:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка поиска игроков",
       });
     }
   }

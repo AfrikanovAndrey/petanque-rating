@@ -60,6 +60,13 @@ export interface TournamentRegistrationPageData {
   teams: TournamentRegisteredTeam[];
 }
 
+/** Ответ GET /rating/players/search (автодополнение) */
+export interface PlayerSearchResult {
+  id: number;
+  name: string;
+  gender: "male" | "female" | null;
+}
+
 export type TournamentCategory = "FEDERAL" | "REGIONAL";
 
 // Enum для причин получения очков

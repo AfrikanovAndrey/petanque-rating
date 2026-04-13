@@ -1,5 +1,5 @@
 import { pool } from "../config/database";
-import { RowDataPacket } from "mysql2/promise";
+import { PoolConnection, RowDataPacket } from "mysql2/promise";
 
 export interface RegisteredTeamRow {
   team_id: number;
@@ -37,5 +37,32 @@ export class TournamentRegistrationModel {
         .split("|||")
         .filter((n) => n.length > 0),
     }));
+  }
+
+  static async isTeamRegistered(
+    tournamentId: number,
+    teamId: number,
+    connection?: PoolConnection
+  ): Promise<boolean> {
+    const exec = connection ?? pool;
+    const [rows] = await exec.execute<RowDataPacket[]>(
+      `SELECT 1 FROM tournament_registrations
+       WHERE tournament_id = ? AND team_id = ?
+       LIMIT 1`,
+      [tournamentId, teamId]
+    );
+    return rows.length > 0;
+  }
+
+  static async addRegistration(
+    tournamentId: number,
+    teamId: number,
+    connection?: PoolConnection
+  ): Promise<void> {
+    const exec = connection ?? pool;
+    await exec.execute(
+      `INSERT INTO tournament_registrations (tournament_id, team_id) VALUES (?, ?)`,
+      [tournamentId, teamId]
+    );
   }
 }

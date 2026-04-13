@@ -26,15 +26,31 @@ router.get("/player/:playerId", RatingController.getPlayerDetails);
 // GET /api/rating/licenses - действующие лицензии на текущий год (публичный доступ)
 router.get("/licenses", RatingController.getActiveLicenses);
 
+// GET /api/rating/players/search — поиск игроков по имени (публичный доступ)
+router.get("/players/search", RatingController.searchPlayers);
+
 // === ТУРНИРЫ ===
 // GET /api/rating/tournaments - получить список всех турниров (публичный доступ)
 router.get("/tournaments", TournamentController.getAllTournaments);
 
-// GET /api/rating/tournaments/:id - получить турнир с результатами (публичный доступ)
-router.get("/tournaments/:id", TournamentController.getTournamentDetails);
-
+// Статические пути до :id
 // GET /api/rating/tournaments/stats - получить статистику турниров (публичный доступ)
 router.get("/tournaments/stats", TournamentController.getTournamentsStats);
+
+// GET /api/rating/tournaments/:id/registration — регистрация (публичный доступ)
+router.get(
+  "/tournaments/:id/registration",
+  TournamentController.getPublicTournamentRegistration,
+);
+
+// POST /api/rating/tournaments/:id/register-team — заявка команды (публичный доступ)
+router.post(
+  "/tournaments/:id/register-team",
+  TournamentController.registerPublicTeam,
+);
+
+// GET /api/rating/tournaments/:id - получить турнир с результатами (публичный доступ)
+router.get("/tournaments/:id", TournamentController.getTournamentDetails);
 
 // === КУБКИ ===
 // GET /api/rating/cups - получить все результаты кубков (публичный доступ)

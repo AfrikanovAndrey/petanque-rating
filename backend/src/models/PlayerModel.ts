@@ -2,6 +2,13 @@ import { pool } from "../config/database";
 import { Player, PlayerRating, TournamentResultWithTournament } from "../types";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 
+/** Минимальные поля для публичного автодополнения при регистрации команды */
+export interface PlayerAutocompleteRow {
+  id: number;
+  name: string;
+  gender: "male" | "female" | null;
+}
+
 export class PlayerModel {
   static async getAllPlayers(): Promise<Player[]> {
     const [rows] = await pool.execute<Player[] & RowDataPacket[]>(
@@ -66,5 +73,44 @@ export class PlayerModel {
       [id]
     );
     return result.affectedRows > 0;
+  }
+
+  /**
+   * Поиск игроков по подстроке имени.
+   * LIKE + ESCAPE: безопасно для % и _ в запросе; LIMIT числом — совместимость с PS в MariaDB.
+   */
+  static async searchPlayersForAutocomplete(
+    query: string,
+    limit: number,
+    gender?: "male" | "female"
+  ): Promise<PlayerAutocompleteRow[]> {
+    const q = query.trim();
+    if (q.length < 2) {
+      return [];
+    }
+    const safeLimit = Math.min(Math.max(Math.floor(Number(limit)) || 20, 1), 50);
+
+    const escapeLike = (s: string) =>
+      s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+    const pattern = `%${escapeLike(q)}%`;
+
+    const params: string[] = [pattern];
+    let sql =
+      "SELECT id, name, gender FROM players WHERE name LIKE ? ESCAPE '\\\\'";
+    if (gender) {
+      sql += " AND gender = ?";
+      params.push(gender);
+    }
+    sql += ` ORDER BY name ASC LIMIT ${safeLimit}`;
+
+    const [rows] = await pool.execute<RowDataPacket[]>(sql, params);
+    return (rows as any[]).map((r) => ({
+      id: r.id as number,
+      name: r.name as string,
+      gender:
+        r.gender === "male" || r.gender === "female"
+          ? (r.gender as "male" | "female")
+          : null,
+    }));
   }
 }

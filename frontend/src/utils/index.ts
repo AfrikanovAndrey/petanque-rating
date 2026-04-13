@@ -114,6 +114,16 @@ export function logout(): void {
   window.location.href = "/admin/login";
 }
 
+/** Текст регламента для UI: пусто и служебные артефакты сборки не показываем как регламент. */
+export function regulationsForDisplay(raw: string | null | undefined): string {
+  const s = raw?.trim();
+  if (!s) return "— не указан —";
+  if (/\[vite\]|Internal server error|Failed to resolve import/i.test(s)) {
+    return "— не указан —";
+  }
+  return s;
+}
+
 // Обработка ошибок API
 export function handleApiError(error: any): string {
   if (error.response?.data?.message) {
