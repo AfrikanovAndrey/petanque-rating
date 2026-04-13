@@ -132,6 +132,12 @@ router.post(
   AdminController.createTournament,
 );
 
+// GET /api/admin/tournaments/:tournamentId/registration — страница регистрации (до :tournamentId одиночного)
+router.get(
+  "/tournaments/:tournamentId/registration",
+  AdminController.getTournamentRegistrationPage,
+);
+
 // GET /api/admin/tournaments/:tournamentId - получить турнир с результатами
 router.get("/tournaments/:tournamentId", AdminController.getTournamentDetails);
 

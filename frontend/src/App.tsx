@@ -16,6 +16,7 @@ import Licenses from "./pages/Licenses";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTournaments from "./pages/admin/AdminTournaments";
+import AdminTournamentRegistration from "./pages/admin/AdminTournamentRegistration";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPlayers from "./pages/admin/AdminPlayers";
 import AdminLicensedPlayers from "./pages/admin/AdminLicensedPlayers";
@@ -107,6 +108,17 @@ function App() {
                 <ProtectedRoute>
                   <AdminLayout>
                     <AdminDashboard />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/tournaments/:tournamentId/registration"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout>
+                    <AdminTournamentRegistration />
                   </AdminLayout>
                 </ProtectedRoute>
               }

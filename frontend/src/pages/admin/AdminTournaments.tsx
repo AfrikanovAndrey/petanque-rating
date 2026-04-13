@@ -8,6 +8,7 @@ import {
   TrophyIcon,
 } from "@heroicons/react/24/outline";
 import React, { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
@@ -54,6 +55,7 @@ interface TournamentCreateBlankForm {
 }
 
 const AdminTournaments: React.FC = () => {
+  const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -532,20 +534,48 @@ const AdminTournaments: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {tournaments.map((tournament) => (
-                  <tr key={tournament.id} className="table-row">
+                {tournaments.map((tournament) => {
+                  const isRegistration =
+                    tournament.status === TournamentStatus.REGISTRATION;
+                  return (
+                  <tr
+                    key={tournament.id}
+                    className={`table-row ${
+                      isRegistration
+                        ? "cursor-pointer hover:bg-gray-50"
+                        : ""
+                    }`}
+                    onClick={
+                      isRegistration
+                        ? () =>
+                            navigate(
+                              `/admin/tournaments/${tournament.id}/registration`
+                            )
+                        : undefined
+                    }
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <TrophyIcon className="h-6 w-6 text-gray-400 mr-3" />
                         <div className="flex items-center">
-                          <button
-                            onClick={() => handleViewDetails(tournament.id)}
-                            disabled={detailsMutation.isLoading}
-                            className="text-sm font-medium text-gray-900 hover:text-primary-600 hover:underline text-left cursor-pointer"
-                            title="Просмотр результатов"
-                          >
-                            {tournament.name}
-                          </button>
+                          {isRegistration ? (
+                            <span className="text-sm font-medium text-gray-900">
+                              {tournament.name}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(tournament.id);
+                              }}
+                              disabled={detailsMutation.isLoading}
+                              className="text-sm font-medium text-gray-900 hover:text-primary-600 hover:underline text-left cursor-pointer"
+                              title="Просмотр результатов"
+                            >
+                              {tournament.name}
+                            </button>
+                          )}
                           {getTournamentTypeIcons(tournament.type)}
                         </div>
                       </div>
@@ -598,9 +628,13 @@ const AdminTournaments: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateTime(tournament.created_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td
+                      className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex justify-end space-x-2">
                         <button
+                          type="button"
                           onClick={() =>
                             recalculateMutation.mutate(tournament.id)
                           }
@@ -630,6 +664,7 @@ const AdminTournaments: React.FC = () => {
                           />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleOpenEditModal(tournament)}
                           className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
                           title="Редактировать турнир"
@@ -637,6 +672,7 @@ const AdminTournaments: React.FC = () => {
                           <PencilIcon className="h-4 w-4" />
                         </button>
                         <button
+                          type="button"
                           onClick={() =>
                             handleDelete(tournament.id, tournament.name)
                           }
@@ -649,7 +685,8 @@ const AdminTournaments: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

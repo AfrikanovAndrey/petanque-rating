@@ -5,6 +5,7 @@ import {
   LoginCredentials,
   AuthResponse,
   Tournament,
+  TournamentRegistrationPageData,
   TournamentWithResults,
   Player,
   User,
@@ -204,6 +205,13 @@ export const adminApi = {
     tournamentId: number
   ): Promise<AxiosResponse<ApiResponse<TournamentWithResults>>> =>
     api.get(`/admin/tournaments/${tournamentId}`),
+
+  // Страница регистрации (турнир в статусе REGISTRATION + записанные команды)
+  getTournamentRegistrationPage: (
+    tournamentId: number
+  ): Promise<
+    AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
+  > => api.get(`/admin/tournaments/${tournamentId}/registration`),
 
   // Обновить турнир
   updateTournament: (

@@ -48,6 +48,18 @@ export interface Tournament {
   teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров
 }
 
+/** Команда, записанная на турнир (фаза регистрации) */
+export interface TournamentRegisteredTeam {
+  team_id: number;
+  registered_at: string;
+  players: string[];
+}
+
+export interface TournamentRegistrationPageData {
+  tournament: Tournament;
+  teams: TournamentRegisteredTeam[];
+}
+
 export type TournamentCategory = "FEDERAL" | "REGIONAL";
 
 // Enum для причин получения очков

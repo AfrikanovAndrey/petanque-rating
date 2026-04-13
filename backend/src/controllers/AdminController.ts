@@ -6,6 +6,7 @@ import { pool } from "../config/database";
 import { LicensedPlayerModel } from "../models/LicensedPlayerModel";
 import { PlayerModel } from "../models/PlayerModel";
 import { TournamentModel } from "../models/TournamentModel";
+import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
 import {
   LicensedPlayerUploadData,
   TournamentCategoryEnum,
@@ -393,6 +394,63 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Ошибка получения деталей турнира",
+      });
+    }
+  }
+
+  /**
+   * Данные страницы регистрации: турнир (в статусе REGISTRATION) + список записанных команд.
+   */
+  static async getTournamentRegistrationPage(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId);
+
+      if (isNaN(tournamentId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.REGISTRATION) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Страница регистрации доступна только для турниров в статусе «Регистрация»",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+        );
+
+      res.json({
+        success: true,
+        data: {
+          tournament,
+          teams,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка страницы регистрации турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка загрузки данных регистрации",
       });
     }
   }

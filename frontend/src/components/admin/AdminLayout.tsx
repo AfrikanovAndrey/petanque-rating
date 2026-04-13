@@ -118,6 +118,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   ].filter((item) => !item.adminOnly || isAdmin); // Фильтруем пункты меню
 
   const isCurrentPage = (href: string) => {
+    if (href === "/admin/tournaments") {
+      return (
+        location.pathname === href ||
+        location.pathname.startsWith("/admin/tournaments/")
+      );
+    }
     return (
       location.pathname === href ||
       (href === "/admin/dashboard" && location.pathname === "/admin")
