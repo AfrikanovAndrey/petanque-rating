@@ -11,9 +11,26 @@ type SlotCfg = {
   slots: number;
   min: number;
   max: number;
+  /** Фильтр поиска по полу для каждого слота; undefined — без фильтра (триплет) */
   genders: ("male" | "female" | undefined)[];
   tripletteHint?: boolean;
 };
+
+/** Подпись поля: «Игрок 1 (М)», «Игрок 2 (Ж)» и т.д. */
+function buildPlayerFieldLabel(
+  slotIndex: number,
+  totalSlots: number,
+  gender?: "male" | "female"
+): string {
+  const base = totalSlots > 1 ? `Игрок ${slotIndex + 1}` : "Игрок";
+  if (gender === "male") {
+    return `${base} (М)`;
+  }
+  if (gender === "female") {
+    return `${base} (Ж)`;
+  }
+  return base;
+}
 
 function getSlotConfig(type: TournamentType): SlotCfg {
   switch (type) {
@@ -30,7 +47,7 @@ function getSlotConfig(type: TournamentType): SlotCfg {
         slots: 2,
         min: 2,
         max: 2,
-        genders: [undefined, undefined],
+        genders: ["male", "female"],
       };
     case TournamentType.TRIPLETTE:
       return {
@@ -178,9 +195,7 @@ export const RegisterTeamModal: React.FC<Props> = ({
           {slots.map((slot, i) => (
             <PlayerAutocompleteField
               key={i}
-              label={
-                cfg.slots > 1 ? `Игрок ${i + 1}` : "Игрок"
-              }
+              label={buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
               gender={cfg.genders[i]}
               value={slot}
               onChange={(p) => {
