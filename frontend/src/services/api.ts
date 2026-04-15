@@ -249,6 +249,8 @@ export const adminApi = {
       category?: string;
       date?: string;
       status?: TournamentStatus;
+      manual?: boolean;
+      regulations?: string | null;
     }
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/tournaments/${tournamentId}`, data),

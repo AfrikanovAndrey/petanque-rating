@@ -468,7 +468,8 @@ export class AdminController {
         return;
       }
 
-      const { name, type, category, date, manual, status } = req.body;
+      const { name, type, category, date, manual, status, regulations } =
+        req.body;
 
       // Проверяем, что передан хотя бы один параметр для обновления
       if (
@@ -477,7 +478,8 @@ export class AdminController {
         !category &&
         !date &&
         manual === undefined &&
-        status === undefined
+        status === undefined &&
+        regulations === undefined
       ) {
         res.status(400).json({
           success: false,
@@ -509,6 +511,22 @@ export class AdminController {
         return;
       }
 
+      let regulationsValue: string | null | undefined = undefined;
+      if (regulations !== undefined) {
+        if (regulations === null) {
+          regulationsValue = null;
+        } else if (typeof regulations === "string") {
+          const trimmed = regulations.trim();
+          regulationsValue = trimmed.length > 0 ? trimmed : null;
+        } else {
+          res.status(400).json({
+            success: false,
+            message: "Поле regulations должно быть строкой или null",
+          });
+          return;
+        }
+      }
+
       const success = await TournamentModel.updateTournament(
         tournamentId,
         name,
@@ -517,6 +535,7 @@ export class AdminController {
         date,
         manual,
         status as TournamentStatus | undefined,
+        regulationsValue,
       );
 
       if (success) {

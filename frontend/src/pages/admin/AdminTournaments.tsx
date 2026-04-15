@@ -671,17 +671,19 @@ const AdminTournaments: React.FC = () => {
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDelete(tournament.id, tournament.name)
-                          }
-                          disabled={deleteMutation.isLoading}
-                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                          title="Удалить турнир"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                        {currentUser?.role === UserRole.ADMIN && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDelete(tournament.id, tournament.name)
+                            }
+                            disabled={deleteMutation.isLoading}
+                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                            title="Удалить турнир"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

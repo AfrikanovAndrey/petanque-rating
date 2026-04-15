@@ -87,10 +87,11 @@ export class TournamentModel {
     id: number,
     name?: string,
     type?: TournamentType,
-    category?: TournamentCategoryEnum,
+    category?: TournamentCategoryEnum | string | number,
     date?: string,
     manual?: boolean,
     status?: TournamentStatus,
+    regulations?: string | null,
   ): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
@@ -105,7 +106,16 @@ export class TournamentModel {
     }
     if (category !== undefined) {
       updates.push("category = ?");
-      values.push(TournamentCategoryEnum[category]);
+      const raw = category as string | number;
+      let member: TournamentCategoryEnum;
+      if (raw === "1" || raw === 1 || raw === "FEDERAL") {
+        member = TournamentCategoryEnum.FEDERAL;
+      } else if (raw === "2" || raw === 2 || raw === "REGIONAL") {
+        member = TournamentCategoryEnum.REGIONAL;
+      } else {
+        member = raw as TournamentCategoryEnum;
+      }
+      values.push(TournamentCategoryEnum[member]);
     }
     if (date !== undefined) {
       updates.push("date = ?");
@@ -118,6 +128,10 @@ export class TournamentModel {
     if (status !== undefined) {
       updates.push("status = ?");
       values.push(status);
+    }
+    if (regulations !== undefined) {
+      updates.push("regulations = ?");
+      values.push(regulations);
     }
 
     if (updates.length === 0) {

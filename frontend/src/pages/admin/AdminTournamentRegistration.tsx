@@ -1,25 +1,38 @@
 import { ArrowLeftIcon, ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
-import React from "react";
-import { useQuery } from "react-query";
+import React, { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import toast from "react-hot-toast";
+import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useParams } from "react-router-dom";
 import { adminApi } from "../../services/api";
-import { TournamentStatus } from "../../types";
 import {
-  formatDate,
+  TournamentStatus,
+  TournamentType,
+} from "../../types";
+import {
   formatDateTime,
+  formatDateForInput,
   getTornamentCategoryText,
   getTournamentStatusText,
-  getTournamentTypeIcons,
-  getTournamentTypeText,
   handleApiError,
-  regulationsForDisplay,
 } from "../../utils";
+
+interface TournamentParamsForm {
+  name: string;
+  date: string;
+  type: TournamentType;
+  category: string;
+  status: TournamentStatus;
+  manual: boolean;
+  regulations: string;
+}
 
 const AdminTournamentRegistration: React.FC = () => {
   const { tournamentId: tournamentIdParam } = useParams<{
     tournamentId: string;
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery(
     ["tournamentRegistration", tournamentId],
@@ -35,6 +48,67 @@ const AdminTournamentRegistration: React.FC = () => {
     {
       enabled: Number.isFinite(tournamentId) && tournamentId > 0,
       retry: false,
+    }
+  );
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isDirty },
+  } = useForm<TournamentParamsForm>({
+    defaultValues: {
+      name: "",
+      date: "",
+      type: TournamentType.TRIPLETTE,
+      category: "1",
+      status: TournamentStatus.REGISTRATION,
+      manual: false,
+      regulations: "",
+    },
+  });
+
+  useEffect(() => {
+    if (!data?.tournament) return;
+    const t = data.tournament;
+    reset({
+      name: t.name,
+      date: formatDateForInput(t.date),
+      type: t.type as TournamentType,
+      category: t.category === "FEDERAL" ? "1" : "2",
+      status: (t.status ?? TournamentStatus.REGISTRATION) as TournamentStatus,
+      manual: !!t.manual,
+      regulations: t.regulations ?? "",
+    });
+  }, [data, reset]);
+
+  const updateMutation = useMutation(
+    async (form: TournamentParamsForm) => {
+      return adminApi.updateTournament(tournamentId, {
+        name: form.name,
+        type: form.type,
+        category: form.category,
+        date: form.date,
+        status: form.status,
+        manual: form.manual,
+        regulations: form.regulations.trim() === "" ? null : form.regulations,
+      });
+    },
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success("Параметры турнира сохранены");
+          void queryClient.invalidateQueries([
+            "tournamentRegistration",
+            tournamentId,
+          ]);
+        } else {
+          toast.error(res.data.message || "Ошибка сохранения");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
     }
   );
 
@@ -105,66 +179,171 @@ const AdminTournamentRegistration: React.FC = () => {
       </div>
 
       <div className="card p-6 space-y-6">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Сведения о турнире
-        </h2>
-        <dl className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Параметры турнира
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Измените поля и нажмите «Сохранить». Доступно организаторам и
+            администраторам.
+          </p>
+        </div>
+
+        <form
+          className="space-y-4"
+          onSubmit={handleSubmit((form) => updateMutation.mutate(form))}
+        >
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Название
-            </dt>
-            <dd className="mt-1 text-gray-900">{tournament.name}</dd>
+            </label>
+            <input
+              type="text"
+              className={`input-field ${errors.name ? "border-red-300" : ""}`}
+              {...register("name", { required: "Укажите название" })}
+            />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+            )}
           </div>
+
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Дата проведения
-            </dt>
-            <dd className="mt-1 text-gray-900">{formatDate(tournament.date)}</dd>
+            </label>
+            <input
+              type="date"
+              className={`input-field ${errors.date ? "border-red-300" : ""}`}
+              {...register("date", { required: "Укажите дату" })}
+            />
+            {errors.date && (
+              <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>
+            )}
           </div>
+
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Тип турнира
-            </dt>
-            <dd className="mt-1 flex items-center gap-2 text-gray-900">
-              {getTournamentTypeText(tournament.type) ?? tournament.type}
-              {getTournamentTypeIcons(tournament.type)}
-            </dd>
+            </label>
+            <select
+              className={`input-field ${errors.type ? "border-red-300" : ""}`}
+              {...register("type", { required: true })}
+            >
+              <option value={TournamentType.TRIPLETTE}>Триплеты</option>
+              <option value={TournamentType.DOUBLETTE_MALE}>
+                Дуплеты мужские
+              </option>
+              <option value={TournamentType.DOUBLETTE_FEMALE}>
+                Дуплеты женские
+              </option>
+              <option value={TournamentType.DOUBLETTE_MIXT}>
+                Дуплеты микст
+              </option>
+              <option value={TournamentType.TET_A_TET_MALE}>
+                Тет-а-тет мужской
+              </option>
+              <option value={TournamentType.TET_A_TET_FEMALE}>
+                Тет-а-тет женский
+              </option>
+            </select>
           </div>
+
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Категория
-            </dt>
-            <dd className="mt-1 text-gray-900">
-              {getTornamentCategoryText(tournament.category)}
-            </dd>
+            </label>
+            <select
+              className={`input-field ${errors.category ? "border-red-300" : ""}`}
+              {...register("category", { required: true })}
+            >
+              <option value="1">1-я категория ({getTornamentCategoryText("FEDERAL")})</option>
+              <option value="2">2-я категория ({getTornamentCategoryText("REGIONAL")})</option>
+            </select>
           </div>
+
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Статус
-            </dt>
-            <dd className="mt-1 text-gray-900">
-              {getTournamentStatusText(
-                tournament.status ?? TournamentStatus.REGISTRATION
-              )}
-            </dd>
+            </label>
+            <select
+              className={`input-field ${errors.status ? "border-red-300" : ""}`}
+              {...register("status", { required: true })}
+            >
+              <option value={TournamentStatus.REGISTRATION}>
+                {getTournamentStatusText(TournamentStatus.REGISTRATION)}
+              </option>
+              <option value={TournamentStatus.IN_PROGRESS}>
+                {getTournamentStatusText(TournamentStatus.IN_PROGRESS)}
+              </option>
+              <option value={TournamentStatus.FINISHED}>
+                {getTournamentStatusText(TournamentStatus.FINISHED)}
+              </option>
+            </select>
           </div>
+
+          <div className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              id="manual-mode"
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600"
+              {...register("manual")}
+            />
+            <label htmlFor="manual-mode" className="text-sm text-gray-700">
+              Ручной режим загрузки результатов
+            </label>
+          </div>
+
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Режим загрузки
-            </dt>
-            <dd className="mt-1 text-gray-900">
-              {tournament.manual ? "Ручной" : "Автоматический"}
-            </dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-xs font-medium uppercase text-gray-500">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Регламент
-            </dt>
-            <dd className="mt-1 text-gray-900 whitespace-pre-wrap">
-              {regulationsForDisplay(tournament.regulations)}
-            </dd>
+            </label>
+            <textarea
+              rows={6}
+              className={`input-field font-mono text-sm ${errors.regulations ? "border-red-300" : ""}`}
+              placeholder="Текст регламента для участников…"
+              {...register("regulations")}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Пустое поле удалит текст регламента в базе.
+            </p>
           </div>
-        </dl>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={updateMutation.isLoading || !isDirty}
+              onClick={() => {
+                if (!data?.tournament) return;
+                const t = data.tournament;
+                reset({
+                  name: t.name,
+                  date: formatDateForInput(t.date),
+                  type: t.type as TournamentType,
+                  category: t.category === "FEDERAL" ? "1" : "2",
+                  status: (t.status ?? TournamentStatus.REGISTRATION) as TournamentStatus,
+                  manual: !!t.manual,
+                  regulations: t.regulations ?? "",
+                });
+              }}
+            >
+              Сбросить
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={updateMutation.isLoading || !isDirty}
+            >
+              {updateMutation.isLoading ? "Сохранение…" : "Сохранить"}
+            </button>
+          </div>
+        </form>
+
+        <div className="rounded-md bg-gray-50 p-3 text-xs text-gray-600 border border-gray-100">
+          <strong className="text-gray-700">Подсказка:</strong> при смене типа
+          турнира проверьте соответствие уже записанных команд новым правилам
+          состава на публичной странице регистрации.
+        </div>
       </div>
 
       <div className="card overflow-hidden">
