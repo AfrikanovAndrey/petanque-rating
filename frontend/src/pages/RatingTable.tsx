@@ -10,17 +10,11 @@ import React, { useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { adminApi, ratingApi } from "../services/api";
 import { PlayerRating, getCupPositionText } from "../types";
+import CsvUtils from "../utils/csv";
 import { formatDate, formatNumber, handleApiError } from "../utils";
 import { getTournamentTypeIcons } from "../utils/tournamentIcons";
 
 type RatingViewType = "male" | "female";
-
-function escapeCsvField(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
 
 function downloadPublicRatingCsv(
   players: PlayerRating[],
@@ -30,7 +24,7 @@ function downloadPublicRatingCsv(
     "ФИО,текущий рейтинг",
     ...players.map((p) => {
       const name = p.licensed_name || p.player_name;
-      return `${escapeCsvField(name)},${p.total_points}`;
+      return `${CsvUtils.escapeCsvField(name)},${p.total_points}`;
     }),
   ];
   const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {

@@ -1,4 +1,5 @@
 import {
+  ArrowDownTrayIcon,
   ArrowLeftIcon,
   ClipboardDocumentListIcon,
   PencilSquareIcon,
@@ -24,6 +25,7 @@ import {
   getTournamentStatusText,
   handleApiError,
 } from "../../utils";
+import CsvUtils from "../../utils/csv";
 
 interface TournamentParamsForm {
   name: string;
@@ -253,6 +255,35 @@ const AdminTournamentRegistration: React.FC = () => {
     return ratingValues.reduce((sum, value) => sum + value, 0);
   };
 
+  const downloadTeamsCsv = () => {
+    const lines = [
+      "№,состав команды,рейтинг",
+      ...teams.map((team, index) => {
+        const teamPlayers = team.players.map(formatPlayerWithRating).join(", ");
+        return `${index + 1},${CsvUtils.escapeCsvField(teamPlayers)},${getTeamTotalRating(
+          team.players
+        )}`;
+      }),
+    ];
+    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const fileSafeTournamentName = tournament.name
+      .replace(/[<>:"/\\|?*]+/g, "-")
+      .trim();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Регистрация-${fileSafeTournamentName || "турнир"}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -449,12 +480,26 @@ const AdminTournamentRegistration: React.FC = () => {
 
       <div className="card overflow-hidden">
         <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Зарегистрированные команды
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Всего: {teams.length} • Подтверждено: {confirmedTeamsCount}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Зарегистрированные команды
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Всего: {teams.length} • Подтверждено: {confirmedTeamsCount}
+              </p>
+            </div>
+            {teams.length > 0 && (
+              <button
+                type="button"
+                onClick={downloadTeamsCsv}
+                className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                <ArrowDownTrayIcon className="h-5 w-5 text-gray-500" />
+                Скачать CSV
+              </button>
+            )}
+          </div>
         </div>
         {teams.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-500">
