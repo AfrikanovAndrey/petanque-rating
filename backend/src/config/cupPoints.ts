@@ -317,7 +317,7 @@ function calculateCupABPoints(
       // Если нет очков за полуфинал в таблице, возвращаем квалификационные
       return qualifyingPoints;
     }
-    if (category === TournamentCategoryEnum.FEDERAL && cup === "A") {
+    if (cup === "A") {
       // В кубке A категории 1: победитель за 3 место получает очки полуфинала +1
       return semiFinalPoints + 1;
     } else {
