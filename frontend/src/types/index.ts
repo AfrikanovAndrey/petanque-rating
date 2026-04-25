@@ -51,8 +51,10 @@ export interface Tournament {
 /** Команда, записанная на турнир (фаза регистрации) */
 export interface TournamentRegisteredTeam {
   team_id: number;
-  registered_at: string;
+  updated_at: string;
+  player_ids: number[];
   players: string[];
+  is_confirmed: boolean;
 }
 
 export interface TournamentRegistrationPageData {

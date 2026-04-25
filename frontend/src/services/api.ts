@@ -240,6 +240,30 @@ export const adminApi = {
     AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
   > => api.get(`/admin/tournaments/${tournamentId}/registration`),
 
+  // Подтвердить заявку команды на турнир
+  confirmTournamentRegistration: (
+    tournamentId: number,
+    teamId: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.post(`/admin/tournaments/${tournamentId}/registration/${teamId}/confirm`),
+
+  // Изменить состав зарегистрированной команды
+  updateTournamentRegistrationTeam: (
+    tournamentId: number,
+    teamId: number,
+    player_ids: number[]
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.put(`/admin/tournaments/${tournamentId}/registration/${teamId}`, {
+      player_ids,
+    }),
+
+  // Удалить заявку команды на турнир
+  deleteTournamentRegistration: (
+    tournamentId: number,
+    teamId: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.delete(`/admin/tournaments/${tournamentId}/registration/${teamId}`),
+
   // Обновить турнир
   updateTournament: (
     tournamentId: number,

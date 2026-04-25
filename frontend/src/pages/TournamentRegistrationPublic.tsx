@@ -5,12 +5,11 @@ import { Link, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../components/RegulationsMarkdown";
 import { RegisterTeamModal } from "../components/RegisterTeamModal";
 import { getPublicTournamentRegistration, ratingApi } from "../services/api";
-import { TournamentStatus, TournamentType } from "../types";
+import { TournamentType } from "../types";
 import {
   formatDate,
   formatDateTime,
   getTornamentCategoryText,
-  getTournamentStatusText,
   getTournamentTypeIcons,
   getTournamentTypeText,
   handleApiError,
@@ -192,9 +191,12 @@ const TournamentRegistrationPublic: React.FC = () => {
         <div className="border-b border-gray-200 px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Зарегистрированные команды
+              Список регистрации 
             </h2>
-            <p className="mt-1 text-sm text-gray-500">Всего: {teams.length}</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Публичный список отображает только подтверждённые заявки. Всего:{" "}
+              {teams.length}
+            </p>
           </div>
           {/* Страница с данными с сервера доступна только в фазе регистрации */}
           <button
@@ -207,7 +209,7 @@ const TournamentRegistrationPublic: React.FC = () => {
         </div>
         {teams.length === 0 ? (
           <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
-            Пока нет зарегистрированных команд.
+            Пока нет подтверждённых команд.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -224,7 +226,7 @@ const TournamentRegistrationPublic: React.FC = () => {
                     Рейтинг команды
                   </th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Дата записи
+                    Обновлено
                   </th>
                 </tr>
               </thead>
@@ -241,7 +243,7 @@ const TournamentRegistrationPublic: React.FC = () => {
                       {getTeamTotalRating(team.players)}
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                      {formatDateTime(team.registered_at)}
+                      {formatDateTime(team.updated_at)}
                     </td>
                   </tr>
                 ))}

@@ -367,6 +367,7 @@ export class TournamentController {
       const teams =
         await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
           tournamentId,
+          { confirmedOnly: true },
         );
 
       res.json({

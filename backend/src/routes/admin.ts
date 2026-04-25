@@ -138,6 +138,24 @@ router.get(
   AdminController.getTournamentRegistrationPage,
 );
 
+// POST /api/admin/tournaments/:tournamentId/registration/:teamId/confirm — подтвердить заявку команды
+router.post(
+  "/tournaments/:tournamentId/registration/:teamId/confirm",
+  AdminController.confirmTournamentRegistration,
+);
+
+// PUT /api/admin/tournaments/:tournamentId/registration/:teamId - изменить состав зарегистрированной команды
+router.put(
+  "/tournaments/:tournamentId/registration/:teamId",
+  AdminController.updateTournamentRegistrationTeam,
+);
+
+// DELETE /api/admin/tournaments/:tournamentId/registration/:teamId - удалить заявку команды
+router.delete(
+  "/tournaments/:tournamentId/registration/:teamId",
+  AdminController.deleteTournamentRegistration,
+);
+
 // GET /api/admin/tournaments/:tournamentId - получить турнир с результатами
 router.get("/tournaments/:tournamentId", AdminController.getTournamentDetails);
 

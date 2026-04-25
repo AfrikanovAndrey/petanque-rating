@@ -1,12 +1,19 @@
-import { ArrowLeftIcon, ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
-import React, { useEffect, useMemo } from "react";
+import {
+  ArrowLeftIcon,
+  ClipboardDocumentListIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useParams } from "react-router-dom";
+import { EditRegisteredTeamModal } from "../../components/EditRegisteredTeamModal";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
 import { adminApi, ratingApi } from "../../services/api";
 import {
+  TournamentRegisteredTeam,
   TournamentStatus,
   TournamentType,
 } from "../../types";
@@ -34,6 +41,9 @@ const AdminTournamentRegistration: React.FC = () => {
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
   const queryClient = useQueryClient();
+  const [teamForEdit, setTeamForEdit] = useState<TournamentRegisteredTeam | null>(
+    null
+  );
 
   const { data, isLoading, error } = useQuery(
     ["tournamentRegistration", tournamentId],
@@ -137,6 +147,50 @@ const AdminTournamentRegistration: React.FC = () => {
     }
   );
 
+  const confirmRegistrationMutation = useMutation(
+    async (teamId: number) => {
+      return adminApi.confirmTournamentRegistration(tournamentId, teamId);
+    },
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success(res.data.message || "Заявка подтверждена");
+          void queryClient.invalidateQueries([
+            "tournamentRegistration",
+            tournamentId,
+          ]);
+        } else {
+          toast.error(res.data.message || "Ошибка подтверждения заявки");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const deleteRegistrationMutation = useMutation(
+    async (teamId: number) => {
+      return adminApi.deleteTournamentRegistration(tournamentId, teamId);
+    },
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success(res.data.message || "Заявка удалена");
+          void queryClient.invalidateQueries([
+            "tournamentRegistration",
+            tournamentId,
+          ]);
+        } else {
+          toast.error(res.data.message || "Ошибка удаления заявки");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
   if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
     return (
       <div className="space-y-4">
@@ -181,6 +235,7 @@ const AdminTournamentRegistration: React.FC = () => {
   }
 
   const { tournament, teams } = data;
+  const confirmedTeamsCount = teams.filter((team) => team.is_confirmed).length;
 
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
@@ -398,7 +453,7 @@ const AdminTournamentRegistration: React.FC = () => {
             Зарегистрированные команды
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Всего: {teams.length}
+            Всего: {teams.length} • Подтверждено: {confirmedTeamsCount}
           </p>
         </div>
         {teams.length === 0 ? (
@@ -420,7 +475,13 @@ const AdminTournamentRegistration: React.FC = () => {
                     Рейтинг команды
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Дата записи
+                    Обновлено
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Статус
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Действие
                   </th>
                 </tr>
               </thead>
@@ -437,7 +498,65 @@ const AdminTournamentRegistration: React.FC = () => {
                       {getTeamTotalRating(team.players)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                      {formatDateTime(team.registered_at)}
+                      {formatDateTime(team.updated_at)}
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap">
+                      {team.is_confirmed ? (
+                        <div className="flex flex-col">
+                          <span className="inline-flex w-fit rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Подтверждена
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Ожидает подтверждения
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        {!team.is_confirmed && (
+                          <button
+                            type="button"
+                            className="btn-primary py-1.5 px-3 text-xs"
+                            disabled={confirmRegistrationMutation.isLoading}
+                            onClick={() => {
+                              confirmRegistrationMutation.mutate(team.team_id);
+                            }}
+                          >
+                            {confirmRegistrationMutation.isLoading
+                              ? "Подтверждение…"
+                              : "Подтвердить"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="inline-flex items-center rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          onClick={() => setTeamForEdit(team)}
+                        >
+                          <PencilSquareIcon className="mr-1 h-4 w-4" />
+                          Изменить состав
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center rounded-md border border-red-300 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                          disabled={deleteRegistrationMutation.isLoading}
+                          onClick={() => {
+                            const confirmed = window.confirm(
+                              "Удалить заявку этой команды на турнир?"
+                            );
+                            if (!confirmed) {
+                              return;
+                            }
+                            deleteRegistrationMutation.mutate(team.team_id);
+                          }}
+                        >
+                          <TrashIcon className="mr-1 h-4 w-4" />
+                          {deleteRegistrationMutation.isLoading
+                            ? "Удаление…"
+                            : "Удалить заявку"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -446,6 +565,14 @@ const AdminTournamentRegistration: React.FC = () => {
           </div>
         )}
       </div>
+      {teamForEdit && (
+        <EditRegisteredTeamModal
+          tournamentId={tournamentId}
+          tournament={tournament}
+          team={teamForEdit}
+          onClose={() => setTeamForEdit(null)}
+        />
+      )}
     </div>
   );
 };
