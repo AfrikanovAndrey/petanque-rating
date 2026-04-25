@@ -9,7 +9,7 @@ import {
 // Ключ: "category-cup_type-teams_range"
 // Значение: Map<позиция, очки>
 
-type PlayersRange = "36-60" | "61-84" | "85-108" | "109+";
+type PlayersRange = "24-60" | "61-84" | "85-108" | "109+";
 type CupPointsKey = `${TournamentCategoryEnum}-${string}-${PlayersRange}`;
 
 export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
@@ -60,8 +60,6 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
       [CupPosition.ROUND_OF_8, 6], // 1/4
     ]),
   ],
-
-  // Кубок Б, 19-24 команды
   [
     "1-B-85-108",
     new Map([
@@ -72,8 +70,6 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
       [CupPosition.ROUND_OF_16, 6], // 1/8
     ]),
   ],
-
-  // Кубок Б
   [
     "1-B-109+",
     new Map([
@@ -88,7 +84,7 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
   // ##### ТУРНИРЫ 2 КАТЕГОРИИ #####
 
   [
-    "2-A-36-60",
+    "2-A-24-60",
     new Map([
       [CupPosition.WINNER, 9], // П
       [CupPosition.RUNNER_UP, 7], // Ф
@@ -129,7 +125,7 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
 
   // Кубок Б
   [
-    "2-B-36-60",
+    "2-B-24-60",
     new Map([
       [CupPosition.WINNER, 5], // П
       [CupPosition.RUNNER_UP, 4], // Ф
@@ -355,7 +351,7 @@ function getPlayersRange(
   }
 
   if (playersCount <= 60) {
-    return "36-60";
+    return "24-60";
   } else if (playersCount <= 84) {
     return "61-84";
   } else if (playersCount <= 108) {
