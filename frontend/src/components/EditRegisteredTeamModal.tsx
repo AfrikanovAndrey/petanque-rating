@@ -1,5 +1,5 @@
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "react-query";
 import { adminApi } from "../services/api";
@@ -84,12 +84,26 @@ export const EditRegisteredTeamModal: React.FC<Props> = ({
     [tournament.type]
   );
 
-  const buildInitialSlots = (): (PlayerSearchResult | null)[] => {
+  const buildInitialSlots = useCallback((): (PlayerSearchResult | null)[] => {
     const size = cfg.slots;
     const base = Array.from({ length: size }, () => null) as (
       | PlayerSearchResult
       | null
     )[];
+    const roster = team.roster_slots;
+    if (roster && roster.length >= size) {
+      for (let i = 0; i < size; i++) {
+        const slot = roster[i];
+        if (slot?.kind === "player") {
+          base[i] = {
+            id: slot.player_id,
+            name: slot.name,
+            gender: null,
+          };
+        }
+      }
+      return base;
+    }
     const maxIndex = Math.min(size, team.player_ids.length, team.players.length);
     for (let i = 0; i < maxIndex; i++) {
       base[i] = {
@@ -99,7 +113,7 @@ export const EditRegisteredTeamModal: React.FC<Props> = ({
       };
     }
     return base;
-  };
+  }, [cfg.slots, team.player_ids, team.players, team.roster_slots]);
 
   const [slots, setSlots] = useState<(PlayerSearchResult | null)[]>(() =>
     buildInitialSlots()
@@ -110,7 +124,7 @@ export const EditRegisteredTeamModal: React.FC<Props> = ({
   useEffect(() => {
     setSlots(buildInitialSlots());
     setFormError("");
-  }, [team.team_id, cfg.slots]);
+  }, [team.team_id, buildInitialSlots]);
 
   const excludeIdsFor = (index: number) =>
     slots
@@ -208,23 +222,38 @@ export const EditRegisteredTeamModal: React.FC<Props> = ({
             )}
           </div>
 
-          {slots.map((slot, i) => (
-            <PlayerAutocompleteField
-              key={i}
-              label={buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
-              gender={cfg.genders[i]}
-              value={slot}
-              onChange={(p) => {
-                setSlots((prev) => {
-                  const next = [...prev];
-                  next[i] = p;
-                  return next;
-                });
-              }}
-              excludeIds={excludeIdsFor(i)}
-              disabled={submitting}
-            />
-          ))}
+          {slots.map((slot, i) => {
+            const rosterSlot = (team.roster_slots ?? [])[i];
+            const pendingNew =
+              rosterSlot?.kind === "new" && !slot
+                ? rosterSlot.display_name
+                : null;
+            return (
+              <div key={i} className="space-y-1">
+                {pendingNew && (
+                  <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    В заявке указан игрок не из базы:{" "}
+                    <span className="font-medium">{pendingNew}</span>. Добавьте
+                    игрока в базу и выберите его ниже.
+                  </p>
+                )}
+                <PlayerAutocompleteField
+                  label={buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
+                  gender={cfg.genders[i]}
+                  value={slot}
+                  onChange={(p) => {
+                    setSlots((prev) => {
+                      const next = [...prev];
+                      next[i] = p;
+                      return next;
+                    });
+                  }}
+                  excludeIds={excludeIdsFor(i)}
+                  disabled={submitting}
+                />
+              </div>
+            );
+          })}
 
           {formError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

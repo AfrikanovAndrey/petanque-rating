@@ -9,6 +9,7 @@ import {
   TournamentWithResults,
   Player,
   PlayerSearchResult,
+  RegisterTournamentSlotPayload,
   User,
   CreateUserRequest,
   UpdateUserRequest,
@@ -108,10 +109,10 @@ export const getPublicTournamentRegistration = (
 /** Публичная заявка команды на турнир (статус REGISTRATION) */
 export const registerTeamForTournamentPublic = (
   tournamentId: number,
-  player_ids: number[]
+  slots: RegisterTournamentSlotPayload[]
 ): Promise<AxiosResponse<ApiResponse<unknown>>> =>
   api.post(`/rating/tournaments/${tournamentId}/register-team`, {
-    player_ids,
+    slots,
   });
 
 export const tournamentsApi = {

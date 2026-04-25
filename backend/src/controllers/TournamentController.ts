@@ -30,6 +30,14 @@ import {
   TournamentType,
 } from "../types";
 import ExcelUtils from "../utils/excelUtils";
+import {
+  buildStoredRosterFromRequestSlots,
+  legacyPlayerIdsToRequestSlots,
+  parseRegistrationRosterRequestSlots,
+  registrationRosterHasNewPlayer,
+  validateRegistrationRequestSlotsShape,
+  type RegistrationRosterRequestSlot,
+} from "../utils/registrationRosterUtils";
 
 export class TournamentController {
   /**
@@ -367,6 +375,7 @@ export class TournamentController {
       const teams =
         await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
           tournamentId,
+          tournament.type as TournamentType,
           { confirmedOnly: true },
         );
 
@@ -448,45 +457,12 @@ export class TournamentController {
 
   /**
    * Публичная регистрация команды на турнир в статусе REGISTRATION.
-   * Тело: { player_ids: number[] } — только существующие id, без повторов.
+   * Тело: { slots: [...] } или устаревшее { player_ids: number[] }.
    */
   static async registerPublicTeam(req: Request, res: Response): Promise<void> {
     const tournamentId = parseInt(req.params.id, 10);
     if (Number.isNaN(tournamentId)) {
       res.status(400).json({ success: false, message: "Неверный ID турнира" });
-      return;
-    }
-
-    const body = req.body as { player_ids?: unknown };
-    if (!Array.isArray(body.player_ids)) {
-      res.status(400).json({
-        success: false,
-        message: "Ожидается массив player_ids",
-      });
-      return;
-    }
-
-    const nums: number[] = [];
-    for (const item of body.player_ids) {
-      const n =
-        typeof item === "number" && Number.isInteger(item)
-          ? item
-          : parseInt(String(item), 10);
-      if (!Number.isFinite(n) || n <= 0) {
-        res.status(400).json({
-          success: false,
-          message: "Некорректный идентификатор игрока",
-        });
-        return;
-      }
-      nums.push(n);
-    }
-    const playerIds = [...new Set(nums)];
-    if (playerIds.length !== nums.length) {
-      res.status(400).json({
-        success: false,
-        message: "Один игрок указан дважды",
-      });
       return;
     }
 
@@ -503,7 +479,73 @@ export class TournamentController {
       return;
     }
 
-    if (playerIds.length === 0) {
+    const ttype = tournament.type as TournamentType;
+    const body = req.body as { player_ids?: unknown; slots?: unknown };
+
+    let requestSlots: RegistrationRosterRequestSlot[] | null =
+      parseRegistrationRosterRequestSlots(body.slots);
+
+    if (!requestSlots && Array.isArray(body.player_ids)) {
+      const nums: number[] = [];
+      for (const item of body.player_ids) {
+        const n =
+          typeof item === "number" && Number.isInteger(item)
+            ? item
+            : parseInt(String(item), 10);
+        if (!Number.isFinite(n) || n <= 0) {
+          res.status(400).json({
+            success: false,
+            message: "Некорректный идентификатор игрока",
+          });
+          return;
+        }
+        nums.push(n);
+      }
+      const playerIds = [...new Set(nums)];
+      if (playerIds.length !== nums.length) {
+        res.status(400).json({
+          success: false,
+          message: "Один игрок указан дважды",
+        });
+        return;
+      }
+      requestSlots = legacyPlayerIdsToRequestSlots(ttype, playerIds);
+    }
+
+    if (!requestSlots) {
+      res.status(400).json({
+        success: false,
+        message: "Передайте слоты состава (slots) или массив player_ids",
+      });
+      return;
+    }
+
+    const shapeErr = validateRegistrationRequestSlotsShape(ttype, requestSlots);
+    if (shapeErr) {
+      res.status(400).json({ success: false, message: shapeErr });
+      return;
+    }
+
+    const dbIdsOrdered: number[] = [];
+    for (const s of requestSlots) {
+      if (s.kind === "player") {
+        dbIdsOrdered.push(s.player_id);
+      }
+    }
+    const uniqueDb = [...new Set(dbIdsOrdered)];
+    if (uniqueDb.length !== dbIdsOrdered.length) {
+      res.status(400).json({
+        success: false,
+        message: "Один игрок из базы указан в составе дважды",
+      });
+      return;
+    }
+
+    const hasNew = requestSlots.some((s) => s.kind === "new");
+    const hasFilled = requestSlots.some(
+      (s) => s.kind === "player" || s.kind === "new",
+    );
+    if (!hasFilled) {
       res.status(400).json({
         success: false,
         message: "Укажите хотя бы одного игрока",
@@ -516,13 +558,13 @@ export class TournamentController {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      lockKey = `tr_reg:${playerIds
+      lockKey = `tr_reg:${tournamentId}:${uniqueDb
         .slice()
         .sort((a, b) => a - b)
-        .join(":")}`.substring(0, 60);
+        .join(":")}${hasNew ? ":new" : ""}`.substring(0, 60);
       const [lockRows] = await connection.query<RowDataPacket[]>(
         "SELECT GET_LOCK(?, 20) AS got",
-        [lockKey]
+        [lockKey],
       );
       const got = (lockRows[0] as { got?: number })?.got;
       if (got !== 1) {
@@ -535,56 +577,84 @@ export class TournamentController {
       }
       lockAcquired = true;
 
-      const [playerRows] = await connection.execute<RowDataPacket[]>(
-        `SELECT id, gender FROM players WHERE id IN (${playerIds
-          .map(() => "?")
-          .join(",")})`,
-        playerIds
-      );
-      if (playerRows.length !== playerIds.length) {
+      const idToName = new Map<number, string>();
+      const idToGender = new Map<number, "male" | "female" | null>();
+
+      if (uniqueDb.length > 0) {
+        const [playerRows] = await connection.execute<RowDataPacket[]>(
+          `SELECT id, gender, name FROM players WHERE id IN (${uniqueDb
+            .map(() => "?")
+            .join(",")})`,
+          uniqueDb,
+        );
+        if (playerRows.length !== uniqueDb.length) {
+          await connection.rollback();
+          res.status(400).json({
+            success: false,
+            message: "Один или несколько игроков не найдены",
+          });
+          return;
+        }
+        for (const r of playerRows) {
+          const row = r as {
+            id: number;
+            gender?: string | null;
+            name?: string | null;
+          };
+          idToName.set(row.id, String(row.name ?? ""));
+          const g = row.gender;
+          idToGender.set(
+            row.id,
+            g === "male" || g === "female" ? g : null,
+          );
+        }
+
+        if (!hasNew) {
+          const orderedPlayers = dbIdsOrdered.map((id) => ({
+            id,
+            gender: idToGender.get(id) ?? null,
+          }));
+          const rosterError = TournamentController.validateTeamRegistrationRoster(
+            ttype,
+            orderedPlayers,
+          );
+          if (rosterError) {
+            await connection.rollback();
+            res.status(400).json({ success: false, message: rosterError });
+            return;
+          }
+        }
+      }
+
+      const stored = buildStoredRosterFromRequestSlots(requestSlots, idToName);
+      if (!stored) {
         await connection.rollback();
         res.status(400).json({
           success: false,
-          message: "Один или несколько игроков не найдены",
+          message: "Не удалось разобрать состав команды",
         });
         return;
       }
 
-      const players = playerIds.map((id) => {
-        const row = playerRows.find((r: RowDataPacket) => (r as any).id === id) as
-          | { gender?: string | null }
-          | undefined;
-        const g = row?.gender;
-        return {
-          id,
-          gender: g === "male" || g === "female" ? g : null,
-        };
-      });
-
-      const rosterError = TournamentController.validateTeamRegistrationRoster(
-        tournament.type as TournamentType,
-        players
-      );
-      if (rosterError) {
-        await connection.rollback();
-        res.status(400).json({ success: false, message: rosterError });
-        return;
-      }
-
-      let team = await TeamModel.findExistingTeam(playerIds, connection);
       let teamId: number;
-      if (team) {
-        teamId = team.id;
+      if (hasNew) {
+        teamId = await TeamModel.createTeam(uniqueDb, connection);
       } else {
-        teamId = await TeamModel.createTeam(playerIds, connection);
+        const team = await TeamModel.findExistingTeam(uniqueDb, connection);
+        teamId = team
+          ? team.id
+          : await TeamModel.createTeam(uniqueDb, connection);
       }
 
-      const already =
-        await TournamentRegistrationModel.isTeamRegistered(
-          tournamentId,
-          teamId,
-          connection
-        );
+      const rosterForDb = registrationRosterHasNewPlayer(stored)
+        ? stored
+        : null;
+
+      const already = await TournamentRegistrationModel.isTeamRegistered(
+        tournamentId,
+        teamId,
+        connection,
+      );
       if (already) {
         await connection.rollback();
         res.status(409).json({
@@ -597,7 +667,8 @@ export class TournamentController {
       await TournamentRegistrationModel.addRegistration(
         tournamentId,
         teamId,
-        connection
+        connection,
+        rosterForDb,
       );
       await connection.commit();
       res.json({ success: true, message: "Команда успешно зарегистрирована" });

@@ -93,8 +93,8 @@ export class TeamModel {
     playerIds: number[],
     connection?: PoolConnection
   ): Promise<number> {
-    if (playerIds.length < 1 || playerIds.length > 4) {
-      throw new Error("В команде должно быть от 1 до 4 игроков");
+    if (playerIds.length > 4) {
+      throw new Error("В команде не больше 4 игроков");
     }
 
     const useExternalConnection = !!connection;
@@ -112,21 +112,21 @@ export class TeamModel {
 
       const teamId = teamResult.insertId;
 
-      // Получаем имена игроков и сортируем их по фамилиям
-      const [playerRows] = await conn.execute<RowDataPacket[]>(
-        `SELECT id, name FROM players WHERE id IN (${playerIds
-          .map(() => "?")
-          .join(",")}) ORDER BY name ASC`,
-        playerIds
-      );
-
-      // Добавляем игроков в team_players
-      for (let i = 0; i < playerRows.length; i++) {
-        const player = playerRows[i] as any;
-        await conn.execute(
-          `INSERT INTO team_players (team_id, player_id, position) VALUES (?, ?, ?)`,
-          [teamId, player.id, i + 1]
+      if (playerIds.length > 0) {
+        const [playerRows] = await conn.execute<RowDataPacket[]>(
+          `SELECT id, name FROM players WHERE id IN (${playerIds
+            .map(() => "?")
+            .join(",")}) ORDER BY name ASC`,
+          playerIds
         );
+
+        for (let i = 0; i < playerRows.length; i++) {
+          const player = playerRows[i] as any;
+          await conn.execute(
+            `INSERT INTO team_players (team_id, player_id, position) VALUES (?, ?, ?)`,
+            [teamId, player.id, i + 1]
+          );
+        }
       }
 
       if (!useExternalConnection) {

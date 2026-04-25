@@ -48,6 +48,18 @@ export interface Tournament {
   teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров
 }
 
+/** Слот состава в заявке (ответ API регистрации). */
+export type RegistrationRosterSlotDto =
+  | { kind: "player"; player_id: number; name: string }
+  | { kind: "new"; display_name: string }
+  | { kind: "empty" };
+
+/** Тело POST заявки: слоты в порядке формы (пустой — только триплет). */
+export type RegisterTournamentSlotPayload =
+  | { kind: "player"; player_id: number }
+  | { kind: "new"; display_name: string }
+  | { kind: "empty" };
+
 /** Команда, записанная на турнир (фаза регистрации) */
 export interface TournamentRegisteredTeam {
   team_id: number;
@@ -55,6 +67,9 @@ export interface TournamentRegisteredTeam {
   player_ids: number[];
   players: string[];
   is_confirmed: boolean;
+  /** Слоты состава; при отсутствии в ответе API считать устаревшим форматом. */
+  roster_slots?: RegistrationRosterSlotDto[];
+  has_pending_new_players?: boolean;
 }
 
 export interface TournamentRegistrationPageData {

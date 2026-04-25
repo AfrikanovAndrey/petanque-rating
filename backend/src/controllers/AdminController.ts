@@ -498,6 +498,7 @@ export class AdminController {
       const teams =
         await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
           tournamentId,
+          tournament.type as TournamentType,
         );
 
       res.json({
@@ -562,6 +563,15 @@ export class AdminController {
         res.status(404).json({
           success: false,
           message: "Заявка команды на этот турнир не найдена",
+        });
+        return;
+      }
+
+      if (confirmState === "pending_new_players") {
+        res.status(400).json({
+          success: false,
+          message:
+            "Подтверждение недоступно: в заявке есть игроки, ещё не заведённые в базе. Добавьте игрока вручную и укажите его в составе через «Изменить состав».",
         });
         return;
       }

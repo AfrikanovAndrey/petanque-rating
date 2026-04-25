@@ -553,9 +553,16 @@ const AdminTournamentRegistration: React.FC = () => {
                           </span>
                         </div>
                       ) : (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          Ожидает подтверждения
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            Ожидает подтверждения
+                          </span>
+                          {!!team.has_pending_new_players && (
+                            <span className="text-xs text-amber-900">
+                              Есть игрок не из базы — сначала правка состава
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm whitespace-nowrap">
@@ -564,7 +571,15 @@ const AdminTournamentRegistration: React.FC = () => {
                           <button
                             type="button"
                             className="btn-primary py-1.5 px-3 text-xs"
-                            disabled={confirmRegistrationMutation.isLoading}
+                            disabled={
+                              confirmRegistrationMutation.isLoading ||
+                              !!team.has_pending_new_players
+                            }
+                            title={
+                              team.has_pending_new_players
+                                ? "Сначала добавьте игрока в базу и укажите его в составе"
+                                : undefined
+                            }
                             onClick={() => {
                               confirmRegistrationMutation.mutate(team.team_id);
                             }}

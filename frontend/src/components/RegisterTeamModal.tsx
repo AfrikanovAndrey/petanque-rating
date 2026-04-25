@@ -3,7 +3,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "react-query";
 import { registerTeamForTournamentPublic } from "../services/api";
-import { PlayerSearchResult, Tournament, TournamentType } from "../types";
+import {
+  PlayerSearchResult,
+  RegisterTournamentSlotPayload,
+  Tournament,
+  TournamentType,
+} from "../types";
 import { getTournamentTypeText } from "../utils";
 import { PlayerAutocompleteField } from "./PlayerAutocompleteField";
 
@@ -82,48 +87,90 @@ export const RegisterTeamModal: React.FC<Props> = ({
   const [slots, setSlots] = useState<(PlayerSearchResult | null)[]>(() =>
     Array.from({ length: cfg.slots }, () => null)
   );
+  const [asNew, setAsNew] = useState<boolean[]>(() =>
+    Array.from({ length: cfg.slots }, () => false)
+  );
+  const [newNames, setNewNames] = useState<string[]>(() =>
+    Array.from({ length: cfg.slots }, () => "")
+  );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
     setSlots(Array.from({ length: cfg.slots }, () => null));
+    setAsNew(Array.from({ length: cfg.slots }, () => false));
+    setNewNames(Array.from({ length: cfg.slots }, () => ""));
     setFormError("");
   }, [tournamentId, cfg.slots]);
 
   const excludeIdsFor = (index: number) =>
     slots
-      .map((s, j) => (j !== index ? s?.id : undefined))
+      .map((s, j) =>
+        j !== index && !asNew[j] ? s?.id : undefined
+      )
       .filter((x): x is number => x != null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
-    const filled = slots.filter((s): s is PlayerSearchResult => s !== null);
-    const ids = filled.map((p) => p.id);
+    const payload: RegisterTournamentSlotPayload[] = [];
+    for (let i = 0; i < cfg.slots; i++) {
+      if (asNew[i]) {
+        const t = newNames[i].trim();
+        if (t.length < 2) {
+          setFormError(
+            `Укажите ФИО для «${buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}» (не короче 2 символов).`
+          );
+          return;
+        }
+        if (t.length > 200) {
+          setFormError("Слишком длинное ФИО нового игрока.");
+          return;
+        }
+        payload.push({ kind: "new", display_name: t });
+        continue;
+      }
+      if (slots[i]) {
+        payload.push({ kind: "player", player_id: slots[i]!.id });
+        continue;
+      }
+      if (tournament.type === TournamentType.TRIPLETTE) {
+        payload.push({ kind: "empty" });
+        continue;
+      }
+      setFormError("Заполните все поля, выбрав игроков из списка.");
+      return;
+    }
 
-    if (new Set(ids).size !== ids.length) {
+    const dbIds = payload
+      .filter((s): s is { kind: "player"; player_id: number } => s.kind === "player")
+      .map((s) => s.player_id);
+    if (new Set(dbIds).size !== dbIds.length) {
       setFormError("Один игрок не может быть выбран дважды.");
       return;
     }
 
+    const filled = payload.filter(
+      (s) => s.kind === "player" || s.kind === "new"
+    ).length;
     if (tournament.type === TournamentType.TRIPLETTE) {
-      if (filled.length < cfg.min || filled.length > cfg.max) {
+      if (filled < cfg.min || filled > cfg.max) {
         setFormError(
-          `В триплете укажите от ${cfg.min} до ${cfg.max} игроков (выбор только из базы).`
+          `В триплете укажите от ${cfg.min} до ${cfg.max} игроков (включая новых).`
         );
         return;
       }
     } else {
-      if (filled.length !== cfg.slots) {
-        setFormError("Заполните все поля, выбрав игроков из списка.");
+      if (filled !== cfg.slots) {
+        setFormError("Заполните все поля состава.");
         return;
       }
     }
 
     try {
       setSubmitting(true);
-      const res = await registerTeamForTournamentPublic(tournamentId, ids);
+      const res = await registerTeamForTournamentPublic(tournamentId, payload);
       if (!res.data.success) {
         setFormError(String(res.data.message || "Ошибка регистрации"));
         return;
@@ -184,6 +231,11 @@ export const RegisterTeamModal: React.FC<Props> = ({
               {getTournamentTypeText(tournament.type as TournamentType) ??
                 tournament.type}
             </p>
+            <p className="mt-2 text-sm text-gray-600">
+              Если участника ещё нет в базе рейтинга, отметьте «Новый игрок» и
+              введите ФИО. Организатор сможет подтвердить заявку только после
+              того, как все игроки будут заведены в базу и выбраны из списка.
+            </p>
             {cfg.tripletteHint && (
               <p className="mt-2 text-sm text-gray-600">
                 Состав триплета: от 3 до 4 игроков, пол не ограничен. Одно поле
@@ -193,21 +245,75 @@ export const RegisterTeamModal: React.FC<Props> = ({
           </div>
 
           {slots.map((slot, i) => (
-            <PlayerAutocompleteField
-              key={i}
-              label={buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
-              gender={cfg.genders[i]}
-              value={slot}
-              onChange={(p) => {
-                setSlots((prev) => {
-                  const next = [...prev];
-                  next[i] = p;
-                  return next;
-                });
-              }}
-              excludeIds={excludeIdsFor(i)}
-              disabled={submitting}
-            />
+            <div key={i} className="space-y-2 rounded-md border border-gray-100 bg-gray-50/60 p-3">
+              <label className="flex items-center gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                  checked={asNew[i]}
+                  disabled={submitting}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAsNew((prev) => {
+                      const next = [...prev];
+                      next[i] = checked;
+                      return next;
+                    });
+                    if (checked) {
+                      setSlots((prev) => {
+                        const next = [...prev];
+                        next[i] = null;
+                        return next;
+                      });
+                    } else {
+                      setNewNames((prev) => {
+                        const next = [...prev];
+                        next[i] = "";
+                        return next;
+                      });
+                    }
+                  }}
+                />
+                <span>Новый игрок (ещё не в базе)</span>
+              </label>
+              {asNew[i] ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    {buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])} — ФИО
+                  </label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+                    value={newNames[i]}
+                    onChange={(e) =>
+                      setNewNames((prev) => {
+                        const next = [...prev];
+                        next[i] = e.target.value;
+                        return next;
+                      })
+                    }
+                    disabled={submitting}
+                    placeholder="Как в заявке, например Иванов Иван"
+                    autoComplete="off"
+                  />
+                </div>
+              ) : (
+                <PlayerAutocompleteField
+                  label={buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
+                  gender={cfg.genders[i]}
+                  value={slot}
+                  onChange={(p) => {
+                    setSlots((prev) => {
+                      const next = [...prev];
+                      next[i] = p;
+                      return next;
+                    });
+                  }}
+                  excludeIds={excludeIdsFor(i)}
+                  disabled={submitting}
+                />
+              )}
+            </div>
           ))}
 
           {formError && (
