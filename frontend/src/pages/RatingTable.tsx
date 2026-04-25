@@ -1,4 +1,5 @@
 import {
+  ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   InformationCircleIcon,
@@ -13,6 +14,39 @@ import { formatDate, formatNumber, handleApiError } from "../utils";
 import { getTournamentTypeIcons } from "../utils/tournamentIcons";
 
 type RatingViewType = "male" | "female";
+
+function escapeCsvField(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function downloadPublicRatingCsv(
+  players: PlayerRating[],
+  ratingView: RatingViewType
+): void {
+  const lines = [
+    "ФИО,текущий рейтинг",
+    ...players.map((p) => {
+      const name = p.licensed_name || p.player_name;
+      return `${escapeCsvField(name)},${p.total_points}`;
+    }),
+  ];
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const suffix = ratingView === "male" ? "мужской" : "женский";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Рейтинг-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 // Компонент всплывающей подсказки
 const Tooltip: React.FC<{ children: React.ReactNode; text: string }> = ({
@@ -235,6 +269,17 @@ const RatingTable: React.FC = () => {
           Последнее обновление рейтинга:{" "}
           {lastTournamentDate ? formatDate(lastTournamentDate) : "—"}
         </p>
+
+        <div className="flex justify-center mt-4 px-2">
+          <button
+            type="button"
+            onClick={() => downloadPublicRatingCsv(ratingData, ratingView)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5 text-gray-500" />
+            Скачать CSV
+          </button>
+        </div>
 
         {/* Поле поиска */}
         <div className="flex justify-center mt-6 px-2">
