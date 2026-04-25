@@ -16,7 +16,7 @@
 
 ### URL адреса в dev-режиме
 
-- **Frontend**: http://localhost:3000
+- **Frontend**: http://localhost:3002
 - **Backend API**: http://localhost:3001/api
 - **Админ панель**: http://localhost:3000/admin (admin/admin123)
 - **MySQL**: localhost:3306

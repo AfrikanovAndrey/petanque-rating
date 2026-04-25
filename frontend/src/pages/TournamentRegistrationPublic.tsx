@@ -1,10 +1,11 @@
 import { ArrowLeftIcon, ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { Link, useParams } from "react-router-dom";
+import RegulationsMarkdown from "../components/RegulationsMarkdown";
 import { RegisterTeamModal } from "../components/RegisterTeamModal";
-import { getPublicTournamentRegistration } from "../services/api";
-import { TournamentStatus } from "../types";
+import { getPublicTournamentRegistration, ratingApi } from "../services/api";
+import { TournamentStatus, TournamentType } from "../types";
 import {
   formatDate,
   formatDateTime,
@@ -13,7 +14,6 @@ import {
   getTournamentTypeIcons,
   getTournamentTypeText,
   handleApiError,
-  regulationsForDisplay,
 } from "../utils";
 
 const TournamentRegistrationPublic: React.FC = () => {
@@ -36,6 +36,29 @@ const TournamentRegistrationPublic: React.FC = () => {
       enabled: Number.isFinite(tournamentId) && tournamentId > 0,
       retry: false,
     }
+  );
+
+  const { data: fullRating } = useQuery(
+    ["publicRegistrationFullRating"],
+    async () => {
+      const response = await ratingApi.getFullRating();
+      return response.data.success && response.data.data ? response.data.data : [];
+    },
+    {
+      retry: false,
+      staleTime: 60_000,
+    }
+  );
+
+  const ratingByPlayerName = useMemo(
+    () =>
+      new Map(
+        (fullRating ?? []).map((player) => [
+          player.player_name,
+          player.total_points,
+        ])
+      ),
+    [fullRating]
   );
 
   if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
@@ -82,6 +105,22 @@ const TournamentRegistrationPublic: React.FC = () => {
   }
 
   const { tournament, teams } = data;
+
+  const formatPlayerWithRating = (playerName: string) =>
+    `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
+
+  const getTeamTotalRating = (players: string[]) => {
+    const sortedRatings = players
+      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
+      .sort((a, b) => b - a);
+
+    const ratingValues =
+      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
+        ? sortedRatings.slice(0, 3)
+        : sortedRatings;
+
+    return ratingValues.reduce((sum, value) => sum + value, 0);
+  };
 
   return (
     <div className="space-y-6">
@@ -138,30 +177,12 @@ const TournamentRegistrationPublic: React.FC = () => {
               {getTornamentCategoryText(tournament.category)}
             </dd>
           </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Статус
-            </dt>
-            <dd className="mt-1 text-gray-900">
-              {getTournamentStatusText(
-                tournament.status ?? TournamentStatus.REGISTRATION
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Режим загрузки
-            </dt>
-            <dd className="mt-1 text-gray-900">
-              {tournament.manual ? "Ручной" : "Автоматический"}
-            </dd>
-          </div>
           <div className="sm:col-span-2">
             <dt className="text-xs font-medium uppercase text-gray-500">
-              Регламент
+              Описание
             </dt>
-            <dd className="mt-1 text-gray-900 whitespace-pre-wrap">
-              {regulationsForDisplay(tournament.regulations)}
+            <dd className="mt-1 text-gray-900">
+              <RegulationsMarkdown source={tournament.regulations} />
             </dd>
           </div>
         </dl>
@@ -200,6 +221,9 @@ const TournamentRegistrationPublic: React.FC = () => {
                     Состав команды
                   </th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Рейтинг команды
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Дата записи
                   </th>
                 </tr>
@@ -211,7 +235,10 @@ const TournamentRegistrationPublic: React.FC = () => {
                       {index + 1}
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                      {team.players.join(", ")}
+                      {team.players.map(formatPlayerWithRating).join(", ")}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                      {getTeamTotalRating(team.players)}
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                       {formatDateTime(team.registered_at)}

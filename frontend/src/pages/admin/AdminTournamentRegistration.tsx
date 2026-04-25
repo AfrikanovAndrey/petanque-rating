@@ -1,10 +1,11 @@
 import { ArrowLeftIcon, ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useParams } from "react-router-dom";
-import { adminApi } from "../../services/api";
+import RegulationsMarkdown from "../../components/RegulationsMarkdown";
+import { adminApi, ratingApi } from "../../services/api";
 import {
   TournamentStatus,
   TournamentType,
@@ -51,10 +52,34 @@ const AdminTournamentRegistration: React.FC = () => {
     }
   );
 
+  const { data: fullRating } = useQuery(
+    ["registrationFullRating"],
+    async () => {
+      const response = await ratingApi.getFullRating();
+      return response.data.success && response.data.data ? response.data.data : [];
+    },
+    {
+      retry: false,
+      staleTime: 60_000,
+    }
+  );
+
+  const ratingByPlayerName = useMemo(
+    () =>
+      new Map(
+        (fullRating ?? []).map((player) => [
+          player.player_name,
+          player.total_points,
+        ])
+      ),
+    [fullRating]
+  );
+
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isDirty },
   } = useForm<TournamentParamsForm>({
     defaultValues: {
@@ -156,6 +181,22 @@ const AdminTournamentRegistration: React.FC = () => {
   }
 
   const { tournament, teams } = data;
+
+  const formatPlayerWithRating = (playerName: string) =>
+    `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
+
+  const getTeamTotalRating = (players: string[]) => {
+    const sortedRatings = players
+      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
+      .sort((a, b) => b - a);
+
+    const ratingValues =
+      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
+        ? sortedRatings.slice(0, 3)
+        : sortedRatings;
+
+    return ratingValues.reduce((sum, value) => sum + value, 0);
+  };
 
   return (
     <div className="space-y-6">
@@ -304,8 +345,13 @@ const AdminTournamentRegistration: React.FC = () => {
               {...register("regulations")}
             />
             <p className="mt-1 text-xs text-gray-500">
-              Пустое поле удалит текст регламента в базе.
+              Поддерживается Markdown. Пустое поле удалит текст регламента в базе.
             </p>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="mb-2 text-sm font-medium text-gray-700">Предпросмотр</p>
+            <RegulationsMarkdown source={watch("regulations")} className="text-sm" />
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
@@ -371,6 +417,9 @@ const AdminTournamentRegistration: React.FC = () => {
                     Состав команды
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Рейтинг команды
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Дата записи
                   </th>
                 </tr>
@@ -382,7 +431,10 @@ const AdminTournamentRegistration: React.FC = () => {
                       {index + 1}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {team.players.join(", ")}
+                      {team.players.map(formatPlayerWithRating).join(", ")}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                      {getTeamTotalRating(team.players)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                       {formatDateTime(team.registered_at)}
