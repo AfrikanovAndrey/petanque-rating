@@ -69,10 +69,8 @@ const TournamentsList: React.FC = () => {
 
   const handleToggleExpand = async (tournamentId: number) => {
     if (expandedTournament === tournamentId) {
-      // Закрываем
       setExpandedTournament(null);
     } else {
-      // Открываем
       setExpandedTournament(tournamentId);
       await loadTournamentDetails(tournamentId);
     }
@@ -150,75 +148,88 @@ const TournamentsList: React.FC = () => {
             .map((tournament) => {
               const isExpanded = expandedTournament === tournament.id;
               const details = tournamentDetails[tournament.id];
+              const isRegistration =
+                tournament.status === TournamentStatus.REGISTRATION;
+
+              const rowSummary = (
+                <div className="flex items-start sm:items-center justify-between">
+                  <div className="flex-1 min-w-0 mr-2">
+                    <div className="flex items-center mb-1 flex-wrap gap-1">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
+                        {tournament.name}
+                      </h3>
+                      {getTournamentTypeIcons(tournament.type)}
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center text-xs sm:text-sm text-gray-500 gap-1 sm:gap-4">
+                      <div className="flex items-center">
+                        <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        {formatDate(tournament.date)}
+                      </div>
+                      <div className="flex items-center">
+                        {getTornamentCategoryText(tournament.category)}
+                      </div>
+                      <div className="flex items-center">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            tournament.status === TournamentStatus.REGISTRATION
+                              ? "bg-amber-100 text-amber-900"
+                              : tournament.status === TournamentStatus.IN_PROGRESS
+                                ? "bg-sky-100 text-sky-900"
+                                : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {getTournamentStatusText(tournament.status)}
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        Команд: {tournament.teams_count ?? 0}
+                      </div>
+                    </div>
+                  </div>
+                  {!isRegistration && (
+                    <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3">
+                      {isExpanded ? (
+                        <ChevronUpIcon className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
 
               return (
                 <div
                   key={tournament.id}
                   className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200"
                 >
-                  {/* Заголовок турнира */}
-                  <div
-                    className="p-4 sm:p-6 cursor-pointer"
-                    onClick={() => handleToggleExpand(tournament.id)}
-                  >
-                    <div className="flex items-start sm:items-center justify-between">
-                      <div className="flex-1 min-w-0 mr-2">
-                        <div className="flex items-center mb-1 flex-wrap gap-1">
-                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
-                            {tournament.name}
-                          </h3>
-                          {getTournamentTypeIcons(tournament.type)}
-                        </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center text-xs sm:text-sm text-gray-500 gap-1 sm:gap-4">
-                          <div className="flex items-center">
-                            <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                            {formatDate(tournament.date)}
-                          </div>
-                          <div className="flex items-center">
-                            {getTornamentCategoryText(tournament.category)}
-                          </div>
-                          <div className="flex items-center">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                tournament.status ===
-                                TournamentStatus.REGISTRATION
-                                  ? "bg-amber-100 text-amber-900"
-                                  : tournament.status ===
-                                      TournamentStatus.IN_PROGRESS
-                                    ? "bg-sky-100 text-sky-900"
-                                    : "bg-gray-100 text-gray-700"
-                              }`}
-                            >
-                              {getTournamentStatusText(tournament.status)}
-                            </span>
-                          </div>
-                          <div className="flex items-center">
-                            <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                            Команд: {tournament.teams_count ?? 0}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3">
-                        {tournament.status === TournamentStatus.REGISTRATION && (
-                          <Link
-                            to={`/tournaments/${tournament.id}/registration`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-sm font-medium text-primary-600 hover:text-primary-800 whitespace-nowrap"
-                          >
-                            Страница регистрации
-                          </Link>
-                        )}
-                        {isExpanded ? (
-                          <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-                        ) : (
-                          <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-                        )}
-                      </div>
+                  {isRegistration ? (
+                    <Link
+                      to={`/tournaments/${tournament.id}/registration`}
+                      className="block p-4 sm:p-6 text-inherit no-underline rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 hover:bg-gray-50/70"
+                    >
+                      {rowSummary}
+                    </Link>
+                  ) : (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="p-4 sm:p-6 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+                      onClick={() => void handleToggleExpand(tournament.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          void handleToggleExpand(tournament.id);
+                        }
+                      }}
+                    >
+                      {rowSummary}
                     </div>
-                  </div>
+                  )}
 
                   {/* Результаты турнира */}
-                  {isExpanded && (
+                  {!isRegistration && isExpanded && (
                     <div className="border-t border-gray-200 px-4 sm:px-6 pb-4 sm:pb-6">
                       {details ? (
                         <div className="pt-4">
