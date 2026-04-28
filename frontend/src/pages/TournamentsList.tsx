@@ -150,6 +150,10 @@ const TournamentsList: React.FC = () => {
               const details = tournamentDetails[tournament.id];
               const isRegistration =
                 tournament.status === TournamentStatus.REGISTRATION;
+              const isInProgress =
+                tournament.status === TournamentStatus.IN_PROGRESS;
+              const navigatesToPublicSnapshot =
+                isRegistration || isInProgress;
 
               const rowSummary = (
                 <div className="flex items-start sm:items-center justify-between">
@@ -187,7 +191,7 @@ const TournamentsList: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  {!isRegistration && (
+                  {!navigatesToPublicSnapshot && (
                     <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3">
                       {isExpanded ? (
                         <ChevronUpIcon className="h-5 w-5 text-gray-400" />
@@ -204,9 +208,13 @@ const TournamentsList: React.FC = () => {
                   key={tournament.id}
                   className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200"
                 >
-                  {isRegistration ? (
+                  {navigatesToPublicSnapshot ? (
                     <Link
-                      to={`/tournaments/${tournament.id}/registration`}
+                      to={
+                        isRegistration
+                          ? `/tournaments/${tournament.id}/registration`
+                          : `/tournaments/${tournament.id}/in-progress`
+                      }
                       className="block p-4 sm:p-6 text-inherit no-underline rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 hover:bg-gray-50/70"
                     >
                       {rowSummary}
@@ -229,7 +237,7 @@ const TournamentsList: React.FC = () => {
                   )}
 
                   {/* Результаты турнира */}
-                  {!isRegistration && isExpanded && (
+                  {!navigatesToPublicSnapshot && isExpanded && (
                     <div className="border-t border-gray-200 px-4 sm:px-6 pb-4 sm:pb-6">
                       {details ? (
                         <div className="pt-4">

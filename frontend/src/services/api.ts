@@ -106,6 +106,13 @@ export const getPublicTournamentRegistration = (
   AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
 > => api.get(`/rating/tournaments/${tournamentId}/registration`);
 
+/** Публичная страница турнира «в процессе» (GET /rating/tournaments/:id/in-progress) */
+export const getPublicTournamentInProgress = (
+  tournamentId: number
+): Promise<
+  AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
+> => api.get(`/rating/tournaments/${tournamentId}/in-progress`);
+
 /** Публичная заявка команды на турнир (статус REGISTRATION) */
 export const registerTeamForTournamentPublic = (
   tournamentId: number,
@@ -127,6 +134,7 @@ export const tournamentsApi = {
     api.get(`/rating/tournaments/${tournamentId}`),
 
   getTournamentRegistrationPublic: getPublicTournamentRegistration,
+  getTournamentInProgressPublic: getPublicTournamentInProgress,
 };
 
 // === API АВТОРИЗАЦИИ ===
@@ -240,6 +248,13 @@ export const adminApi = {
   ): Promise<
     AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
   > => api.get(`/admin/tournaments/${tournamentId}/registration`),
+
+  // Турнир в процессе: параметры + список заявок (только чтение)
+  getTournamentInProgressPage: (
+    tournamentId: number
+  ): Promise<
+    AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
+  > => api.get(`/admin/tournaments/${tournamentId}/in-progress`),
 
   // Подтвердить заявку команды на турнир
   confirmTournamentRegistration: (

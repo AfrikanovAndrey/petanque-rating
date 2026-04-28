@@ -518,6 +518,64 @@ export class AdminController {
   }
 
   /**
+   * Снимок заявок на турнир в статусе IN_PROGRESS: те же данные, что на странице регистрации, без редактирования заявок.
+   */
+  static async getTournamentInProgressPage(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId);
+
+      if (isNaN(tournamentId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Эта страница доступна только для турниров в статусе «В процессе»",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+
+      res.json({
+        success: true,
+        data: {
+          tournament,
+          teams,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка страницы «турнир в процессе»:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка загрузки данных",
+      });
+    }
+  }
+
+  /**
    * Подтвердить заявку команды на турнир.
    */
   static async confirmTournamentRegistration(

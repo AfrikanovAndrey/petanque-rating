@@ -12,12 +12,14 @@ import { Toaster } from "react-hot-toast";
 import RatingTable from "./pages/RatingTable";
 import TournamentsList from "./pages/TournamentsList";
 import TournamentRegistrationPublic from "./pages/TournamentRegistrationPublic";
+import TournamentInProgressPublic from "./pages/TournamentInProgressPublic";
 import RatingRules from "./pages/RatingRules";
 import Licenses from "./pages/Licenses";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTournaments from "./pages/admin/AdminTournaments";
 import AdminTournamentRegistration from "./pages/admin/AdminTournamentRegistration";
+import AdminTournamentInProgress from "./pages/admin/AdminTournamentInProgress";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPlayers from "./pages/admin/AdminPlayers";
 import AdminLicensedPlayers from "./pages/admin/AdminLicensedPlayers";
@@ -64,6 +66,15 @@ function App() {
               element={
                 <Layout>
                   <TournamentRegistrationPublic />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/tournaments/:tournamentId/in-progress"
+              element={
+                <Layout>
+                  <TournamentInProgressPublic />
                 </Layout>
               }
             />
@@ -129,6 +140,17 @@ function App() {
                 <ProtectedRoute>
                   <AdminLayout>
                     <AdminTournamentRegistration />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/tournaments/:tournamentId/in-progress"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout>
+                    <AdminTournamentInProgress />
                   </AdminLayout>
                 </ProtectedRoute>
               }

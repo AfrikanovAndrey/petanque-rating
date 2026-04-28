@@ -43,6 +43,12 @@ router.get(
   TournamentController.getPublicTournamentRegistration,
 );
 
+// GET /api/rating/tournaments/:id/in-progress — заявки на турнире «в процессе» (публичный доступ)
+router.get(
+  "/tournaments/:id/in-progress",
+  TournamentController.getPublicTournamentInProgress,
+);
+
 // POST /api/rating/tournaments/:id/register-team — заявка команды (публичный доступ)
 router.post(
   "/tournaments/:id/register-team",

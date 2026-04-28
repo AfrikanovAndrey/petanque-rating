@@ -395,6 +395,60 @@ export class TournamentController {
     }
   }
 
+  /**
+   * Публичная страница турнира «в процессе»: те же данные, что для регистрации
+   * (подтверждённые заявки), только при статусе IN_PROGRESS.
+   */
+  static async getPublicTournamentInProgress(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const tournamentId = parseInt(req.params.id);
+
+    if (isNaN(tournamentId)) {
+      res.status(400).json({ success: false, message: "Неверный ID турнира" });
+      return;
+    }
+
+    try {
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({ success: false, message: "Турнир не найден" });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Страница доступна только для турниров в статусе «В процессе»",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+          { confirmedOnly: true },
+        );
+
+      res.json({
+        success: true,
+        data: {
+          tournament,
+          teams,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка публичной страницы «турнир в процессе»:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
   /** Проверка состава команды по типу турнира (игроки уже загружены из БД). */
   private static validateTeamRegistrationRoster(
     type: TournamentType,

@@ -537,19 +537,24 @@ const AdminTournaments: React.FC = () => {
                 {tournaments.map((tournament) => {
                   const isRegistration =
                     tournament.status === TournamentStatus.REGISTRATION;
+                  const isInProgress =
+                    tournament.status === TournamentStatus.IN_PROGRESS;
+                  const opensSnapshotView = isRegistration || isInProgress;
                   return (
                   <tr
                     key={tournament.id}
                     className={`table-row ${
-                      isRegistration
+                      opensSnapshotView
                         ? "cursor-pointer hover:bg-gray-50"
                         : ""
                     }`}
                     onClick={
-                      isRegistration
+                      opensSnapshotView
                         ? () =>
                             navigate(
-                              `/admin/tournaments/${tournament.id}/registration`
+                              isRegistration
+                                ? `/admin/tournaments/${tournament.id}/registration`
+                                : `/admin/tournaments/${tournament.id}/in-progress`
                             )
                         : undefined
                     }
@@ -558,7 +563,7 @@ const AdminTournaments: React.FC = () => {
                       <div className="flex items-center">
                         <TrophyIcon className="h-6 w-6 text-gray-400 mr-3" />
                         <div className="flex items-center">
-                          {isRegistration ? (
+                          {opensSnapshotView ? (
                             <span className="text-sm font-medium text-gray-900">
                               {tournament.name}
                             </span>

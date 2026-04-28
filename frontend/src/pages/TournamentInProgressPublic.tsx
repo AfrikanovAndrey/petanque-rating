@@ -1,0 +1,260 @@
+import { ArrowLeftIcon, PlayCircleIcon } from "@heroicons/react/24/outline";
+import React, { useMemo } from "react";
+import { useQuery } from "react-query";
+import { Link, useParams } from "react-router-dom";
+import RegulationsMarkdown from "../components/RegulationsMarkdown";
+import { getPublicTournamentInProgress, ratingApi } from "../services/api";
+import { TournamentType } from "../types";
+import {
+  formatDate,
+  formatDateTime,
+  getTornamentCategoryText,
+  getTournamentStatusText,
+  getTournamentTypeIcons,
+  getTournamentTypeText,
+  handleApiError,
+} from "../utils";
+
+const TournamentInProgressPublic: React.FC = () => {
+  const { tournamentId: tournamentIdParam } = useParams<{
+    tournamentId: string;
+  }>();
+  const tournamentId = parseInt(tournamentIdParam || "", 10);
+
+  const { data, isLoading, error } = useQuery(
+    ["publicTournamentInProgress", tournamentId],
+    async () => {
+      const response = await getPublicTournamentInProgress(tournamentId);
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || "Не удалось загрузить данные");
+      }
+      return response.data.data;
+    },
+    {
+      enabled: Number.isFinite(tournamentId) && tournamentId > 0,
+      retry: false,
+    }
+  );
+
+  const { data: fullRating } = useQuery(
+    ["publicInProgressFullRating"],
+    async () => {
+      const response = await ratingApi.getFullRating();
+      return response.data.success && response.data.data ? response.data.data : [];
+    },
+    {
+      retry: false,
+      staleTime: 60_000,
+    }
+  );
+
+  const ratingByPlayerName = useMemo(
+    () =>
+      new Map(
+        (fullRating ?? []).map((player) => [
+          player.player_name,
+          player.total_points,
+        ])
+      ),
+    [fullRating]
+  );
+
+  if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
+    return (
+      <div className="space-y-4">
+        <p className="text-red-600">Некорректный идентификатор турнира.</p>
+        <Link to="/tournaments" className="text-primary-600 hover:underline">
+          ← К списку турниров
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[320px]">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-2 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-600">Загрузка…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+          {handleApiError(error)}
+        </div>
+        <Link
+          to="/tournaments"
+          className="inline-flex items-center text-primary-600 hover:underline"
+        >
+          <ArrowLeftIcon className="h-4 w-4 mr-1" />
+          К списку турниров
+        </Link>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const { tournament, teams } = data;
+
+  const formatPlayerWithRating = (playerName: string) =>
+    `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
+
+  const getTeamTotalRating = (players: string[]) => {
+    const sortedRatings = players
+      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
+      .sort((a, b) => b - a);
+
+    const ratingValues =
+      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
+        ? sortedRatings.slice(0, 3)
+        : sortedRatings;
+
+    return ratingValues.reduce((sum, value) => sum + value, 0);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link
+          to="/tournaments"
+          className="inline-flex items-center text-sm text-primary-600 hover:text-primary-800 mb-4"
+        >
+          <ArrowLeftIcon className="h-4 w-4 mr-1" />
+          К списку турниров
+        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            {tournament.name}
+          </h1>            
+          <PlayCircleIcon className="h-9 w-9 shrink-0 text-sky-600" />
+          <p className="mt-1 text-gray-600">Турнир в процессе</p>            
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6 space-y-6">
+        <h2 className="text-lg font-semibold text-gray-900">
+          Сведения о турнире
+        </h2>
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs font-medium uppercase text-gray-500">
+              Название
+            </dt>
+            <dd className="mt-1 text-gray-900">{tournament.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase text-gray-500">
+              Дата проведения
+            </dt>
+            <dd className="mt-1 text-gray-900">{formatDate(tournament.date)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase text-gray-500">
+              Тип турнира
+            </dt>
+            <dd className="mt-1 flex items-center gap-2 text-gray-900">
+              {getTournamentTypeText(tournament.type) ?? tournament.type}
+              {getTournamentTypeIcons(tournament.type)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase text-gray-500">
+              Категория
+            </dt>
+            <dd className="mt-1 text-gray-900">
+              {getTornamentCategoryText(tournament.category)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase text-gray-500">
+              Статус
+            </dt>
+            <dd className="mt-1">
+              <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900">
+                {getTournamentStatusText(tournament.status)}
+              </span>
+            </dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-medium uppercase text-gray-500">
+              Описание
+            </dt>
+            <dd className="mt-1 text-gray-900">
+              {tournament.regulations?.trim() ? (
+                <RegulationsMarkdown source={tournament.regulations} />
+              ) : (
+                <span className="text-gray-500">—</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="border-b border-gray-200 px-4 sm:px-6 py-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Список заявок
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Публичный список — только подтверждённые заявки. Всего:{" "}
+            {teams.length}
+          </p>
+        </div>
+        {teams.length === 0 ? (
+          <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
+            Пока нет подтверждённых команд.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    №
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Состав команды
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Рейтинг команды
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Обновлено
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {teams.map((team, index) => (
+                  <tr key={team.team_id}>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
+                      {index + 1}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
+                      {team.players.map(formatPlayerWithRating).join(", ")}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                      {getTeamTotalRating(team.players)}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                      {formatDateTime(team.updated_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TournamentInProgressPublic;

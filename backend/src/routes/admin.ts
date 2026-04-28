@@ -138,6 +138,12 @@ router.get(
   AdminController.getTournamentRegistrationPage,
 );
 
+// GET /api/admin/tournaments/:tournamentId/in-progress — снимок заявок (статус «В процессе»)
+router.get(
+  "/tournaments/:tournamentId/in-progress",
+  AdminController.getTournamentInProgressPage,
+);
+
 // POST /api/admin/tournaments/:tournamentId/registration/:teamId/confirm — подтвердить заявку команды
 router.post(
   "/tournaments/:tournamentId/registration/:teamId/confirm",

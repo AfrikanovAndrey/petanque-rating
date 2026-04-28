@@ -9,7 +9,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { EditRegisteredTeamModal } from "../../components/EditRegisteredTeamModal";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
 import { adminApi, ratingApi } from "../../services/api";
@@ -43,6 +43,7 @@ const AdminTournamentRegistration: React.FC = () => {
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [teamForEdit, setTeamForEdit] = useState<TournamentRegisteredTeam | null>(
     null
   );
@@ -193,6 +194,31 @@ const AdminTournamentRegistration: React.FC = () => {
     }
   );
 
+  const startTournamentMutation = useMutation(
+    async () =>
+      adminApi.updateTournament(tournamentId, {
+        status: TournamentStatus.IN_PROGRESS,
+      }),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success("Турнир переведён в статус «В процессе»");
+          void queryClient.invalidateQueries([
+            "tournamentRegistration",
+            tournamentId,
+          ]);
+          void queryClient.invalidateQueries("tournaments");
+          navigate("/admin/tournaments");
+        } else {
+          toast.error(res.data.message || "Не удалось начать турнир");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
   if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
     return (
       <div className="space-y-4">
@@ -294,14 +320,28 @@ const AdminTournamentRegistration: React.FC = () => {
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
           К списку турниров
         </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <ClipboardDocumentListIcon className="h-9 w-9 text-primary-600" />
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Регистрация на турнир
-            </h1>
-            <p className="mt-1 text-gray-600">{tournament.name}</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <ClipboardDocumentListIcon className="h-9 w-9 shrink-0 text-primary-600" />
+            <div className="min-w-0">
+              <h1 className="text-3xl font-bold text-gray-900">
+                Регистрация на турнир
+              </h1>
+              <p className="mt-1 text-gray-600 break-words">{tournament.name}</p>
+            </div>
           </div>
+          {tournament.status === TournamentStatus.REGISTRATION && (
+            <button
+              type="button"
+              className="btn-primary shrink-0"
+              disabled={startTournamentMutation.isLoading}
+              onClick={() => startTournamentMutation.mutate()}
+            >
+              {startTournamentMutation.isLoading
+                ? "Сохранение…"
+                : "Начать турнир"}
+            </button>
+          )}
         </div>
       </div>
 
