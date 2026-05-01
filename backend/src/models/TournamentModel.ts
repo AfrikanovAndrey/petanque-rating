@@ -28,14 +28,31 @@ export class TournamentModel {
     return date;
   }
 
+  /**
+   * Список турниров. Поле teams_count: для REGISTRATION / IN_PROGRESS — число
+   * подтверждённых заявок (tournament_registrations.is_confirmed = 1);
+   * для FINISHED — по tournament_results.
+   */
   static async getAllTournaments(): Promise<Tournament[]> {
     const [rows] = await pool.execute<Tournament[] & RowDataPacket[]>(
-      `SELECT 
+      `SELECT
         t.*,
-        COALESCE(COUNT(DISTINCT tr.team_id), 0) as teams_count
+        CASE
+          WHEN t.status IN ('REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
+          ELSE COALESCE(res.cnt, 0)
+        END AS teams_count
       FROM tournaments t
-      LEFT JOIN tournament_results tr ON t.id = tr.tournament_id
-      GROUP BY t.id
+      LEFT JOIN (
+        SELECT tournament_id, COUNT(DISTINCT team_id) AS cnt
+        FROM tournament_registrations
+        WHERE is_confirmed = 1
+        GROUP BY tournament_id
+      ) reg ON reg.tournament_id = t.id
+      LEFT JOIN (
+        SELECT tournament_id, COUNT(DISTINCT team_id) AS cnt
+        FROM tournament_results
+        GROUP BY tournament_id
+      ) res ON res.tournament_id = t.id
       ORDER BY t.date DESC`,
     );
     return rows;

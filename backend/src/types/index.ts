@@ -34,7 +34,8 @@ export interface Tournament {
   regulations?: string | null;
   created_at: Date;
   updated_at: Date;
-  teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров
+  /** См. TournamentModel.getAllTournaments: REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */
+  teams_count?: number;
 }
 
 export interface TournamentResult {

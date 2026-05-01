@@ -471,12 +471,19 @@ const AdminTournamentRegistration: React.FC = () => {
               {...register("regulations")}
             />
             <p className="mt-1 text-xs text-gray-500">
-              Поддерживается Markdown. Пустое поле удалит текст регламента в базе.
+              <a
+                href="https://markdownlivepreview.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-600 hover:underline"
+              >
+                Поддерживается Markdown
+              </a>      
             </p>
           </div>
 
+          <p className="mb-2 text-sm font-medium text-gray-700">Предпросмотр</p>
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <p className="mb-2 text-sm font-medium text-gray-700">Предпросмотр</p>
             <RegulationsMarkdown source={watch("regulations")} className="text-sm" />
           </div>
 

@@ -31,6 +31,7 @@ import {
 } from "../types";
 import ExcelUtils from "../utils/excelUtils";
 import {
+  buildOrderedPlayersForRegistrationCheck,
   buildStoredRosterFromRequestSlots,
   legacyPlayerIdsToRequestSlots,
   parseRegistrationRosterRequestSlots,
@@ -662,22 +663,20 @@ export class TournamentController {
             g === "male" || g === "female" ? g : null,
           );
         }
+      }
 
-        if (!hasNew) {
-          const orderedPlayers = dbIdsOrdered.map((id) => ({
-            id,
-            gender: idToGender.get(id) ?? null,
-          }));
-          const rosterError = TournamentController.validateTeamRegistrationRoster(
-            ttype,
-            orderedPlayers,
-          );
-          if (rosterError) {
-            await connection.rollback();
-            res.status(400).json({ success: false, message: rosterError });
-            return;
-          }
-        }
+      const orderedPlayers = buildOrderedPlayersForRegistrationCheck(
+        requestSlots,
+        idToGender,
+      );
+      const rosterError = TournamentController.validateTeamRegistrationRoster(
+        ttype,
+        orderedPlayers,
+      );
+      if (rosterError) {
+        await connection.rollback();
+        res.status(400).json({ success: false, message: rosterError });
+        return;
       }
 
       const stored = buildStoredRosterFromRequestSlots(requestSlots, idToName);

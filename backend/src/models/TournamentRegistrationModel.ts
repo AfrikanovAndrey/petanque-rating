@@ -11,7 +11,13 @@ import {
 /** Слот состава для ответа API (страница регистрации). */
 export type RegistrationRosterSlotDto =
   | { kind: "player"; player_id: number; name: string }
-  | { kind: "new"; display_name: string }
+  | {
+      kind: "new";
+      display_name: string;
+      gender?: "male" | "female";
+      license_number?: string;
+      city?: string;
+    }
   | { kind: "empty" };
 
 export interface RegisteredTeamRow {
@@ -31,7 +37,15 @@ function storedSlotToDto(
     return { kind: "empty" };
   }
   if (slot.kind === "new") {
-    return { kind: "new", display_name: slot.display_name };
+    return {
+      kind: "new",
+      display_name: slot.display_name,
+      ...(slot.gender ? { gender: slot.gender } : {}),
+      ...(slot.license_number
+        ? { license_number: slot.license_number }
+        : {}),
+      ...(slot.city ? { city: slot.city } : {}),
+    };
   }
   return {
     kind: "player",

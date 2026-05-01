@@ -224,17 +224,43 @@ export const EditRegisteredTeamModal: React.FC<Props> = ({
 
           {slots.map((slot, i) => {
             const rosterSlot = (team.roster_slots ?? [])[i];
-            const pendingNew =
-              rosterSlot?.kind === "new" && !slot
-                ? rosterSlot.display_name
+            const pendingNewSlot =
+              rosterSlot?.kind === "new" && !slot ? rosterSlot : null;
+            const pendingNew = pendingNewSlot?.display_name ?? null;
+            const pendingExtra =
+              pendingNewSlot &&
+              (pendingNewSlot.gender ||
+                pendingNewSlot.city ||
+                pendingNewSlot.license_number)
+                ? [
+                    pendingNewSlot.gender === "male"
+                      ? "пол: мужской"
+                      : pendingNewSlot.gender === "female"
+                        ? "пол: женский"
+                        : null,
+                    pendingNewSlot.city
+                      ? `город: ${pendingNewSlot.city}`
+                      : null,
+                    pendingNewSlot.license_number
+                      ? `лицензия: ${pendingNewSlot.license_number}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")
                 : null;
             return (
               <div key={i} className="space-y-1">
                 {pendingNew && (
                   <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     В заявке указан игрок не из базы:{" "}
-                    <span className="font-medium">{pendingNew}</span>. Добавьте
-                    игрока в базу и выберите его ниже.
+                    <span className="font-medium">{pendingNew}</span>
+                    {pendingExtra ? (
+                      <>
+                        {" "}
+                        <span className="text-amber-800">({pendingExtra})</span>
+                      </>
+                    ) : null}
+                    . Добавьте игрока в базу и выберите его ниже.
                   </p>
                 )}
                 <PlayerAutocompleteField

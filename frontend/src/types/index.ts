@@ -45,19 +45,32 @@ export interface Tournament {
   regulations?: string | null;
   created_at: string;
   updated_at: string;
-  teams_count?: number; // Вычисляемое поле, возвращается при получении списка турниров
+  /** Для FINISHED — команды с результатами; для REGISTRATION / IN_PROGRESS — только подтверждённые заявки */
+  teams_count?: number;
 }
 
 /** Слот состава в заявке (ответ API регистрации). */
 export type RegistrationRosterSlotDto =
   | { kind: "player"; player_id: number; name: string }
-  | { kind: "new"; display_name: string }
+  | {
+      kind: "new";
+      display_name: string;
+      gender?: "male" | "female";
+      license_number?: string;
+      city?: string;
+    }
   | { kind: "empty" };
 
 /** Тело POST заявки: слоты в порядке формы (пустой — только триплет). */
 export type RegisterTournamentSlotPayload =
   | { kind: "player"; player_id: number }
-  | { kind: "new"; display_name: string }
+  | {
+      kind: "new";
+      display_name: string;
+      gender: "male" | "female";
+      license_number?: string;
+      city?: string;
+    }
   | { kind: "empty" };
 
 /** Команда, записанная на турнир (фаза регистрации) */

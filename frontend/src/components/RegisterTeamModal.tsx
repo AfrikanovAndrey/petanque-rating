@@ -93,6 +93,21 @@ export const RegisterTeamModal: React.FC<Props> = ({
   const [newNames, setNewNames] = useState<string[]>(() =>
     Array.from({ length: cfg.slots }, () => "")
   );
+  const [newLicenses, setNewLicenses] = useState<string[]>(() =>
+    Array.from({ length: cfg.slots }, () => "")
+  );
+  const [newCities, setNewCities] = useState<string[]>(() =>
+    Array.from({ length: cfg.slots }, () => "")
+  );
+  /** Для триплета — выбор пользователя; для гендерных слотов задаётся типом турнира */
+  const [newGenders, setNewGenders] = useState<("male" | "female" | null)[]>(
+    () =>
+      Array.from({ length: cfg.slots }, (_, j) =>
+        cfg.genders[j] === "male" || cfg.genders[j] === "female"
+          ? cfg.genders[j]
+          : null
+      )
+  );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -100,8 +115,17 @@ export const RegisterTeamModal: React.FC<Props> = ({
     setSlots(Array.from({ length: cfg.slots }, () => null));
     setAsNew(Array.from({ length: cfg.slots }, () => false));
     setNewNames(Array.from({ length: cfg.slots }, () => ""));
+    setNewLicenses(Array.from({ length: cfg.slots }, () => ""));
+    setNewCities(Array.from({ length: cfg.slots }, () => ""));
+    setNewGenders(
+      Array.from({ length: cfg.slots }, (_, j) =>
+        cfg.genders[j] === "male" || cfg.genders[j] === "female"
+          ? cfg.genders[j]
+          : null
+      )
+    );
     setFormError("");
-  }, [tournamentId, cfg.slots]);
+  }, [tournamentId, cfg.slots, cfg.genders]);
 
   const excludeIdsFor = (index: number) =>
     slots
@@ -128,7 +152,33 @@ export const RegisterTeamModal: React.FC<Props> = ({
           setFormError("Слишком длинное ФИО нового игрока.");
           return;
         }
-        payload.push({ kind: "new", display_name: t });
+        const genderEff =
+          cfg.genders[i] === "male" || cfg.genders[i] === "female"
+            ? cfg.genders[i]
+            : newGenders[i];
+        if (genderEff !== "male" && genderEff !== "female") {
+          setFormError(
+            `Укажите пол для «${buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}».`
+          );
+          return;
+        }
+        const lic = newLicenses[i].trim();
+        if (lic.length > 20) {
+          setFormError("Номер лицензии не длиннее 20 символов.");
+          return;
+        }
+        const city = newCities[i].trim();
+        if (city.length > 100) {
+          setFormError("Название города не длиннее 100 символов.");
+          return;
+        }
+        payload.push({
+          kind: "new",
+          display_name: t,
+          gender: genderEff,
+          ...(lic.length > 0 ? { license_number: lic } : {}),
+          ...(city.length > 0 ? { city } : {}),
+        });
         continue;
       }
       if (slots[i]) {
@@ -265,37 +315,149 @@ export const RegisterTeamModal: React.FC<Props> = ({
                         next[i] = null;
                         return next;
                       });
+                      setNewGenders((prev) => {
+                        const next = [...prev];
+                        const g = cfg.genders[i];
+                        next[i] =
+                          g === "male" || g === "female" ? g : null;
+                        return next;
+                      });
                     } else {
                       setNewNames((prev) => {
                         const next = [...prev];
                         next[i] = "";
                         return next;
                       });
+                      setNewLicenses((prev) => {
+                        const next = [...prev];
+                        next[i] = "";
+                        return next;
+                      });
+                      setNewCities((prev) => {
+                        const next = [...prev];
+                        next[i] = "";
+                        return next;
+                      });
+                      setNewGenders((prev) => {
+                        const next = [...prev];
+                        const g = cfg.genders[i];
+                        next[i] =
+                          g === "male" || g === "female" ? g : null;
+                        return next;
+                      });
                     }
                   }}
                 />
-                <span>Новый игрок (ещё не в базе)</span>
+                <span>Новый игрок</span>
               </label>
               {asNew[i] ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    {buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])} — ФИО
-                  </label>
-                  <input
-                    type="text"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-                    value={newNames[i]}
-                    onChange={(e) =>
-                      setNewNames((prev) => {
-                        const next = [...prev];
-                        next[i] = e.target.value;
-                        return next;
-                      })
-                    }
-                    disabled={submitting}
-                    placeholder="Как в заявке, например Иванов Иван"
-                    autoComplete="off"
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])} — ФИО
+                    </label>
+                    <input
+                      type="text"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+                      value={newNames[i]}
+                      onChange={(e) =>
+                        setNewNames((prev) => {
+                          const next = [...prev];
+                          next[i] = e.target.value;
+                          return next;
+                        })
+                      }
+                      disabled={submitting}
+                      placeholder="Как в заявке, например Иванов Иван"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Номер лицензии
+                    </label>
+                    <input
+                      type="text"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+                      value={newLicenses[i]}
+                      onChange={(e) =>
+                        setNewLicenses((prev) => {
+                          const next = [...prev];
+                          next[i] = e.target.value;
+                          return next;
+                        })
+                      }
+                      disabled={submitting}
+                      autoComplete="off"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Необязательное поле</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Пол
+                    </label>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`new-gender-${i}`}
+                          className="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                          checked={newGenders[i] === "male"}
+                          disabled={
+                            submitting ||
+                            cfg.genders[i] === "female"
+                          }
+                          onChange={() =>
+                            setNewGenders((prev) => {
+                              const next = [...prev];
+                              next[i] = "male";
+                              return next;
+                            })
+                          }
+                        />
+                        Мужской
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`new-gender-${i}`}
+                          className="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500"
+                          checked={newGenders[i] === "female"}
+                          disabled={
+                            submitting ||
+                            cfg.genders[i] === "male"
+                          }
+                          onChange={() =>
+                            setNewGenders((prev) => {
+                              const next = [...prev];
+                              next[i] = "female";
+                              return next;
+                            })
+                          }
+                        />
+                        Женский
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Город
+                    </label>
+                    <input
+                      type="text"
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+                      value={newCities[i]}
+                      onChange={(e) =>
+                        setNewCities((prev) => {
+                          const next = [...prev];
+                          next[i] = e.target.value;
+                          return next;
+                        })
+                      }
+                      disabled={submitting}                    
+                      autoComplete="address-level2"
+                    />
+                  </div>
                 </div>
               ) : (
                 <PlayerAutocompleteField
