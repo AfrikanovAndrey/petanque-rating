@@ -166,12 +166,17 @@ export class AdminController {
 
       console.log(`🔗 Загружаем турнир из Google Sheets: ${google_sheets_url}`);
 
+      const requestedCategory =
+        tournament_category === "2" || tournament_category === 2
+          ? TournamentCategoryEnum.REGIONAL
+          : TournamentCategoryEnum.FEDERAL;
+
       const result = await TournamentController.parseTournamentFromGoogleSheets(
         google_sheets_url,
         tournament_name,
         tournament_date,
-        tournament_type,
-        tournament_category
+        tournament_type as TournamentType,
+        requestedCategory
       );
 
       res.json({
@@ -306,6 +311,264 @@ export class AdminController {
         statusCode = 400;
         errorMessage = `Файл не содержит данных для обработки: ${errorMessage}. 
         Убедитесь, что листы файла содержат данные команд и результатов турнира.`;
+      }
+
+      res.status(statusCode).json({
+        success: false,
+        message: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Завершить турнир «в процессе»: загрузить Excel с результатами в ту же запись турнира.
+   */
+  static async completeInProgressTournamentFromExcel(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: "Файл не был загружен",
+        });
+        return;
+      }
+
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (Number.isNaN(tournamentId) || tournamentId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Загрузка результатов в эту запись доступна только для турниров в статусе «В процессе»",
+        });
+        return;
+      }
+
+      const catRaw = String(tournament.category).toUpperCase();
+      const requestedCategory =
+        catRaw === "REGIONAL" || catRaw === "2"
+          ? TournamentCategoryEnum.REGIONAL
+          : TournamentCategoryEnum.FEDERAL;
+
+      const dateStr =
+        tournament.date instanceof Date
+          ? `${tournament.date.getFullYear()}-${String(
+              tournament.date.getMonth() + 1
+            ).padStart(2, "0")}-${String(tournament.date.getDate()).padStart(
+              2,
+              "0"
+            )}`
+          : String(tournament.date).slice(0, 10);
+
+      const result = await TournamentController.parseTournamentData(
+        req.file.buffer,
+        req.file.originalname,
+        tournament.name,
+        dateStr,
+        tournament.type as TournamentType,
+        requestedCategory,
+        undefined,
+        { existingTournamentId: tournamentId }
+      );
+
+      res.json({
+        success: true,
+        message: `Результаты загружены, турнир завершён. Обработано команд: ${result.teamsCount}.`,
+        tournament_id: result.tournamentId,
+        results_count: result.resultsCount,
+      });
+    } catch (error) {
+      console.error("Ошибка завершения турнира по файлу:", error);
+
+      let errorMessage = (error as Error).message;
+      let statusCode = 500;
+
+      if (errorMessage.includes("Критические ошибки")) {
+        statusCode = 400;
+      } else if (errorMessage.includes("имеет неполное имя")) {
+        statusCode = 400;
+        errorMessage = `Критические ошибки в именах игроков (Лист регистрации):\n${errorMessage}`;
+      } else if (errorMessage.includes("Не найден лист регистрации")) {
+        statusCode = 400;
+        errorMessage = `Ошибка структуры файла: ${errorMessage}. 
+        Убедитесь, что в Excel файле есть лист с названием "Лист регистрации", "Регистрация" или аналогичным, 
+        содержащий данные команд в формате: номер команды, игрок 1, игрок 2, игрок 3, игрок 4.`;
+      } else if (errorMessage.includes("Ошибка при чтении Excel файла")) {
+        statusCode = 400;
+        errorMessage = `Файл поврежден или имеет неверный формат: ${errorMessage}. 
+        Проверьте, что файл является корректным Excel файлом (.xlsx или .xls).`;
+      } else if (errorMessage.includes("пуст или не содержит данных")) {
+        statusCode = 400;
+        errorMessage = `Файл не содержит данных для обработки: ${errorMessage}. 
+        Убедитесь, что листы файла содержат данные команд и результатов турнира.`;
+      } else if (
+        errorMessage.includes("не совпадает") ||
+        errorMessage.includes("доступна только в статусе")
+      ) {
+        statusCode = 400;
+      }
+
+      res.status(statusCode).json({
+        success: false,
+        message: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Завершить турнир «в процессе»: загрузить результаты из Google Таблицы в ту же запись.
+   */
+  static async completeInProgressTournamentFromGoogleSheets(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (Number.isNaN(tournamentId) || tournamentId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const { google_sheets_url } = req.body as { google_sheets_url?: unknown };
+      if (
+        typeof google_sheets_url !== "string" ||
+        !google_sheets_url.trim()
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите ссылку на Google таблицу",
+        });
+        return;
+      }
+
+      const url = google_sheets_url.trim();
+      if (!url.includes("docs.google.com/spreadsheets")) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный формат ссылки на Google таблицу",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Загрузка результатов в эту запись доступна только для турниров в статусе «В процессе»",
+        });
+        return;
+      }
+
+      const catRaw = String(tournament.category).toUpperCase();
+      const requestedCategory =
+        catRaw === "REGIONAL" || catRaw === "2"
+          ? TournamentCategoryEnum.REGIONAL
+          : TournamentCategoryEnum.FEDERAL;
+
+      const dateStr =
+        tournament.date instanceof Date
+          ? `${tournament.date.getFullYear()}-${String(
+              tournament.date.getMonth() + 1
+            ).padStart(2, "0")}-${String(tournament.date.getDate()).padStart(
+              2,
+              "0"
+            )}`
+          : String(tournament.date).slice(0, 10);
+
+      console.log(
+        `🔗 Завершение турнира ${tournamentId} из Google Sheets: ${url}`
+      );
+
+      const result = await TournamentController.parseTournamentFromGoogleSheets(
+        url,
+        tournament.name,
+        dateStr,
+        tournament.type as TournamentType,
+        requestedCategory,
+        { existingTournamentId: tournamentId }
+      );
+
+      res.json({
+        success: true,
+        message: `Результаты из Google таблицы загружены, турнир завершён. Обработано команд: ${result.teamsCount}.`,
+        tournament_id: result.tournamentId,
+        results_count: result.resultsCount,
+      });
+    } catch (error) {
+      console.error("Ошибка завершения турнира из Google Sheets:", error);
+
+      let errorMessage = (error as Error).message;
+      let statusCode = 500;
+
+      if (errorMessage.includes("Критические ошибки")) {
+        statusCode = 400;
+      } else if (errorMessage.includes("имеет неполное имя")) {
+        statusCode = 400;
+        errorMessage = `Критические ошибки в именах игроков (Лист регистрации):\n${errorMessage}`;
+      } else if (
+        errorMessage.includes("недоступна") ||
+        errorMessage.includes("доступ")
+      ) {
+        statusCode = 400;
+        errorMessage = `Ошибка доступа к Google таблице: ${errorMessage}. 
+        Убедитесь, что таблица открыта для общего доступа на чтение.`;
+      } else if (errorMessage.includes("Не найден лист регистрации")) {
+        statusCode = 400;
+        errorMessage = `Ошибка структуры таблицы: ${errorMessage}. 
+        Убедитесь, что в Google таблице есть лист с названием "Лист регистрации", "Регистрация" или аналогичным, 
+        содержащий данные команд в формате: номер команды, игрок 1, игрок 2, игрок 3, игрок 4.`;
+      } else if (
+        errorMessage.includes(
+          "Не удалось загрузить данные турнира из Google таблицы"
+        )
+      ) {
+        statusCode = 400;
+        errorMessage = `Таблица повреждена или имеет неверный формат: ${errorMessage}. 
+        Проверьте, что Google таблица содержит корректные данные и доступна для чтения.`;
+      } else if (errorMessage.includes("пуст или не содержит данных")) {
+        statusCode = 400;
+        errorMessage = `Таблица не содержит данных для обработки: ${errorMessage}. 
+        Убедитесь, что листы таблицы содержат данные команд и результатов турнира.`;
+      } else if (errorMessage.includes("Ошибка при парсинге")) {
+        statusCode = 400;
+        errorMessage = `Ошибка структуры данных: ${errorMessage}. 
+        Проверьте формат данных в Google таблице и убедитесь, что все обязательные поля заполнены корректно.`;
+      } else if (
+        errorMessage.includes("не совпадает") ||
+        errorMessage.includes("доступна только в статусе")
+      ) {
+        statusCode = 400;
       }
 
       res.status(statusCode).json({

@@ -40,6 +40,24 @@ import {
   type RegistrationRosterRequestSlot,
 } from "../utils/registrationRosterUtils";
 
+function tournamentCategoryDbToEnum(
+  category: string
+): TournamentCategoryEnum {
+  const c = String(category).toUpperCase();
+  if (c === "REGIONAL" || c === "2") return TournamentCategoryEnum.REGIONAL;
+  return TournamentCategoryEnum.FEDERAL;
+}
+
+function sqlDateToYyyyMmDd(value: string | Date): string {
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 export class TournamentController {
   /**
    * Преобразование TournamentCategoryEnum в строковое представление для getCupPoints
@@ -855,7 +873,8 @@ export class TournamentController {
     tournamentDate: string,
     tournamentType: TournamentType,
     tournamentCategory: TournamentCategoryEnum,
-    providedWorkbook?: XLSX.WorkBook
+    providedWorkbook?: XLSX.WorkBook,
+    options?: { existingTournamentId?: number }
   ): Promise<{
     tournamentId: number;
     teamsCount: number;
@@ -1045,14 +1064,61 @@ export class TournamentController {
         await connection.beginTransaction();
         console.log("🔄 Начата транзакция сохранения турнира");
 
-        tournamentId = await TournamentModel.createTournament(
-          tournamentName,
-          tournamentType,
-          tournamentCategory,
-          tournamentDate,
-          isManualInput,
-          connection
-        );
+        const existingId = options?.existingTournamentId;
+        if (existingId !== undefined) {
+          const [lockRows] = await connection.query<RowDataPacket[]>(
+            "SELECT id, status, type, category, date FROM tournaments WHERE id = ? FOR UPDATE",
+            [existingId]
+          );
+          const row = lockRows[0] as
+            | {
+                id: number;
+                status: string;
+                type: string;
+                category: string;
+                date: string | Date;
+              }
+            | undefined;
+          if (!row) {
+            throw new Error(`Турнир с ID ${existingId} не найден`);
+          }
+          if (row.status !== TournamentStatus.IN_PROGRESS) {
+            throw new Error(
+              "Загрузка результатов в существующий турнир доступна только в статусе «В процессе»"
+            );
+          }
+          if (row.type !== tournamentType) {
+            throw new Error(
+              "Тип турнира в файле не совпадает с типом турнира в системе"
+            );
+          }
+          if (tournamentCategoryDbToEnum(row.category) !== tournamentCategory) {
+            throw new Error(
+              "Категория турнира в файле не совпадает с категорией турнира в системе"
+            );
+          }
+          const rowDate = sqlDateToYyyyMmDd(row.date);
+          const paramDate = sqlDateToYyyyMmDd(tournamentDate);
+          if (rowDate !== paramDate) {
+            throw new Error(
+              "Дата турнира в файле не совпадает с датой турнира в системе"
+            );
+          }
+          tournamentId = existingId;
+          await connection.execute(
+            "DELETE FROM tournament_results WHERE tournament_id = ?",
+            [tournamentId]
+          );
+        } else {
+          tournamentId = await TournamentModel.createTournament(
+            tournamentName,
+            tournamentType,
+            tournamentCategory,
+            tournamentDate,
+            isManualInput,
+            connection
+          );
+        }
 
         // Рассчитываем эффективное количество команд (с учётом парных турниров в один день)
         const effectiveTeamsCount =
@@ -1122,6 +1188,13 @@ export class TournamentController {
             results.qualifyingWins!,
             points,
             connection
+          );
+        }
+
+        if (existingId !== undefined) {
+          await connection.execute(
+            "UPDATE tournaments SET status = ?, manual = ? WHERE id = ?",
+            [TournamentStatus.FINISHED, isManualInput, tournamentId]
           );
         }
 
@@ -1264,7 +1337,8 @@ export class TournamentController {
     tournamentName: string,
     tournamentDate: string,
     tournamentType: TournamentType,
-    tournamentCategory: TournamentCategoryEnum
+    tournamentCategory: TournamentCategoryEnum,
+    options?: { existingTournamentId?: number }
   ): Promise<{
     tournamentId: number;
     teamsCount: number;
@@ -1302,7 +1376,8 @@ export class TournamentController {
         tournamentDate,
         tournamentType,
         tournamentCategory,
-        workbook // Передаем готовый workbook
+        workbook, // Передаем готовый workbook
+        options
       );
     } catch (error) {
       console.error("Ошибка при загрузке турнира из Google Sheets:", error);

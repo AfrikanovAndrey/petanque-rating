@@ -11,6 +11,7 @@ import {
   IdentificationIcon,
   UserGroupIcon,
   DocumentTextIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import { logout } from "../../utils";
 import { adminApi } from "../../services/api";
@@ -88,6 +89,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       icon: TrophyIcon,
     },
     {
+      name: "Справка",
+      href: "/admin/help",
+      icon: BookOpenIcon,
+    },
+    {
       name: "Игроки",
       href: "/admin/players",
       icon: UsersIcon,
@@ -122,6 +128,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       return (
         location.pathname === href ||
         location.pathname.startsWith("/admin/tournaments/")
+      );
+    }
+    if (href === "/admin/help") {
+      return (
+        location.pathname === href ||
+        location.pathname.startsWith("/admin/help/")
       );
     }
     return (

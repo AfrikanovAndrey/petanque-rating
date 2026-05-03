@@ -256,6 +256,34 @@ export const adminApi = {
     AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
   > => api.get(`/admin/tournaments/${tournamentId}/in-progress`),
 
+  /** Завершить турнир «в процессе»: записать результаты из Excel в этот же турнир */
+  completeInProgressTournamentFromExcel: (
+    tournamentId: number,
+    file: File
+  ): Promise<AxiosResponse<ApiResponse<{ tournament_id?: number }>>> => {
+    const formData = new FormData();
+    formData.append("tournament_file", file);
+    return api.post(
+      `/admin/tournaments/${tournamentId}/complete-from-excel`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000,
+      }
+    );
+  },
+
+  /** Завершить турнир «в процессе»: записать результаты из Google Таблицы в этот же турнир */
+  completeInProgressTournamentFromGoogleSheets: (
+    tournamentId: number,
+    data: { google_sheets_url: string }
+  ): Promise<AxiosResponse<ApiResponse<{ tournament_id?: number }>>> =>
+    api.post(
+      `/admin/tournaments/${tournamentId}/complete-from-google-sheets`,
+      data,
+      { timeout: 120_000 }
+    ),
+
   // Подтвердить заявку команды на турнир
   confirmTournamentRegistration: (
     tournamentId: number,

@@ -144,6 +144,33 @@ router.get(
   AdminController.getTournamentInProgressPage,
 );
 
+// POST /api/admin/tournaments/:tournamentId/complete-from-excel — завершить турнир «в процессе» загрузкой Excel
+router.post(
+  "/tournaments/:tournamentId/complete-from-excel",
+  uploadMiddleware,
+  auditLog({
+    action: "UPLOAD_TOURNAMENT",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Завершение турнира ID ${req.params.tournamentId} загрузкой результатов из файла`,
+  }),
+  AdminController.completeInProgressTournamentFromExcel,
+);
+
+// POST /api/admin/tournaments/:tournamentId/complete-from-google-sheets — завершить «в процессе» из Google Таблицы
+router.post(
+  "/tournaments/:tournamentId/complete-from-google-sheets",
+  auditLog({
+    action: "UPLOAD_TOURNAMENT",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Завершение турнира ID ${req.params.tournamentId} загрузкой результатов из Google Sheets`,
+  }),
+  AdminController.completeInProgressTournamentFromGoogleSheets,
+);
+
 // POST /api/admin/tournaments/:tournamentId/registration/:teamId/confirm — подтвердить заявку команды
 router.post(
   "/tournaments/:tournamentId/registration/:teamId/confirm",

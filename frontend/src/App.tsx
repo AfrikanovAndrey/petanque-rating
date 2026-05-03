@@ -25,6 +25,9 @@ import AdminPlayers from "./pages/admin/AdminPlayers";
 import AdminLicensedPlayers from "./pages/admin/AdminLicensedPlayers";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
+import AdminHelpLayout from "./pages/admin/help/AdminHelpLayout";
+import AdminHelpIndex from "./pages/admin/help/AdminHelpIndex";
+import HelpTournamentResultsExcel from "./pages/admin/help/HelpTournamentResultsExcel";
 
 // Components
 import Layout from "./components/Layout";
@@ -221,6 +224,27 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            <Route
+              path="/admin/help"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout>
+                    <AdminHelpLayout />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AdminHelpIndex />} />
+              <Route
+                path="tournament-results-excel"
+                element={<HelpTournamentResultsExcel />}
+              />
+              <Route
+                path="*"
+                element={<Navigate to="/admin/help" replace />}
+              />
+            </Route>
 
             {/* 404 страница */}
             <Route

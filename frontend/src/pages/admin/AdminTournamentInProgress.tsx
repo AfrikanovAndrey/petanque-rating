@@ -1,14 +1,18 @@
 import {
   ArrowDownTrayIcon,
   ArrowLeftIcon,
+  ArrowUturnLeftIcon,
+  DocumentArrowUpIcon,
   PlayCircleIcon,
+  TableCellsIcon,
 } from "@heroicons/react/24/outline";
-import React, { useMemo } from "react";
-import { useQuery } from "react-query";
-import { Link, useParams } from "react-router-dom";
+import React, { useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import { useMutation, useQuery, useQueryClient } from "react-query";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
 import { adminApi, ratingApi } from "../../services/api";
-import { TournamentType } from "../../types";
+import { TournamentStatus, TournamentType } from "../../types";
 import {
   formatDate,
   formatDateTime,
@@ -25,6 +29,20 @@ const AdminTournamentInProgress: React.FC = () => {
     tournamentId: string;
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const completeFileInputRef = useRef<HTMLInputElement>(null);
+  const [googleCompleteOpen, setGoogleCompleteOpen] = useState(false);
+  const [googleSheetsUrl, setGoogleSheetsUrl] = useState("");
+  const [googleSheetsCheck, setGoogleSheetsCheck] = useState<{
+    loading: boolean;
+    result: {
+      spreadsheetId: string;
+      sheetNames: string[];
+      totalSheets: number;
+    } | null;
+    error: string;
+  }>({ loading: false, result: null, error: "" });
 
   const { data, isLoading, error } = useQuery(
     ["tournamentInProgress", tournamentId],
@@ -51,6 +69,113 @@ const AdminTournamentInProgress: React.FC = () => {
     },
     { retry: false, staleTime: 60_000 }
   );
+
+  const revertToRegistrationMutation = useMutation(
+    () =>
+      adminApi.updateTournament(tournamentId, {
+        status: TournamentStatus.REGISTRATION,
+      }),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success("Турнир возвращён в статус «Регистрация»");
+          void queryClient.invalidateQueries("tournaments");
+          navigate(`/admin/tournaments/${tournamentId}/registration`);
+        } else {
+          toast.error(res.data.message || "Не удалось изменить статус");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const completeFromExcelMutation = useMutation(
+    async (file: File) =>
+      adminApi.completeInProgressTournamentFromExcel(tournamentId, file),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success(
+            res.data.message || "Результаты загружены, турнир завершён"
+          );
+          void queryClient.invalidateQueries([
+            "tournamentInProgress",
+            tournamentId,
+          ]);
+          void queryClient.invalidateQueries("tournaments");
+          navigate("/admin/tournaments");
+        } else {
+          toast.error(res.data.message || "Не удалось загрузить результаты");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const completeFromGoogleMutation = useMutation(
+    async (url: string) =>
+      adminApi.completeInProgressTournamentFromGoogleSheets(tournamentId, {
+        google_sheets_url: url,
+      }),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success(
+            res.data.message || "Результаты загружены, турнир завершён"
+          );
+          void queryClient.invalidateQueries([
+            "tournamentInProgress",
+            tournamentId,
+          ]);
+          void queryClient.invalidateQueries("tournaments");
+          setGoogleCompleteOpen(false);
+          setGoogleSheetsUrl("");
+          setGoogleSheetsCheck({ loading: false, result: null, error: "" });
+          navigate("/admin/tournaments");
+        } else {
+          toast.error(res.data.message || "Не удалось загрузить результаты");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const checkGoogleSheetsUrl = async () => {
+    const url = googleSheetsUrl.trim();
+    if (!url || !url.includes("docs.google.com/spreadsheets")) {
+      setGoogleSheetsCheck({
+        loading: false,
+        result: null,
+        error: "Неверный формат ссылки на Google таблицу",
+      });
+      return;
+    }
+    setGoogleSheetsCheck({ loading: true, result: null, error: "" });
+    try {
+      const response = await adminApi.checkGoogleSheetsAccess({ url });
+      setGoogleSheetsCheck({
+        loading: false,
+        result: response.data.data ?? null,
+        error: "",
+      });
+    } catch (err) {
+      setGoogleSheetsCheck({
+        loading: false,
+        result: null,
+        error: handleApiError(err),
+      });
+    }
+  };
+
+  const completionBusy =
+    completeFromExcelMutation.isLoading ||
+    completeFromGoogleMutation.isLoading;
 
   const ratingByPlayerName = useMemo(
     () =>
@@ -165,12 +290,81 @@ const AdminTournamentInProgress: React.FC = () => {
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
           К списку турниров
         </Link>
-        <div className="flex flex-wrap items-center gap-3">                
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
             <h1 className="text-3xl font-bold text-gray-900">
-            {tournament.name}
+              {tournament.name}
             </h1>
-          <PlayCircleIcon className="h-9 w-9 shrink-0 text-sky-600" />
-          <p className="mt-1 text-gray-600 break-words">Турнир в процессе</p>
+            <PlayCircleIcon className="h-9 w-9 shrink-0 text-sky-600" />
+            <p className="mt-1 text-gray-600 break-words">
+              Турнир в процессе
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <input
+              ref={completeFileInputRef}
+              type="file"
+              accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                if (
+                  !window.confirm(
+                    "Загрузить результаты из выбранного Excel и завершить турнир? Дата, тип и категория в файле должны совпадать с карточкой турнира."
+                  )
+                ) {
+                  return;
+                }
+                completeFromExcelMutation.mutate(file);
+              }}
+            />
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+              disabled={completionBusy}
+              onClick={() => completeFileInputRef.current?.click()}
+            >
+              <DocumentArrowUpIcon className="h-5 w-5 text-gray-500" />
+              {completeFromExcelMutation.isLoading
+                ? "Загрузка…"
+                : "Загрузить результаты (Excel)"}
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-900 shadow-sm hover:bg-emerald-100 disabled:opacity-50"
+              disabled={completionBusy}
+              onClick={() => {
+                setGoogleSheetsUrl("");
+                setGoogleSheetsCheck({ loading: false, result: null, error: "" });
+                setGoogleCompleteOpen(true);
+              }}
+            >
+              <TableCellsIcon className="h-5 w-5" />
+              Загрузить результаты (Google Таблицы)
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 shadow-sm hover:bg-amber-100 disabled:opacity-50"
+              disabled={revertToRegistrationMutation.isLoading}
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    "Вернуть турнир в статус «Регистрация»? Снова откроется приём и редактирование заявок."
+                  )
+                ) {
+                  return;
+                }
+                revertToRegistrationMutation.mutate();
+              }}
+            >
+              <ArrowUturnLeftIcon className="h-5 w-5" />
+              {revertToRegistrationMutation.isLoading
+                ? "Сохранение…"
+                : "Вернуть в регистрацию"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -315,6 +509,122 @@ const AdminTournamentInProgress: React.FC = () => {
           </div>
         )}
       </div>
+
+      {googleCompleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600/50 p-4">
+          <div
+            className="absolute inset-0"
+            aria-hidden
+            onClick={() => {
+              if (!completionBusy) {
+                setGoogleCompleteOpen(false);
+              }
+            }}
+          />
+          <div className="relative card max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl">
+            <div className="flex justify-between items-start gap-4 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Загрузить результаты турнира из Google Таблиц
+              </h2>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600 shrink-0"
+                disabled={completionBusy}
+                onClick={() => setGoogleCompleteOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Название, дата, тип и категория в таблице должны совпадать с
+              карточкой турнира «{tournament.name}». Таблица должна быть доступна
+              по ссылке для чтения.
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ссылка на Google Таблицу
+            </label>
+            <input
+              type="url"
+              className="input-field"
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              value={googleSheetsUrl}
+              disabled={completionBusy}
+              onChange={(e) => {
+                setGoogleSheetsUrl(e.target.value);
+                setGoogleSheetsCheck({
+                  loading: false,
+                  result: null,
+                  error: "",
+                });
+              }}
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-secondary text-sm"
+                disabled={completionBusy || !googleSheetsUrl.trim()}
+                onClick={() => void checkGoogleSheetsUrl()}
+              >
+                Проверить доступ
+              </button>
+            </div>
+            {googleSheetsCheck.loading && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center gap-2">
+                <div className="loading-spinner shrink-0" />
+                Проверяем доступность таблицы…
+              </div>
+            )}
+            {googleSheetsCheck.error && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                {googleSheetsCheck.error}
+              </div>
+            )}
+            {googleSheetsCheck.result && !googleSheetsCheck.error && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                <p className="font-medium">Таблица доступна для чтения</p>
+                <p className="text-xs mt-1">
+                  Листов: {googleSheetsCheck.result.totalSheets}.{" "}
+                  {googleSheetsCheck.result.sheetNames.join(", ")}
+                </p>
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={completionBusy}
+                onClick={() => setGoogleCompleteOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={
+                  completionBusy ||
+                  !googleSheetsUrl.trim() ||
+                  !googleSheetsUrl.includes("docs.google.com/spreadsheets")
+                }
+                onClick={() => {
+                  const url = googleSheetsUrl.trim();
+                  if (
+                    !window.confirm(
+                      "Загрузить результаты из этой Google Таблицы и завершить турнир?"
+                    )
+                  ) {
+                    return;
+                  }
+                  completeFromGoogleMutation.mutate(url);
+                }}
+              >
+                {completeFromGoogleMutation.isLoading
+                  ? "Загрузка…"
+                  : "Загрузить и завершить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
