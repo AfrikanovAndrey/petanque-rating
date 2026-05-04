@@ -51,8 +51,19 @@ const RegulationsMarkdown: React.FC<RegulationsMarkdownProps> = ({
               {children}
             </a>
           ),
-          code: ({ inline, children }) =>
-            inline ? (
+          code: (props) => {
+            const { children, className } = props;
+            const hasLanguage =
+              typeof className === "string" &&
+              className.includes("language-");
+            const explicitInline =
+              "inline" in props
+                ? (props as { inline?: boolean }).inline
+                : undefined;
+            const useInline =
+              explicitInline === true ||
+              (explicitInline !== false && !hasLanguage);
+            return useInline ? (
               <code className="rounded bg-gray-100 px-1 py-0.5 text-sm">
                 {children}
               </code>
@@ -60,7 +71,8 @@ const RegulationsMarkdown: React.FC<RegulationsMarkdownProps> = ({
               <code className="block overflow-x-auto rounded bg-gray-900 p-3 text-sm text-gray-100">
                 {children}
               </code>
-            ),
+            );
+          },
         }}
       >
         {text}

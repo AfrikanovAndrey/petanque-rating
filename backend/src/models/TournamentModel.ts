@@ -29,7 +29,7 @@ export class TournamentModel {
   }
 
   /**
-   * Список турниров. Поле teams_count: для REGISTRATION / IN_PROGRESS — число
+   * Список турниров. Поле teams_count: для DRAFT / REGISTRATION / IN_PROGRESS — число
    * подтверждённых заявок (tournament_registrations.is_confirmed = 1);
    * для FINISHED — по tournament_results.
    */
@@ -38,7 +38,7 @@ export class TournamentModel {
       `SELECT
         t.*,
         CASE
-          WHEN t.status IN ('REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
+          WHEN t.status IN ('DRAFT', 'REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
           ELSE COALESCE(res.cnt, 0)
         END AS teams_count
       FROM tournaments t

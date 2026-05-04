@@ -242,6 +242,13 @@ export const adminApi = {
   ): Promise<AxiosResponse<ApiResponse<TournamentWithResults>>> =>
     api.get(`/admin/tournaments/${tournamentId}`),
 
+  // Черновик турнира (статус DRAFT, без списка заявок)
+  getTournamentDraftPage: (
+    tournamentId: number
+  ): Promise<
+    AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
+  > => api.get(`/admin/tournaments/${tournamentId}/draft`),
+
   // Страница регистрации (турнир в статусе REGISTRATION + записанные команды)
   getTournamentRegistrationPage: (
     tournamentId: number
@@ -280,6 +287,34 @@ export const adminApi = {
   ): Promise<AxiosResponse<ApiResponse<{ tournament_id?: number }>>> =>
     api.post(
       `/admin/tournaments/${tournamentId}/complete-from-google-sheets`,
+      data,
+      { timeout: 120_000 }
+    ),
+
+  /** Полностью заменить результаты завершённого турнира (Excel) */
+  replaceFinishedTournamentResultsFromExcel: (
+    tournamentId: number,
+    file: File
+  ): Promise<AxiosResponse<ApiResponse<{ tournament_id?: number }>>> => {
+    const formData = new FormData();
+    formData.append("tournament_file", file);
+    return api.post(
+      `/admin/tournaments/${tournamentId}/replace-results-from-excel`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000,
+      }
+    );
+  },
+
+  /** Полностью заменить результаты завершённого турнира (Google Таблицы) */
+  replaceFinishedTournamentResultsFromGoogleSheets: (
+    tournamentId: number,
+    data: { google_sheets_url: string }
+  ): Promise<AxiosResponse<ApiResponse<{ tournament_id?: number }>>> =>
+    api.post(
+      `/admin/tournaments/${tournamentId}/replace-results-from-google-sheets`,
       data,
       { timeout: 120_000 }
     ),

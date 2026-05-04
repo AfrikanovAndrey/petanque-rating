@@ -132,6 +132,12 @@ router.post(
   AdminController.createTournament,
 );
 
+// GET /api/admin/tournaments/:tournamentId/draft — черновик (параметры без заявок)
+router.get(
+  "/tournaments/:tournamentId/draft",
+  AdminController.getTournamentDraftPage,
+);
+
 // GET /api/admin/tournaments/:tournamentId/registration — страница регистрации (до :tournamentId одиночного)
 router.get(
   "/tournaments/:tournamentId/registration",
@@ -169,6 +175,33 @@ router.post(
       `Завершение турнира ID ${req.params.tournamentId} загрузкой результатов из Google Sheets`,
   }),
   AdminController.completeInProgressTournamentFromGoogleSheets,
+);
+
+// POST /api/admin/tournaments/:tournamentId/replace-results-from-excel — полностью заменить результаты завершённого турнира
+router.post(
+  "/tournaments/:tournamentId/replace-results-from-excel",
+  uploadMiddleware,
+  auditLog({
+    action: "UPLOAD_TOURNAMENT",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Замена результатов завершённого турнира ID ${req.params.tournamentId} из файла`,
+  }),
+  AdminController.replaceFinishedTournamentResultsFromExcel,
+);
+
+// POST /api/admin/tournaments/:tournamentId/replace-results-from-google-sheets — заменить результаты завершённого турнира из Google
+router.post(
+  "/tournaments/:tournamentId/replace-results-from-google-sheets",
+  auditLog({
+    action: "UPLOAD_TOURNAMENT",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Замена результатов завершённого турнира ID ${req.params.tournamentId} из Google Sheets`,
+  }),
+  AdminController.replaceFinishedTournamentResultsFromGoogleSheets,
 );
 
 // POST /api/admin/tournaments/:tournamentId/registration/:teamId/confirm — подтвердить заявку команды

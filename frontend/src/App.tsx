@@ -138,6 +138,17 @@ function App() {
             />
 
             <Route
+              path="/admin/tournaments/:tournamentId/draft"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout>
+                    <AdminTournamentRegistration />
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/admin/tournaments/:tournamentId/registration"
               element={
                 <ProtectedRoute>

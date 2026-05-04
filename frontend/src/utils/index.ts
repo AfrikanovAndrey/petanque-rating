@@ -54,6 +54,8 @@ export function getTournamentStatusText(
 ): string {
   const key = status ?? TournamentStatus.FINISHED;
   switch (key) {
+    case TournamentStatus.DRAFT:
+      return "Черновик";
     case TournamentStatus.REGISTRATION:
       return "Регистрация";
     case TournamentStatus.IN_PROGRESS:

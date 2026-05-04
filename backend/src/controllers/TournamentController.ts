@@ -283,7 +283,10 @@ export class TournamentController {
   static async getAllTournaments(req: Request, res: Response) {
     try {
       const tournaments = await TournamentModel.getAllTournaments();
-      res.json({ success: true, data: tournaments });
+      const publicTournaments = tournaments.filter(
+        (t) => t.status !== TournamentStatus.DRAFT
+      );
+      res.json({ success: true, data: publicTournaments });
     } catch (error) {
       console.error("Ошибка при получении списка турниров:", error);
       res
@@ -306,6 +309,12 @@ export class TournamentController {
       const tournament = await TournamentModel.getTournamentById(tournamentId);
 
       if (!tournament) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Турнир не найден" });
+      }
+
+      if (tournament.status === TournamentStatus.DRAFT) {
         return res
           .status(404)
           .json({ success: false, message: "Турнир не найден" });
@@ -766,15 +775,18 @@ export class TournamentController {
   static async getTournamentsStats(req: Request, res: Response) {
     try {
       const tournaments = await TournamentModel.getAllTournaments();
+      const publicTournaments = tournaments.filter(
+        (t) => t.status !== TournamentStatus.DRAFT
+      );
 
       const stats = {
-        totalTournaments: tournaments.length,
-        recentTournaments: tournaments
+        totalTournaments: publicTournaments.length,
+        recentTournaments: publicTournaments
           .sort(
             (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
           )
           .slice(0, 5),
-        tournamentsThisYear: tournaments.filter(
+        tournamentsThisYear: publicTournaments.filter(
           (t) => new Date(t.date).getFullYear() === new Date().getFullYear()
         ).length,
       };
@@ -874,7 +886,10 @@ export class TournamentController {
     tournamentType: TournamentType,
     tournamentCategory: TournamentCategoryEnum,
     providedWorkbook?: XLSX.WorkBook,
-    options?: { existingTournamentId?: number }
+    options?: {
+      existingTournamentId?: number;
+      replaceFinishedResults?: boolean;
+    }
   ): Promise<{
     tournamentId: number;
     teamsCount: number;
@@ -1065,6 +1080,7 @@ export class TournamentController {
         console.log("🔄 Начата транзакция сохранения турнира");
 
         const existingId = options?.existingTournamentId;
+        const replaceFinished = options?.replaceFinishedResults === true;
         if (existingId !== undefined) {
           const [lockRows] = await connection.query<RowDataPacket[]>(
             "SELECT id, status, type, category, date FROM tournaments WHERE id = ? FOR UPDATE",
@@ -1082,7 +1098,13 @@ export class TournamentController {
           if (!row) {
             throw new Error(`Турнир с ID ${existingId} не найден`);
           }
-          if (row.status !== TournamentStatus.IN_PROGRESS) {
+          if (replaceFinished) {
+            if (row.status !== TournamentStatus.FINISHED) {
+              throw new Error(
+                "Перезапись результатов доступна только для завершённых турниров"
+              );
+            }
+          } else if (row.status !== TournamentStatus.IN_PROGRESS) {
             throw new Error(
               "Загрузка результатов в существующий турнир доступна только в статусе «В процессе»"
             );
@@ -1192,10 +1214,17 @@ export class TournamentController {
         }
 
         if (existingId !== undefined) {
-          await connection.execute(
-            "UPDATE tournaments SET status = ?, manual = ? WHERE id = ?",
-            [TournamentStatus.FINISHED, isManualInput, tournamentId]
-          );
+          if (replaceFinished) {
+            await connection.execute(
+              "UPDATE tournaments SET manual = ? WHERE id = ?",
+              [isManualInput, tournamentId]
+            );
+          } else {
+            await connection.execute(
+              "UPDATE tournaments SET status = ?, manual = ? WHERE id = ?",
+              [TournamentStatus.FINISHED, isManualInput, tournamentId]
+            );
+          }
         }
 
         await connection.commit();
@@ -1338,7 +1367,10 @@ export class TournamentController {
     tournamentDate: string,
     tournamentType: TournamentType,
     tournamentCategory: TournamentCategoryEnum,
-    options?: { existingTournamentId?: number }
+    options?: {
+      existingTournamentId?: number;
+      replaceFinishedResults?: boolean;
+    }
   ): Promise<{
     tournamentId: number;
     teamsCount: number;

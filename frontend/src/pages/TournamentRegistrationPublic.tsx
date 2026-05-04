@@ -135,9 +135,9 @@ const TournamentRegistrationPublic: React.FC = () => {
           <ClipboardDocumentListIcon className="h-9 w-9 text-primary-600" />
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              Регистрация на турнир
+            {tournament.name}
             </h1>
-            <p className="mt-1 text-gray-600">{tournament.name}</p>
+            <p className="mt-1 text-gray-600">Регистрация на турнир</p>
           </div>
         </div>
       </div>

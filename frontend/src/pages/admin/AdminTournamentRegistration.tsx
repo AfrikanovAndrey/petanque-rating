@@ -10,7 +10,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { EditRegisteredTeamModal } from "../../components/EditRegisteredTeamModal";
 import { RegisterTeamModal } from "../../components/RegisterTeamModal";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
@@ -44,6 +44,8 @@ const AdminTournamentRegistration: React.FC = () => {
     tournamentId: string;
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
+  const location = useLocation();
+  const isDraftPage = location.pathname.endsWith("/draft");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [teamForEdit, setTeamForEdit] = useState<TournamentRegisteredTeam | null>(
@@ -51,12 +53,16 @@ const AdminTournamentRegistration: React.FC = () => {
   );
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
 
+  const pageQueryKey = isDraftPage
+    ? (["tournamentDraft", tournamentId] as const)
+    : (["tournamentRegistration", tournamentId] as const);
+
   const { data, isLoading, error } = useQuery(
-    ["tournamentRegistration", tournamentId],
+    pageQueryKey,
     async () => {
-      const response = await adminApi.getTournamentRegistrationPage(
-        tournamentId
-      );
+      const response = isDraftPage
+        ? await adminApi.getTournamentDraftPage(tournamentId)
+        : await adminApi.getTournamentRegistrationPage(tournamentId);
       if (!response.data.success || !response.data.data) {
         throw new Error(response.data.message || "Не удалось загрузить данные");
       }
@@ -103,7 +109,9 @@ const AdminTournamentRegistration: React.FC = () => {
       date: "",
       type: TournamentType.TRIPLETTE,
       category: "1",
-      status: TournamentStatus.REGISTRATION,
+      status: isDraftPage
+        ? TournamentStatus.DRAFT
+        : TournamentStatus.REGISTRATION,
       manual: false,
       regulations: "",
     },
@@ -117,11 +125,14 @@ const AdminTournamentRegistration: React.FC = () => {
       date: formatDateForInput(t.date),
       type: t.type as TournamentType,
       category: t.category === "FEDERAL" ? "1" : "2",
-      status: (t.status ?? TournamentStatus.REGISTRATION) as TournamentStatus,
+      status: (t.status ??
+        (isDraftPage
+          ? TournamentStatus.DRAFT
+          : TournamentStatus.REGISTRATION)) as TournamentStatus,
       manual: !!t.manual,
       regulations: t.regulations ?? "",
     });
-  }, [data, reset]);
+  }, [data, reset, isDraftPage]);
 
   const updateMutation = useMutation(
     async (form: TournamentParamsForm) => {
@@ -136,13 +147,20 @@ const AdminTournamentRegistration: React.FC = () => {
       });
     },
     {
-      onSuccess: (res) => {
+      onSuccess: (res, form) => {
         if (res.data.success) {
           toast.success("Параметры турнира сохранены");
           void queryClient.invalidateQueries([
             "tournamentRegistration",
             tournamentId,
           ]);
+          void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
+          if (isDraftPage && form.status === TournamentStatus.REGISTRATION) {
+            navigate(`/admin/tournaments/${tournamentId}/registration`);
+          }
+          if (!isDraftPage && form.status === TournamentStatus.DRAFT) {
+            navigate(`/admin/tournaments/${tournamentId}/draft`);
+          }
         } else {
           toast.error(res.data.message || "Ошибка сохранения");
         }
@@ -210,10 +228,37 @@ const AdminTournamentRegistration: React.FC = () => {
             "tournamentRegistration",
             tournamentId,
           ]);
+          void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
           void queryClient.invalidateQueries("tournaments");
           navigate("/admin/tournaments");
         } else {
           toast.error(res.data.message || "Не удалось начать турнир");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const openRegistrationMutation = useMutation(
+    async () =>
+      adminApi.updateTournament(tournamentId, {
+        status: TournamentStatus.REGISTRATION,
+      }),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success("Открыта регистрация на турнир");
+          void queryClient.invalidateQueries([
+            "tournamentRegistration",
+            tournamentId,
+          ]);
+          void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
+          void queryClient.invalidateQueries("tournaments");
+          navigate(`/admin/tournaments/${tournamentId}/registration`);
+        } else {
+          toast.error(res.data.message || "Не удалось сменить статус");
         }
       },
       onError: (e) => {
@@ -328,23 +373,38 @@ const AdminTournamentRegistration: React.FC = () => {
             <ClipboardDocumentListIcon className="h-9 w-9 shrink-0 text-primary-600" />
             <div className="min-w-0">
               <h1 className="text-3xl font-bold text-gray-900">
-                Регистрация на турнир
+              {tournament.name}
               </h1>
-              <p className="mt-1 text-gray-600 break-words">{tournament.name}</p>
+              <p className="mt-1 text-gray-600 break-words">{isDraftPage ? "Черновик турнира" : "Регистрация на турнир"}</p>
             </div>
           </div>
-          {tournament.status === TournamentStatus.REGISTRATION && (
-            <button
-              type="button"
-              className="btn-primary shrink-0"
-              disabled={startTournamentMutation.isLoading}
-              onClick={() => startTournamentMutation.mutate()}
-            >
-              {startTournamentMutation.isLoading
-                ? "Сохранение…"
-                : "Начать турнир"}
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {isDraftPage && tournament.status === TournamentStatus.DRAFT && (
+              <button
+                type="button"
+                className="btn-primary shrink-0"
+                disabled={openRegistrationMutation.isLoading}
+                onClick={() => openRegistrationMutation.mutate()}
+              >
+                {openRegistrationMutation.isLoading
+                  ? "Сохранение…"
+                  : "Открыть регистрацию"}
+              </button>
+            )}
+            {!isDraftPage &&
+              tournament.status === TournamentStatus.REGISTRATION && (
+                <button
+                  type="button"
+                  className="btn-primary shrink-0"
+                  disabled={startTournamentMutation.isLoading}
+                  onClick={() => startTournamentMutation.mutate()}
+                >
+                  {startTournamentMutation.isLoading
+                    ? "Сохранение…"
+                    : "Начать турнир"}
+                </button>
+              )}
+          </div>
         </div>
       </div>
 
@@ -439,6 +499,9 @@ const AdminTournamentRegistration: React.FC = () => {
               className={`input-field ${errors.status ? "border-red-300" : ""}`}
               {...register("status", { required: true })}
             >
+              <option value={TournamentStatus.DRAFT}>
+                {getTournamentStatusText(TournamentStatus.DRAFT)}
+              </option>
               <option value={TournamentStatus.REGISTRATION}>
                 {getTournamentStatusText(TournamentStatus.REGISTRATION)}
               </option>
@@ -503,7 +566,10 @@ const AdminTournamentRegistration: React.FC = () => {
                   date: formatDateForInput(t.date),
                   type: t.type as TournamentType,
                   category: t.category === "FEDERAL" ? "1" : "2",
-                  status: (t.status ?? TournamentStatus.REGISTRATION) as TournamentStatus,
+                  status: (t.status ??
+                    (isDraftPage
+                      ? TournamentStatus.DRAFT
+                      : TournamentStatus.REGISTRATION)) as TournamentStatus,
                   manual: !!t.manual,
                   regulations: t.regulations ?? "",
                 });
@@ -521,13 +587,16 @@ const AdminTournamentRegistration: React.FC = () => {
           </div>
         </form>
 
-        <div className="rounded-md bg-gray-50 p-3 text-xs text-gray-600 border border-gray-100">
-          <strong className="text-gray-700">Подсказка:</strong> при смене типа
-          турнира проверьте соответствие уже записанных команд новым правилам
-          состава на публичной странице регистрации.
-        </div>
+        {!isDraftPage && (
+          <div className="rounded-md bg-gray-50 p-3 text-xs text-gray-600 border border-gray-100">
+            <strong className="text-gray-700">Подсказка:</strong> при смене типа
+            турнира проверьте соответствие уже записанных команд новым правилам
+            состава на публичной странице регистрации.
+          </div>
+        )}
       </div>
 
+      {!isDraftPage && (
       <div className="card overflow-hidden">
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -687,6 +756,7 @@ const AdminTournamentRegistration: React.FC = () => {
           </div>
         )}
       </div>
+      )}
       {teamForEdit && (
         <EditRegisteredTeamModal
           tournamentId={tournamentId}

@@ -1,6 +1,6 @@
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { pool } from "../config/database";
-import { LicensedPlayer, LicensedPlayerUploadData } from "../types";
+import { LicensedPlayer, LicensedPlayerUploadData, Player } from "../types";
 
 export class LicensedPlayerModel {
   // Получить всех лицензионных игроков с именами игроков и номерами лицензий

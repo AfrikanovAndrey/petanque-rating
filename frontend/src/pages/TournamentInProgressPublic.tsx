@@ -9,7 +9,6 @@ import {
   formatDate,
   formatDateTime,
   getTornamentCategoryText,
-  getTournamentStatusText,
   getTournamentTypeIcons,
   getTournamentTypeText,
   handleApiError,
@@ -171,16 +170,6 @@ const TournamentInProgressPublic: React.FC = () => {
             </dt>
             <dd className="mt-1 text-gray-900">
               {getTornamentCategoryText(tournament.category)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Статус
-            </dt>
-            <dd className="mt-1">
-              <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900">
-                {getTournamentStatusText(tournament.status)}
-              </span>
             </dd>
           </div>
           <div className="sm:col-span-2">

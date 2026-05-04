@@ -18,6 +18,7 @@ export enum TournamentType {
 }
 
 export enum TournamentStatus {
+  DRAFT = "DRAFT",
   FINISHED = "FINISHED",
   REGISTRATION = "REGISTRATION",
   IN_PROGRESS = "IN_PROGRESS",
@@ -34,7 +35,7 @@ export interface Tournament {
   regulations?: string | null;
   created_at: Date;
   updated_at: Date;
-  /** См. TournamentModel.getAllTournaments: REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */
+  /** См. TournamentModel.getAllTournaments: DRAFT/REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */
   teams_count?: number;
 }
 
