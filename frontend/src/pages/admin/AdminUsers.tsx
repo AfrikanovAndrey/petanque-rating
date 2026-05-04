@@ -6,6 +6,7 @@ import {
   CreateUserRequest,
   UpdateUserRequest,
 } from "../../types";
+import { getUserRoleLabel } from "../../utils";
 
 interface UserFormData {
   name: string;
@@ -115,7 +116,6 @@ const AdminUsers: React.FC = () => {
 
     try {
       if (editingUser) {
-        // Обновление пользователя
         const updateData: UpdateUserRequest = {
           name: formData.name,
           username: formData.username,
@@ -127,7 +127,6 @@ const AdminUsers: React.FC = () => {
         await adminApi.updateUser(editingUser.id, updateData);
         alert("Пользователь успешно обновлен");
       } else {
-        // Создание пользователя
         const createData: CreateUserRequest = {
           name: formData.name,
           username: formData.username,
@@ -160,8 +159,15 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const getRoleText = (role: UserRole): string => {
-    return role === UserRole.ADMIN ? "Администратор" : "Организатор турнира";
+  const roleBadgeClass = (role: UserRole): string => {
+    switch (role) {
+      case UserRole.ADMIN:
+        return "bg-purple-100 text-purple-800";
+      case UserRole.LICENSE_MANAGER:
+        return "bg-amber-100 text-amber-900";
+      default:
+        return "bg-green-100 text-green-800";
+    }
   };
 
   if (loading) {
@@ -224,13 +230,11 @@ const AdminUsers: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.role === UserRole.ADMIN
-                        ? "bg-purple-100 text-purple-800"
-                        : "bg-green-100 text-green-800"
-                    }`}
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${roleBadgeClass(
+                      user.role
+                    )}`}
                   >
-                    {getRoleText(user.role)}
+                    {getUserRoleLabel(user.role)}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -238,12 +242,14 @@ const AdminUsers: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
+                    type="button"
                     onClick={() => openEditModal(user)}
                     className="text-blue-600 hover:text-blue-900 mr-4"
                   >
                     Редактировать
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDelete(user.id, user.name)}
                     className="text-red-600 hover:text-red-900"
                   >
@@ -262,7 +268,6 @@ const AdminUsers: React.FC = () => {
         )}
       </div>
 
-      {/* Модальное окно */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-md w-full">
@@ -273,7 +278,6 @@ const AdminUsers: React.FC = () => {
             </h2>
 
             <form onSubmit={handleSubmit}>
-              {/* Имя */}
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Фамилия Имя *
@@ -294,7 +298,6 @@ const AdminUsers: React.FC = () => {
                 )}
               </div>
 
-              {/* Логин */}
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Логин *
@@ -317,7 +320,6 @@ const AdminUsers: React.FC = () => {
                 )}
               </div>
 
-              {/* Пароль */}
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Пароль{" "}
@@ -341,7 +343,6 @@ const AdminUsers: React.FC = () => {
                 )}
               </div>
 
-              {/* Роль */}
               <div className="mb-6">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
                   Роль *
@@ -361,7 +362,23 @@ const AdminUsers: React.FC = () => {
                       }
                       className="mr-2"
                     />
-                    <span>Организатор турнира</span>
+                    <span>{getUserRoleLabel(UserRole.MANAGER)}</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="role"
+                      value={UserRole.LICENSE_MANAGER}
+                      checked={formData.role === UserRole.LICENSE_MANAGER}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          role: e.target.value as UserRole,
+                        })
+                      }
+                      className="mr-2"
+                    />
+                    <span>{getUserRoleLabel(UserRole.LICENSE_MANAGER)}</span>
                   </label>
                   <label className="flex items-center">
                     <input
@@ -377,12 +394,11 @@ const AdminUsers: React.FC = () => {
                       }
                       className="mr-2"
                     />
-                    <span>Администратор</span>
+                    <span>{getUserRoleLabel(UserRole.ADMIN)}</span>
                   </label>
                 </div>
               </div>
 
-              {/* Кнопки */}
               <div className="flex justify-end space-x-4">
                 <button
                   type="button"

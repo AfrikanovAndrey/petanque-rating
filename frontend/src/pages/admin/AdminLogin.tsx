@@ -4,8 +4,12 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { authApi } from "../../services/api";
-import { LoginCredentials } from "../../types";
-import { handleApiError, isAuthenticated } from "../../utils";
+import { LoginCredentials, UserRole } from "../../types";
+import {
+  getAdminHomePath,
+  handleApiError,
+  isAuthenticated,
+} from "../../utils";
 
 const AdminLogin: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,9 +24,18 @@ const AdminLogin: React.FC = () => {
 
   // Перенаправляем, если уже авторизован
   useEffect(() => {
-    if (isAuthenticated()) {
-      navigate("/admin/dashboard");
+    if (!isAuthenticated()) return;
+    const raw = localStorage.getItem("current_user");
+    let path = "/admin/dashboard";
+    if (raw) {
+      try {
+        const u = JSON.parse(raw) as { role?: UserRole };
+        if (u?.role) path = getAdminHomePath(u.role);
+      } catch {
+        /* ignore */
+      }
     }
+    navigate(path);
   }, [navigate]);
 
   // Функция для очистки старых данных
@@ -51,7 +64,8 @@ const AdminLogin: React.FC = () => {
         }
 
         toast.success("Успешная авторизация!");
-        navigate("/admin/dashboard");
+        const u = response.data.user;
+        navigate(u?.role ? getAdminHomePath(u.role) : "/admin/dashboard");
       } else {
         toast.error(response.data.message || "Ошибка авторизации");
       }

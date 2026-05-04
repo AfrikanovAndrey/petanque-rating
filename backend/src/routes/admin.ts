@@ -9,7 +9,13 @@ import { SettingsController } from "../controllers/SettingsController";
 import { TournamentController } from "../controllers/TournamentController";
 import { UserController } from "../controllers/UserController";
 import { AdminAuditController } from "../controllers/AdminAuditController";
-import { authenticateAdmin, requireAdmin } from "../middleware/auth";
+import {
+  authenticateAdmin,
+  requireAdmin,
+  requireTournamentStaff,
+  requirePlayersSectionAccess,
+  requireLicensedPlayersEditor,
+} from "../middleware/auth";
 import { auditLog, auditLogDelete } from "../middleware/audit";
 
 const router = Router();
@@ -30,7 +36,7 @@ router.get(
 // Применяем middleware авторизации ко всем остальным админским роутам
 router.use(authenticateAdmin);
 
-// === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только для ADMIN) ===
+// === УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (только ADMIN) ===
 // GET /api/admin/users - получить всех пользователей
 router.get("/users", requireAdmin, UserController.getAllUsers);
 
@@ -84,6 +90,7 @@ router.delete(
 // POST /api/admin/tournaments/upload - загрузка турнира из Excel
 router.post(
   "/tournaments/upload",
+  requireTournamentStaff,
   uploadMiddleware,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
@@ -100,6 +107,7 @@ router.post(
 // POST /api/admin/tournaments/upload-from-google-sheets - загрузка турнира из Google Sheets
 router.post(
   "/tournaments/upload-from-google-sheets",
+  requireTournamentStaff,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
     entityType: "tournament",
@@ -113,15 +121,21 @@ router.post(
 // POST /api/admin/tournaments/check-google-sheets - проверка доступности Google таблицы
 router.post(
   "/tournaments/check-google-sheets",
+  requireTournamentStaff,
   TournamentController.checkGoogleSheetsAccess,
 );
 
 // GET /api/admin/tournaments - получить все турниры
-router.get("/tournaments", AdminController.getTournaments);
+router.get(
+  "/tournaments",
+  requireTournamentStaff,
+  AdminController.getTournaments,
+);
 
 // POST /api/admin/tournaments - создать турнир без загрузки результатов (ADMIN и MANAGER)
 router.post(
   "/tournaments",
+  requireTournamentStaff,
   auditLog({
     action: "CREATE_TOURNAMENT",
     entityType: "tournament",
@@ -135,24 +149,28 @@ router.post(
 // GET /api/admin/tournaments/:tournamentId/draft — черновик (параметры без заявок)
 router.get(
   "/tournaments/:tournamentId/draft",
+  requireTournamentStaff,
   AdminController.getTournamentDraftPage,
 );
 
 // GET /api/admin/tournaments/:tournamentId/registration — страница регистрации (до :tournamentId одиночного)
 router.get(
   "/tournaments/:tournamentId/registration",
+  requireTournamentStaff,
   AdminController.getTournamentRegistrationPage,
 );
 
 // GET /api/admin/tournaments/:tournamentId/in-progress — снимок заявок (статус «В процессе»)
 router.get(
   "/tournaments/:tournamentId/in-progress",
+  requireTournamentStaff,
   AdminController.getTournamentInProgressPage,
 );
 
 // POST /api/admin/tournaments/:tournamentId/complete-from-excel — завершить турнир «в процессе» загрузкой Excel
 router.post(
   "/tournaments/:tournamentId/complete-from-excel",
+  requireTournamentStaff,
   uploadMiddleware,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
@@ -167,6 +185,7 @@ router.post(
 // POST /api/admin/tournaments/:tournamentId/complete-from-google-sheets — завершить «в процессе» из Google Таблицы
 router.post(
   "/tournaments/:tournamentId/complete-from-google-sheets",
+  requireTournamentStaff,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
     entityType: "tournament",
@@ -180,6 +199,7 @@ router.post(
 // POST /api/admin/tournaments/:tournamentId/replace-results-from-excel — полностью заменить результаты завершённого турнира
 router.post(
   "/tournaments/:tournamentId/replace-results-from-excel",
+  requireTournamentStaff,
   uploadMiddleware,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
@@ -194,6 +214,7 @@ router.post(
 // POST /api/admin/tournaments/:tournamentId/replace-results-from-google-sheets — заменить результаты завершённого турнира из Google
 router.post(
   "/tournaments/:tournamentId/replace-results-from-google-sheets",
+  requireTournamentStaff,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
     entityType: "tournament",
@@ -207,27 +228,35 @@ router.post(
 // POST /api/admin/tournaments/:tournamentId/registration/:teamId/confirm — подтвердить заявку команды
 router.post(
   "/tournaments/:tournamentId/registration/:teamId/confirm",
+  requireTournamentStaff,
   AdminController.confirmTournamentRegistration,
 );
 
 // PUT /api/admin/tournaments/:tournamentId/registration/:teamId - изменить состав зарегистрированной команды
 router.put(
   "/tournaments/:tournamentId/registration/:teamId",
+  requireTournamentStaff,
   AdminController.updateTournamentRegistrationTeam,
 );
 
 // DELETE /api/admin/tournaments/:tournamentId/registration/:teamId - удалить заявку команды
 router.delete(
   "/tournaments/:tournamentId/registration/:teamId",
+  requireTournamentStaff,
   AdminController.deleteTournamentRegistration,
 );
 
 // GET /api/admin/tournaments/:tournamentId - получить турнир с результатами
-router.get("/tournaments/:tournamentId", AdminController.getTournamentDetails);
+router.get(
+  "/tournaments/:tournamentId",
+  requireTournamentStaff,
+  AdminController.getTournamentDetails,
+);
 
 // PUT /api/admin/tournaments/:tournamentId - обновить турнир (ADMIN и MANAGER)
 router.put(
   "/tournaments/:tournamentId",
+  requireTournamentStaff,
   auditLog({
     action: "UPDATE_TOURNAMENT",
     entityType: "tournament",
@@ -241,6 +270,7 @@ router.put(
 // DELETE /api/admin/tournaments/:tournamentId - удалить турнир (только ADMIN)
 router.delete(
   "/tournaments/:tournamentId",
+  requireTournamentStaff,
   requireAdmin,
   auditLogDelete({
     action: "DELETE_TOURNAMENT",
@@ -255,6 +285,7 @@ router.delete(
 // DELETE /api/admin/tournaments/results/:resultId - удалить результат (турнир/кубок) (только ADMIN)
 router.delete(
   "/tournaments/results/:resultId",
+  requireTournamentStaff,
   requireAdmin,
   auditLogDelete({
     action: "DELETE_TOURNAMENT",
@@ -269,13 +300,18 @@ router.delete(
 );
 
 // === УПРАВЛЕНИЕ ИГРОКАМИ ===
-// Доступно для ADMIN и MANAGER
+// Доступно для ADMIN, MANAGER и LICENSE_MANAGER
 // GET /api/admin/players - получить всех игроков
-router.get("/players", AdminController.getPlayers);
+router.get(
+  "/players",
+  requirePlayersSectionAccess,
+  AdminController.getPlayers,
+);
 
 // POST /api/admin/players - создать игрока
 router.post(
   "/players",
+  requirePlayersSectionAccess,
   auditLog({
     action: "CREATE_PLAYER",
     entityType: "player",
@@ -288,6 +324,7 @@ router.post(
 // POST /api/admin/players/upload-text - массовая загрузка игроков из текстового файла
 router.post(
   "/players/upload-text",
+  requirePlayersSectionAccess,
   playersTextUploadMiddleware,
   auditLog({
     action: "CREATE_PLAYER",
@@ -300,6 +337,7 @@ router.post(
 // PUT /api/admin/players/:playerId - обновить игрока
 router.put(
   "/players/:playerId",
+  requirePlayersSectionAccess,
   auditLog({
     action: "UPDATE_PLAYER",
     entityType: "player",
@@ -313,6 +351,7 @@ router.put(
 // DELETE /api/admin/players/:playerId - удалить игрока (ADMIN и MANAGER, если игрок не участвовал в турнирах)
 router.delete(
   "/players/:playerId",
+  requirePlayersSectionAccess,
   auditLogDelete({
     action: "DELETE_PLAYER",
     entityType: "player",
@@ -342,28 +381,39 @@ router.put(
 router.get("/settings", requireAdmin, SettingsController.getAllSettings);
 
 // === УПРАВЛЕНИЕ ЛИЦЕНЗИОННЫМИ ИГРОКАМИ ===
-// Доступно для ADMIN и MANAGER
+// Только ADMIN и LICENSE_MANAGER (организатор турнира раздел не видит)
 // GET /api/admin/licensed-players - получить всех лицензионных игроков
-router.get("/licensed-players", AdminController.getLicensedPlayers);
+router.get(
+  "/licensed-players",
+  requireLicensedPlayersEditor,
+  AdminController.getLicensedPlayers,
+);
 
 // GET /api/admin/licensed-players/active - получить активных лицензионных игроков
 router.get(
   "/licensed-players/active",
+  requireLicensedPlayersEditor,
   AdminController.getActiveLicensedPlayers,
 );
 
 // GET /api/admin/licensed-players/years - получить доступные годы
-router.get("/licensed-players/years", AdminController.getLicensedPlayersYears);
+router.get(
+  "/licensed-players/years",
+  requireLicensedPlayersEditor,
+  AdminController.getLicensedPlayersYears,
+);
 
 // GET /api/admin/licensed-players/statistics - получить статистику
 router.get(
   "/licensed-players/statistics",
+  requireLicensedPlayersEditor,
   AdminController.getLicensedPlayersStatistics,
 );
 
 // POST /api/admin/licensed-players - создать лицензионного игрока
 router.post(
   "/licensed-players",
+  requireLicensedPlayersEditor,
   auditLog({
     action: "CREATE_PLAYER",
     entityType: "licensed_player",
@@ -377,6 +427,7 @@ router.post(
 // PUT /api/admin/licensed-players/:playerId - обновить лицензионного игрока
 router.put(
   "/licensed-players/:playerId",
+  requireLicensedPlayersEditor,
   auditLog({
     action: "UPDATE_PLAYER",
     entityType: "licensed_player",
@@ -387,10 +438,10 @@ router.put(
   AdminController.updateLicensedPlayer,
 );
 
-// DELETE /api/admin/licensed-players/:playerId - удалить лицензионного игрока (ADMIN и MANAGER)
+// DELETE /api/admin/licensed-players/:playerId - удалить лицензионного игрока
 router.delete(
   "/licensed-players/:playerId",
-  authenticateAdmin,
+  requireLicensedPlayersEditor,
   auditLogDelete({
     action: "DELETE_PLAYER",
     entityType: "licensed_player",
@@ -406,6 +457,7 @@ router.delete(
 // POST /api/admin/licensed-players/upload - загрузка списка из Excel файла
 router.post(
   "/licensed-players/upload",
+  requireLicensedPlayersEditor,
   licensedPlayersUploadMiddleware,
   auditLog({
     action: "UPLOAD_LICENSED_PLAYERS",
@@ -426,7 +478,7 @@ router.post(
 // POST /api/admin/tournaments/:tournamentId/recalculate-points - пересчитать очки конкретного турнира
 router.post(
   "/tournaments/:tournamentId/recalculate-points",
-  authenticateAdmin,
+  requireTournamentStaff,
   async (req, res) => {
     try {
       const tournamentId = parseInt(req.params.tournamentId);

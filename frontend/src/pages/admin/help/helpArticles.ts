@@ -10,6 +10,12 @@ export type HelpArticleMeta = {
 
 export const HELP_ARTICLES: HelpArticleMeta[] = [
   {
+    slug: "user-roles",
+    title: "Роли в админ-панели",
+    description:
+      "ADMIN, MANAGER и LICENSE_MANAGER: турниры, игроки, лицензии и остальное.",
+  },
+  {
     slug: "tournament-results-excel",
     title: "Загрузка результатов турниров (Excel и Google Таблицы)",
     description:

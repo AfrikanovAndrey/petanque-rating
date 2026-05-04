@@ -13,9 +13,19 @@ import {
   DocumentTextIcon,
   BookOpenIcon,
 } from "@heroicons/react/24/outline";
-import { logout } from "../../utils";
+import { getUserRoleLabel, logout } from "../../utils";
 import { adminApi } from "../../services/api";
 import { User, UserRole } from "../../types";
+
+const ROLES_ALL_STAFF: UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.LICENSE_MANAGER,
+];
+const ROLES_TOURNAMENT_STAFF: UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+];
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -81,47 +91,54 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       name: "Панель управления",
       href: "/admin/dashboard",
       icon: HomeIcon,
-      adminOnly: true, // Только для ADMIN
+      roles: [UserRole.ADMIN],
     },
     {
       name: "Турниры",
       href: "/admin/tournaments",
       icon: TrophyIcon,
+      roles: ROLES_TOURNAMENT_STAFF,
     },
     {
       name: "Справка",
       href: "/admin/help",
       icon: BookOpenIcon,
+      roles: ROLES_ALL_STAFF,
     },
     {
       name: "Игроки",
       href: "/admin/players",
       icon: UsersIcon,
+      roles: ROLES_ALL_STAFF,
     },
     {
       name: "Лицензии",
       href: "/admin/licensed-players",
       icon: IdentificationIcon,
+      roles: [UserRole.ADMIN, UserRole.LICENSE_MANAGER],
     },
     {
       name: "Пользователи",
       href: "/admin/users",
       icon: UserGroupIcon,
-      adminOnly: true, // Только для ADMIN
+      roles: [UserRole.ADMIN],
     },
     {
       name: "Логи аудита",
       href: "/admin/audit-logs",
       icon: DocumentTextIcon,
-      adminOnly: true, // Только для ADMIN
+      roles: [UserRole.ADMIN],
     },
     {
       name: "Настройки",
       href: "/admin/settings",
       icon: CogIcon,
-      adminOnly: true, // Только для ADMIN
+      roles: [UserRole.ADMIN],
     },
-  ].filter((item) => !item.adminOnly || isAdmin); // Фильтруем пункты меню
+  ].filter(
+    (item) =>
+      currentUser && item.roles.includes(currentUser.role as UserRole)
+  );
 
   const isCurrentPage = (href: string) => {
     if (href === "/admin/tournaments") {
@@ -190,9 +207,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 {currentUser.name}
               </p>
               <p className="text-xs text-gray-500">
-                {currentUser.role === UserRole.ADMIN
-                  ? "Администратор"
-                  : "Организатор"}
+                {getUserRoleLabel(currentUser.role)}
               </p>
             </div>
           )}

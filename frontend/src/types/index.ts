@@ -243,6 +243,7 @@ export interface RatingSetting {
 export enum UserRole {
   ADMIN = "ADMIN",
   MANAGER = "MANAGER",
+  LICENSE_MANAGER = "LICENSE_MANAGER",
 }
 
 // Пользователь

@@ -28,11 +28,22 @@ import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
 import AdminHelpLayout from "./pages/admin/help/AdminHelpLayout";
 import AdminHelpIndex from "./pages/admin/help/AdminHelpIndex";
 import HelpTournamentResultsExcel from "./pages/admin/help/HelpTournamentResultsExcel";
+import HelpUserRoles from "./pages/admin/help/HelpUserRoles";
 
 // Components
 import Layout from "./components/Layout";
 import AdminLayout from "./components/admin/AdminLayout";
+import AdminRoleRoute from "./components/admin/AdminRoleRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { UserRole } from "./types";
+
+const ROLES_ALL_STAFF = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.LICENSE_MANAGER,
+];
+const ROLES_LICENSE_SECTION = [UserRole.ADMIN, UserRole.LICENSE_MANAGER];
+const ROLES_TOURNAMENT_STAFF = [UserRole.ADMIN, UserRole.MANAGER];
 
 // Create a client
 const queryClient = new QueryClient({
@@ -119,9 +130,11 @@ function App() {
               path="/admin"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminDashboard />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={[UserRole.ADMIN]}>
+                    <AdminLayout>
+                      <AdminDashboard />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -130,9 +143,11 @@ function App() {
               path="/admin/dashboard"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminDashboard />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={[UserRole.ADMIN]}>
+                    <AdminLayout>
+                      <AdminDashboard />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -141,9 +156,11 @@ function App() {
               path="/admin/tournaments/:tournamentId/draft"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminTournamentRegistration />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENT_STAFF}>
+                    <AdminLayout>
+                      <AdminTournamentRegistration />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -152,9 +169,11 @@ function App() {
               path="/admin/tournaments/:tournamentId/registration"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminTournamentRegistration />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENT_STAFF}>
+                    <AdminLayout>
+                      <AdminTournamentRegistration />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -163,9 +182,11 @@ function App() {
               path="/admin/tournaments/:tournamentId/in-progress"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminTournamentInProgress />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENT_STAFF}>
+                    <AdminLayout>
+                      <AdminTournamentInProgress />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -174,9 +195,11 @@ function App() {
               path="/admin/tournaments"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminTournaments />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENT_STAFF}>
+                    <AdminLayout>
+                      <AdminTournaments />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -185,9 +208,11 @@ function App() {
               path="/admin/players"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminPlayers />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={ROLES_ALL_STAFF}>
+                    <AdminLayout>
+                      <AdminPlayers />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -196,9 +221,11 @@ function App() {
               path="/admin/settings"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminSettings />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={[UserRole.ADMIN]}>
+                    <AdminLayout>
+                      <AdminSettings />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -207,9 +234,11 @@ function App() {
               path="/admin/licensed-players"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminLicensedPlayers />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={ROLES_LICENSE_SECTION}>
+                    <AdminLayout>
+                      <AdminLicensedPlayers />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -218,9 +247,11 @@ function App() {
               path="/admin/users"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminUsers />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={[UserRole.ADMIN]}>
+                    <AdminLayout>
+                      <AdminUsers />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -229,9 +260,11 @@ function App() {
               path="/admin/audit-logs"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminAuditLogs />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={[UserRole.ADMIN]}>
+                    <AdminLayout>
+                      <AdminAuditLogs />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             />
@@ -240,9 +273,11 @@ function App() {
               path="/admin/help"
               element={
                 <ProtectedRoute>
-                  <AdminLayout>
-                    <AdminHelpLayout />
-                  </AdminLayout>
+                  <AdminRoleRoute allowedRoles={ROLES_ALL_STAFF}>
+                    <AdminLayout>
+                      <AdminHelpLayout />
+                    </AdminLayout>
+                  </AdminRoleRoute>
                 </ProtectedRoute>
               }
             >
@@ -251,6 +286,7 @@ function App() {
                 path="tournament-results-excel"
                 element={<HelpTournamentResultsExcel />}
               />
+              <Route path="user-roles" element={<HelpUserRoles />} />
               <Route
                 path="*"
                 element={<Navigate to="/admin/help" replace />}

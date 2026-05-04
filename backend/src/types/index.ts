@@ -88,6 +88,8 @@ export interface RatingSetting {
 export enum UserRole {
   ADMIN = "ADMIN",
   MANAGER = "MANAGER",
+  /** Управление лицензиями и пользователями (без турниров и игроков рейтинга) */
+  LICENSE_MANAGER = "LICENSE_MANAGER",
 }
 
 export interface User {

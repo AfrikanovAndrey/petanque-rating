@@ -2,6 +2,7 @@ import {
   TournamentCategory,
   TournamentStatus,
   TournamentType,
+  UserRole,
 } from "../types";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -107,6 +108,33 @@ export function formatNumber(num: number): string {
 // Проверка авторизации
 export function isAuthenticated(): boolean {
   return !!localStorage.getItem("admin_token");
+}
+
+/** Стартовая страница админки после входа в зависимости от роли */
+export function getAdminHomePath(role: UserRole): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return "/admin/dashboard";
+    case UserRole.MANAGER:
+      return "/admin/tournaments";
+    case UserRole.LICENSE_MANAGER:
+      return "/admin/players";
+    default:
+      return "/admin/tournaments";
+  }
+}
+
+export function getUserRoleLabel(role: UserRole): string {
+  switch (role) {
+    case UserRole.ADMIN:
+      return "Администратор";
+    case UserRole.MANAGER:
+      return "Организатор турнира";
+    case UserRole.LICENSE_MANAGER:
+      return "Менеджер лицензий";
+    default:
+      return String(role);
+  }
 }
 
 // Выход из системы

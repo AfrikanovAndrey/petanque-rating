@@ -78,3 +78,22 @@ export const requireRole = (allowedRoles: UserRole[]) => {
  * Middleware только для ADMIN
  */
 export const requireAdmin = requireRole([UserRole.ADMIN]);
+
+/** Турниры: только ADMIN и MANAGER */
+export const requireTournamentStaff = requireRole([
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+]);
+
+/** Игроки рейтинга (справочник): ADMIN, MANAGER и менеджер лицензий */
+export const requirePlayersSectionAccess = requireRole([
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.LICENSE_MANAGER,
+]);
+
+/** Раздел лицензионных игроков (API чтения и записи): только ADMIN и LICENSE_MANAGER */
+export const requireLicensedPlayersEditor = requireRole([
+  UserRole.ADMIN,
+  UserRole.LICENSE_MANAGER,
+]);

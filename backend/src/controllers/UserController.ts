@@ -83,8 +83,12 @@ export class UserController {
         return;
       }
 
-      // Проверка валидности роли
-      if (role !== UserRole.ADMIN && role !== UserRole.MANAGER) {
+      const allowedRoles = [
+        UserRole.ADMIN,
+        UserRole.MANAGER,
+        UserRole.LICENSE_MANAGER,
+      ];
+      if (!allowedRoles.includes(role)) {
         res.status(400).json({
           success: false,
           message: "Недопустимая роль",
@@ -147,15 +151,24 @@ export class UserController {
 
       const data: UpdateUserRequest = req.body;
 
-      // Проверка валидности роли, если она указана
-      if (
-        data.role &&
-        data.role !== UserRole.ADMIN &&
-        data.role !== UserRole.MANAGER
-      ) {
+      const assignableRoles = [
+        UserRole.ADMIN,
+        UserRole.MANAGER,
+        UserRole.LICENSE_MANAGER,
+      ];
+      if (data.role && !assignableRoles.includes(data.role)) {
         res.status(400).json({
           success: false,
           message: "Недопустимая роль",
+        });
+        return;
+      }
+
+      const existingUser = await UserModel.getUserById(userId);
+      if (!existingUser) {
+        res.status(404).json({
+          success: false,
+          message: "Пользователь не найден",
         });
         return;
       }
@@ -171,8 +184,8 @@ export class UserController {
 
       // Проверка уникальности username, если он изменяется
       if (data.username) {
-        const existingUser = await UserModel.getUserByUsername(data.username);
-        if (existingUser && existingUser.id !== userId) {
+        const duplicateLogin = await UserModel.getUserByUsername(data.username);
+        if (duplicateLogin && duplicateLogin.id !== userId) {
           res.status(409).json({
             success: false,
             message: "Пользователь с таким логином уже существует",

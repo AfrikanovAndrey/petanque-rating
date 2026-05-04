@@ -330,6 +330,7 @@ const AdminLicensedPlayers: React.FC = () => {
           Лицензированные игроки
         </h1>
         <button
+          type="button"
           onClick={() => {
             setShowModal(true);
             setSearchQuery("");
@@ -483,12 +484,14 @@ const AdminLicensedPlayers: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button
+                      type="button"
                       onClick={() => handleEdit(player)}
                       className="text-indigo-600 hover:text-indigo-900"
                     >
                       Редактировать
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(player.id)}
                       className="text-red-600 hover:text-red-900"
                     >
