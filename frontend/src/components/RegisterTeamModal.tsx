@@ -71,12 +71,21 @@ type Props = {
   tournamentId: number;
   tournament: Tournament;
   onClose: () => void;
+  /** По умолчанию — публичная страница регистрации */
+  context?: "public" | "admin";
+  /** Ключи react-query для инвалидации после успешной регистрации */
+  invalidateQueryKeys?: readonly (readonly unknown[])[];
+  /** Подпись основной кнопки отправки */
+  submitButtonLabel?: string;
 };
 
 export const RegisterTeamModal: React.FC<Props> = ({
   tournamentId,
   tournament,
   onClose,
+  context = "public",
+  invalidateQueryKeys,
+  submitButtonLabel,
 }) => {
   const queryClient = useQueryClient();
   const cfg = useMemo(
@@ -225,10 +234,12 @@ export const RegisterTeamModal: React.FC<Props> = ({
         setFormError(String(res.data.message || "Ошибка регистрации"));
         return;
       }
-      await queryClient.invalidateQueries([
-        "publicTournamentRegistration",
-        tournamentId,
-      ]);
+      const keysToInvalidate =
+        invalidateQueryKeys ??
+        ([["publicTournamentRegistration", tournamentId]] as const);
+      for (const key of keysToInvalidate) {
+        await queryClient.invalidateQueries(key);
+      }
       onClose();
     } catch (err: unknown) {
       const msg =
@@ -282,9 +293,21 @@ export const RegisterTeamModal: React.FC<Props> = ({
                 tournament.type}
             </p>
             <p className="mt-2 text-sm text-gray-600">
-              Если участника ещё нет в базе рейтинга, отметьте «Новый игрок» и
-              введите ФИО. Организатор сможет подтвердить заявку только после
-              того, как все игроки будут заведены в базу и выбраны из списка.
+              {context === "admin" ? (
+                <>
+                  Участника нет в базе — отметьте «Новый игрок» и введите ФИО.
+                  Такую заявку можно подтвердить только когда все игроки есть в
+                  базе (через «Изменить состав»). Если все выбраны из списка,
+                  подтвердите заявку кнопкой «Подтвердить».
+                </>
+              ) : (
+                <>
+                  Если участника ещё нет в базе рейтинга, отметьте «Новый игрок»
+                  и введите ФИО. Организатор сможет подтвердить заявку только
+                  после того, как все игроки будут заведены в базу и выбраны из
+                  списка.
+                </>
+              )}
             </p>
             {cfg.tripletteHint && (
               <p className="mt-2 text-sm text-gray-600">
@@ -498,7 +521,12 @@ export const RegisterTeamModal: React.FC<Props> = ({
               disabled={submitting}
               className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
             >
-              {submitting ? "Отправка…" : "Отправить заявку"}
+              {submitting
+                ? "Отправка…"
+                : submitButtonLabel ??
+                  (context === "admin"
+                    ? "Зарегистрировать команду"
+                    : "Отправить заявку")}
             </button>
           </div>
         </form>

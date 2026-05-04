@@ -4,6 +4,7 @@ import {
   ClipboardDocumentListIcon,
   PencilSquareIcon,
   TrashIcon,
+  UserPlusIcon,
 } from "@heroicons/react/24/outline";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -11,6 +12,7 @@ import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { EditRegisteredTeamModal } from "../../components/EditRegisteredTeamModal";
+import { RegisterTeamModal } from "../../components/RegisterTeamModal";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
 import { adminApi, ratingApi } from "../../services/api";
 import {
@@ -47,6 +49,7 @@ const AdminTournamentRegistration: React.FC = () => {
   const [teamForEdit, setTeamForEdit] = useState<TournamentRegisteredTeam | null>(
     null
   );
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery(
     ["tournamentRegistration", tournamentId],
@@ -536,21 +539,33 @@ const AdminTournamentRegistration: React.FC = () => {
                 Всего: {teams.length} • Подтверждено: {confirmedTeamsCount}
               </p>
             </div>
-            {teams.length > 0 && (
-              <button
-                type="button"
-                onClick={downloadTeamsCsv}
-                className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-              >
-                <ArrowDownTrayIcon className="h-5 w-5 text-gray-500" />
-                Скачать CSV
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {tournament.status === TournamentStatus.REGISTRATION && (
+                <button
+                  type="button"
+                  onClick={() => setRegisterModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700"
+                >
+                  <UserPlusIcon className="h-5 w-5 shrink-0" />
+                  Зарегистрировать команду
+                </button>
+              )}
+              {teams.length > 0 && (
+                <button
+                  type="button"
+                  onClick={downloadTeamsCsv}
+                  className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                >
+                  <ArrowDownTrayIcon className="h-5 w-5 text-gray-500" />
+                  Скачать CSV
+                </button>
+              )}
+            </div>
           </div>
         </div>
         {teams.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-500">
-            Пока нет зарегистрированных команд.
+            Пока нет зарегистрированных команд.          
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -678,6 +693,15 @@ const AdminTournamentRegistration: React.FC = () => {
           tournament={tournament}
           team={teamForEdit}
           onClose={() => setTeamForEdit(null)}
+        />
+      )}
+      {registerModalOpen && (
+        <RegisterTeamModal
+          tournamentId={tournamentId}
+          tournament={tournament}
+          context="admin"
+          invalidateQueryKeys={[["tournamentRegistration", tournamentId]]}
+          onClose={() => setRegisterModalOpen(false)}
         />
       )}
     </div>
