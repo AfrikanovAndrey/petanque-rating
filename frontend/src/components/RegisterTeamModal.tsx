@@ -318,7 +318,13 @@ export const RegisterTeamModal: React.FC<Props> = ({
           </div>
 
           {slots.map((slot, i) => (
-            <div key={i} className="space-y-2 rounded-md border border-gray-100 bg-gray-50/60 p-3">
+            <div
+              key={i}
+              className="space-y-2 rounded-md border border-gray-100 bg-gray-50/60 p-3"
+            >
+              <div className="text-sm font-medium text-gray-900">
+                {buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
+              </div>
               <label className="flex items-center gap-2 text-sm text-gray-800">
                 <input
                   type="checkbox"
@@ -377,7 +383,7 @@ export const RegisterTeamModal: React.FC<Props> = ({
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      {buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])} — ФИО
+                      ФИО
                     </label>
                     <input
                       type="text"
@@ -482,9 +488,9 @@ export const RegisterTeamModal: React.FC<Props> = ({
                     />
                   </div>
                 </div>
-              ) : (
+              ) : (              
                 <PlayerAutocompleteField
-                  label={buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
+                  label='ФИО'                  
                   gender={cfg.genders[i]}
                   value={slot}
                   onChange={(p) => {
