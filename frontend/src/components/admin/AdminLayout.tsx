@@ -94,18 +94,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       roles: [UserRole.ADMIN],
     },
     {
-      name: "Турниры",
-      href: "/admin/tournaments",
-      icon: TrophyIcon,
-      roles: ROLES_TOURNAMENT_STAFF,
-    },
-    {
-      name: "Справка",
-      href: "/admin/help",
-      icon: BookOpenIcon,
-      roles: ROLES_ALL_STAFF,
-    },
-    {
       name: "Игроки",
       href: "/admin/players",
       icon: UsersIcon,
@@ -116,6 +104,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       href: "/admin/licensed-players",
       icon: IdentificationIcon,
       roles: [UserRole.ADMIN, UserRole.LICENSE_MANAGER],
+    },
+    {
+      name: "Турниры",
+      href: "/admin/tournaments",
+      icon: TrophyIcon,
+      roles: ROLES_TOURNAMENT_STAFF,
     },
     {
       name: "Пользователи",
@@ -134,6 +128,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       href: "/admin/settings",
       icon: CogIcon,
       roles: [UserRole.ADMIN],
+    },
+    {
+      name: "Справка",
+      href: "/admin/help",
+      icon: BookOpenIcon,
+      roles: ROLES_ALL_STAFF,
     },
   ].filter(
     (item) =>
