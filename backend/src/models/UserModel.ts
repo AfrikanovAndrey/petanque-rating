@@ -4,6 +4,51 @@ import { ResultSetHeader, RowDataPacket } from "mysql2";
 import bcrypt from "bcrypt";
 
 export class UserModel {
+  private static readonly ROLE_PRIORITY: UserRole[] = [
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.LICENSE_MANAGER,
+    UserRole.PRESIDIUM_MEMBER,
+  ];
+
+  private static getPrimaryRole(roles: UserRole[], fallback: UserRole): UserRole {
+    for (const role of UserModel.ROLE_PRIORITY) {
+      if (roles.includes(role)) return role;
+    }
+    return fallback;
+  }
+
+  private static normalizeRoles(rawRoles: unknown, fallbackRole: UserRole): UserRole[] {
+    let parsed: unknown = rawRoles;
+
+    if (typeof rawRoles === "string") {
+      try {
+        parsed = JSON.parse(rawRoles);
+      } catch {
+        parsed = null;
+      }
+    }
+
+    if (!Array.isArray(parsed)) {
+      return [fallbackRole];
+    }
+
+    const allowed = new Set<string>(Object.values(UserRole));
+    const roles = parsed.filter(
+      (r): r is UserRole => typeof r === "string" && allowed.has(r),
+    );
+    return roles.length > 0 ? [...new Set(roles)] : [fallbackRole];
+  }
+
+  private static normalizeUserRow(row: User & RowDataPacket): User {
+    const roles = UserModel.normalizeRoles(row.roles, row.role);
+    return {
+      ...row,
+      role: UserModel.getPrimaryRole(roles, row.role),
+      roles,
+    };
+  }
+
   /**
    * Получить пользователя по username
    */
@@ -12,7 +57,8 @@ export class UserModel {
       "SELECT * FROM users WHERE username = ?",
       [username]
     );
-    return rows[0] || null;
+    if (rows.length === 0) return null;
+    return UserModel.normalizeUserRow(rows[0]);
   }
 
   /**
@@ -23,7 +69,8 @@ export class UserModel {
       "SELECT * FROM users WHERE id = ?",
       [id]
     );
-    return rows[0] || null;
+    if (rows.length === 0) return null;
+    return UserModel.normalizeUserRow(rows[0]);
   }
 
   /**
@@ -31,9 +78,13 @@ export class UserModel {
    */
   static async getAllUsers(): Promise<Omit<User, "password_hash">[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT id, name, username, role, created_at, updated_at FROM users ORDER BY name"
+      "SELECT id, name, username, role, roles, created_at, updated_at FROM users ORDER BY name"
     );
-    return rows as Omit<User, "password_hash">[];
+    return (rows as (User & RowDataPacket)[]).map((row) => {
+      const normalized = UserModel.normalizeUserRow(row);
+      const { password_hash, ...userWithoutPassword } = normalized;
+      return userWithoutPassword;
+    });
   }
 
   /**
@@ -42,10 +93,16 @@ export class UserModel {
   static async createUser(data: CreateUserRequest): Promise<number> {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(data.password, saltRounds);
+    const roles = data.roles && data.roles.length > 0
+      ? [...new Set(data.roles)]
+      : data.role
+        ? [data.role]
+        : [UserRole.MANAGER];
+    const primaryRole = UserModel.getPrimaryRole(roles, UserRole.MANAGER);
 
     const [result] = await pool.execute<ResultSetHeader>(
-      "INSERT INTO users (name, username, password_hash, role) VALUES (?, ?, ?, ?)",
-      [data.name, data.username, passwordHash, data.role]
+      "INSERT INTO users (name, username, password_hash, role, roles) VALUES (?, ?, ?, ?, ?)",
+      [data.name, data.username, passwordHash, primaryRole, JSON.stringify(roles)]
     );
     return result.insertId;
   }
@@ -80,6 +137,21 @@ export class UserModel {
     if (data.role !== undefined) {
       updates.push("role = ?");
       values.push(data.role);
+      if (data.roles === undefined) {
+        updates.push("roles = ?");
+        values.push(JSON.stringify([data.role]));
+      }
+    }
+    if (data.roles !== undefined) {
+      const roles = data.roles.length > 0 ? [...new Set(data.roles)] : [];
+      if (roles.length > 0) {
+        updates.push("roles = ?");
+        values.push(JSON.stringify(roles));
+        if (data.role === undefined) {
+          updates.push("role = ?");
+          values.push(UserModel.getPrimaryRole(roles, UserRole.MANAGER));
+        }
+      }
     }
 
     if (updates.length === 0) {

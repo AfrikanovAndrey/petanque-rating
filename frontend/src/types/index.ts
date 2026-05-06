@@ -44,6 +44,8 @@ export interface Tournament {
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
   status: TournamentStatus;
   regulations?: string | null;
+  /** Признание президиумом: учёт результатов в рейтинге */
+  results_validated_at?: string | null;
   created_at: string;
   updated_at: string;
   /** Для FINISHED — команды с результатами; для DRAFT / REGISTRATION / IN_PROGRESS — только подтверждённые заявки */
@@ -244,6 +246,7 @@ export enum UserRole {
   ADMIN = "ADMIN",
   MANAGER = "MANAGER",
   LICENSE_MANAGER = "LICENSE_MANAGER",
+  PRESIDIUM_MEMBER = "PRESIDIUM_MEMBER",
 }
 
 // Пользователь
@@ -252,6 +255,7 @@ export interface User {
   name: string;
   username: string;
   role: UserRole;
+  roles?: UserRole[];
   created_at: string;
   updated_at: string;
 }
@@ -274,7 +278,8 @@ export interface CreateUserRequest {
   name: string;
   username: string;
   password: string;
-  role: UserRole;
+  role?: UserRole;
+  roles?: UserRole[];
 }
 
 // Обновление пользователя
@@ -283,6 +288,7 @@ export interface UpdateUserRequest {
   username?: string;
   password?: string;
   role?: UserRole;
+  roles?: UserRole[];
 }
 
 // Турнир с результатами

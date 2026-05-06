@@ -13,7 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { ratingApi, adminApi } from "../../services/api";
-import { formatNumber, handleApiError } from "../../utils";
+import { formatNumber, handleApiError, hasAnyUserRole } from "../../utils";
 import { User, UserRole } from "../../types";
 
 const AdminDashboard: React.FC = () => {
@@ -51,7 +51,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isAdmin = hasAnyUserRole(currentUser, [UserRole.ADMIN]);
 
   // Debug информация
   useEffect(() => {

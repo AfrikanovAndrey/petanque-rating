@@ -33,6 +33,8 @@ export interface Tournament {
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
   status: TournamentStatus;
   regulations?: string | null;
+  /** Признание президиумом / админом: только тогда результаты входят в публичный рейтинг */
+  results_validated_at?: Date | string | null;
   created_at: Date;
   updated_at: Date;
   /** См. TournamentModel.getAllTournaments: DRAFT/REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */
@@ -90,6 +92,8 @@ export enum UserRole {
   MANAGER = "MANAGER",
   /** Управление лицензиями и пользователями (без турниров и игроков рейтинга) */
   LICENSE_MANAGER = "LICENSE_MANAGER",
+  /** Признание результатов турниров для рейтинга */
+  PRESIDIUM_MEMBER = "PRESIDIUM_MEMBER",
 }
 
 export interface User {
@@ -98,6 +102,7 @@ export interface User {
   username: string;
   password_hash: string;
   role: UserRole;
+  roles?: UserRole[];
   created_at: Date;
   updated_at: Date;
 }
@@ -166,6 +171,7 @@ export interface AuthResponse {
     name: string;
     username: string;
     role: UserRole;
+    roles?: UserRole[];
   };
 }
 
@@ -173,7 +179,8 @@ export interface CreateUserRequest {
   name: string;
   username: string;
   password: string;
-  role: UserRole;
+  role?: UserRole;
+  roles?: UserRole[];
 }
 
 export interface UpdateUserRequest {
@@ -181,6 +188,7 @@ export interface UpdateUserRequest {
   username?: string;
   password?: string;
   role?: UserRole;
+  roles?: UserRole[];
 }
 
 export type TournamentCategory = "FEDERAL" | "REGIONAL";

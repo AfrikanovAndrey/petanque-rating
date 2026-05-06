@@ -10,8 +10,8 @@ const HelpUserRoles: React.FC = () => {
         Роли в админ-панели
       </h2>
       <p className="text-gray-700 mb-6">
-        Доступ к разделам админки задаётся ролью учётной записи. Ниже перечислены
-        роли, которые поддерживает система.
+        Доступ к разделам админки задаётся ролями учётной записи. Пользователю
+        можно назначить сразу несколько ролей: итоговые права складываются.
       </p>
 
       <section className="mb-8">
@@ -63,6 +63,57 @@ const HelpUserRoles: React.FC = () => {
           Нет доступа к панели управления, турнирам, учётным записям
           пользователей, настройкам и логам аудита.
         </p>
+      </section>
+
+      <section className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          {getUserRoleLabel(UserRole.PRESIDIUM_MEMBER)} (
+          <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">
+            PRESIDIUM_MEMBER
+          </code>
+          )
+        </h3>
+        <p className="text-gray-700 mb-2">
+          Роль для признания результатов завершённых турниров. В меню доступны
+          «Турниры» и «Справка».
+        </p>
+        <p className="text-sm text-gray-600">
+          Член президиума может подтвердить учёт результатов турнира в рейтинге,
+          но не может загружать/редактировать/удалять турниры, а также не имеет
+          доступа к игрокам, лицензиям, пользователям, настройкам и аудиту.
+        </p>
+      </section>
+
+      <section className="mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Несколько ролей у одного пользователя
+        </h3>
+        <p className="text-gray-700 mb-2">
+          При назначении нескольких ролей доступы объединяются. Достаточно
+          наличия любой подходящей роли для доступа к конкретному разделу или
+          действию.
+        </p>
+        <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+          <li>
+            <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+              MANAGER + PRESIDIUM_MEMBER
+            </code>{" "}
+            — можно вести турниры и признавать их результаты для рейтинга.
+          </li>
+          <li>
+            <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+              LICENSE_MANAGER + PRESIDIUM_MEMBER
+            </code>{" "}
+            — работа с лицензиями и признание турниров, но без редактирования
+            турниров.
+          </li>
+          <li>
+            <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+              ADMIN + любая роль
+            </code>{" "}
+            — фактически полный доступ администратора.
+          </li>
+        </ul>
       </section>
     </article>
   );

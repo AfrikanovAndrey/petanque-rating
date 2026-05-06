@@ -85,7 +85,7 @@ export class RatingController {
            JOIN teams tm ON tr.team_id = tm.id
            JOIN team_players tp ON tm.id = tp.team_id
            JOIN tournaments t ON tr.tournament_id = t.id
-           WHERE ${whereClause}
+           WHERE ${whereClause} AND t.results_validated_at IS NOT NULL
            ORDER BY tr.points DESC, t.date DESC`,
           [playerId, minDateStr]
         );
@@ -173,7 +173,7 @@ export class RatingController {
            JOIN tournaments t ON tr.tournament_id = t.id
            WHERE EXISTS (
              SELECT 1 FROM team_players tp2 WHERE tp2.team_id = tr.team_id AND tp2.player_id = ?
-           ) AND tr.points > 0 AND t.date >= ?${additionalWhere}
+           ) AND tr.points > 0 AND t.date >= ? AND t.results_validated_at IS NOT NULL${additionalWhere}
            GROUP BY tr.id
            ORDER BY tr.points DESC, t.date DESC`,
           [playerId, minDateStr]
@@ -274,7 +274,7 @@ export class RatingController {
          JOIN tournaments t ON tr.tournament_id = t.id
          WHERE EXISTS (
            SELECT 1 FROM team_players tp2 WHERE tp2.team_id = tr.team_id AND tp2.player_id = ?
-         ) AND tr.points > 0 AND t.date >= ?${additionalWhere}
+         ) AND tr.points > 0 AND t.date >= ? AND t.results_validated_at IS NOT NULL${additionalWhere}
          GROUP BY tr.id
          ORDER BY tr.points DESC, t.date DESC`,
         [playerId, minDateStr]
@@ -365,7 +365,7 @@ export class RatingController {
            JOIN tournaments t ON tr.tournament_id = t.id
            WHERE EXISTS (
              SELECT 1 FROM team_players tp2 WHERE tp2.team_id = tr.team_id AND tp2.player_id = ?
-           ) AND tr.points > 0 AND t.date >= ?${additionalWhere}
+           ) AND tr.points > 0 AND t.date >= ? AND t.results_validated_at IS NOT NULL${additionalWhere}
            GROUP BY tr.id
            ORDER BY tr.points DESC, t.date DESC`,
           [playerId, minDateStr]
@@ -467,7 +467,7 @@ export class RatingController {
            JOIN tournaments t ON tr.tournament_id = t.id
            WHERE EXISTS (
              SELECT 1 FROM team_players tp2 WHERE tp2.team_id = tr.team_id AND tp2.player_id = ?
-           ) AND tr.points > 0 AND t.date >= ?${additionalWhere}
+           ) AND tr.points > 0 AND t.date >= ? AND t.results_validated_at IS NOT NULL${additionalWhere}
            GROUP BY tr.id
            ORDER BY tr.points DESC, t.date DESC`,
           [playerId, minDateStr]

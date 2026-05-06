@@ -13,7 +13,12 @@ import {
   DocumentTextIcon,
   BookOpenIcon,
 } from "@heroicons/react/24/outline";
-import { getUserRoleLabel, logout } from "../../utils";
+import {
+  getUserRoles,
+  getUserRolesLabel,
+  hasAnyUserRole,
+  logout,
+} from "../../utils";
 import { adminApi } from "../../services/api";
 import { User, UserRole } from "../../types";
 
@@ -22,9 +27,10 @@ const ROLES_ALL_STAFF: UserRole[] = [
   UserRole.MANAGER,
   UserRole.LICENSE_MANAGER,
 ];
-const ROLES_TOURNAMENT_STAFF: UserRole[] = [
+const ROLES_TOURNAMENTS_NAV: UserRole[] = [
   UserRole.ADMIN,
   UserRole.MANAGER,
+  UserRole.PRESIDIUM_MEMBER,
 ];
 
 interface AdminLayoutProps {
@@ -75,7 +81,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
   };
 
-  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isAdmin = hasAnyUserRole(currentUser, [UserRole.ADMIN]);
 
   // Debug информация
   useEffect(() => {
@@ -109,7 +115,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       name: "Турниры",
       href: "/admin/tournaments",
       icon: TrophyIcon,
-      roles: ROLES_TOURNAMENT_STAFF,
+      roles: ROLES_TOURNAMENTS_NAV,
     },
     {
       name: "Пользователи",
@@ -137,7 +143,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     },
   ].filter(
     (item) =>
-      currentUser && item.roles.includes(currentUser.role as UserRole)
+      currentUser && hasAnyUserRole(currentUser, item.roles)
   );
 
   const isCurrentPage = (href: string) => {
@@ -178,16 +184,20 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       <div className="lg:flex">
         {/* Sidebar */}
         <div
-          className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+          className={`fixed inset-y-0 left-0 z-30 w-80 max-w-[85vw] bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 lg:max-w-none ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+          <div className="flex items-center justify-between h-16 px-5 border-b border-gray-200 gap-2">
+            <Link
+              to="/"
+              className="flex items-center gap-2 min-w-0 flex-1"
+              title="На главную рейтинга"
+            >
+              <div className="w-8 h-8 shrink-0 bg-primary-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold">P</span>
               </div>
-              <span className="text-lg font-semibold text-gray-900">
+              <span className="text-lg font-semibold text-gray-900 whitespace-nowrap truncate">
                 Админ панель
               </span>
             </Link>
@@ -207,7 +217,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 {currentUser.name}
               </p>
               <p className="text-xs text-gray-500">
-                {getUserRoleLabel(currentUser.role)}
+                {getUserRolesLabel(getUserRoles(currentUser))}
               </p>
             </div>
           )}
@@ -239,9 +249,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             <div className="mt-8 pt-6 border-t border-gray-200">
               <Link
                 to="/"
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+                className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200 whitespace-nowrap"
               >
-                <HomeIcon className="mr-3 h-5 w-5" />К рейтингу
+                <HomeIcon className="mr-3 h-5 w-5 shrink-0" />
+                К рейтингу
               </Link>
               <button
                 onClick={handleLogout}

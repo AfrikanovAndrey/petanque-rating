@@ -44,6 +44,11 @@ const ROLES_ALL_STAFF = [
 ];
 const ROLES_LICENSE_SECTION = [UserRole.ADMIN, UserRole.LICENSE_MANAGER];
 const ROLES_TOURNAMENT_STAFF = [UserRole.ADMIN, UserRole.MANAGER];
+const ROLES_TOURNAMENTS_PAGE = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.PRESIDIUM_MEMBER,
+];
 
 // Create a client
 const queryClient = new QueryClient({
@@ -195,7 +200,7 @@ function App() {
               path="/admin/tournaments"
               element={
                 <ProtectedRoute>
-                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENT_STAFF}>
+                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENTS_PAGE}>
                     <AdminLayout>
                       <AdminTournaments />
                     </AdminLayout>

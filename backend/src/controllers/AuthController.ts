@@ -83,6 +83,7 @@ export class AuthController {
           userId: user.id,
           username: user.username,
           role: user.role,
+          roles: user.roles ?? [user.role],
         },
         jwtSecret,
         {
@@ -102,6 +103,7 @@ export class AuthController {
           name: user.name,
           username: user.username,
           role: user.role,
+          roles: user.roles ?? [user.role],
         },
       };
 
@@ -132,6 +134,7 @@ export class AuthController {
         userId: number;
         username: string;
         role: string;
+        roles?: string[];
       };
 
       // Получаем актуальные данные пользователя из БД
@@ -151,6 +154,7 @@ export class AuthController {
           name: user.name,
           username: user.username,
           role: user.role,
+          roles: user.roles ?? [user.role],
         },
       });
     } catch (error) {
@@ -179,6 +183,7 @@ export class AuthController {
         userId: number;
         username: string;
         role: string;
+        roles?: string[];
       };
 
       // Проверяем текущий пароль

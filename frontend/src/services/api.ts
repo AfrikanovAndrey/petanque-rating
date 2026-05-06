@@ -242,6 +242,12 @@ export const adminApi = {
   ): Promise<AxiosResponse<ApiResponse<TournamentWithResults>>> =>
     api.get(`/admin/tournaments/${tournamentId}`),
 
+  /** Признать результаты турнира для учёта в рейтинге */
+  validateTournamentResults: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.post(`/admin/tournaments/${tournamentId}/validate-results`),
+
   // Черновик турнира (статус DRAFT, без списка заявок)
   getTournamentDraftPage: (
     tournamentId: number

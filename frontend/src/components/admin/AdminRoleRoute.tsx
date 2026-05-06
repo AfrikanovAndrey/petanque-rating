@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { adminApi } from "../../services/api";
 import { UserRole } from "../../types";
-import { getAdminHomePath } from "../../utils";
+import { getAdminHomePath, getUserRoles } from "../../utils";
 
 interface AdminRoleRouteProps {
   children: React.ReactNode;
@@ -27,12 +27,12 @@ const AdminRoleRoute: React.FC<AdminRoleRouteProps> = ({
       try {
         const response = await adminApi.getCurrentUser();
         const user = response.data.success ? response.data.data : null;
-        const role = user?.role as UserRole | undefined;
+        const roles = getUserRoles(user);
         if (!cancelled) {
-          if (role && allowedRoles.includes(role)) {
+          if (allowedRoles.some((role) => roles.includes(role))) {
             setAllowed(true);
-          } else if (role) {
-            setRedirectPath(getAdminHomePath(role));
+          } else if (roles.length > 0) {
+            setRedirectPath(getAdminHomePath(roles));
             setAllowed(false);
           } else {
             setAllowed(false);

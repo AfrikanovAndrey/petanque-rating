@@ -13,7 +13,7 @@ export const HELP_ARTICLES: HelpArticleMeta[] = [
     slug: "user-roles",
     title: "Роли в админ-панели",
     description:
-      "ADMIN, MANAGER и LICENSE_MANAGER: турниры, игроки, лицензии и остальное.",
+      "ADMIN, MANAGER, LICENSE_MANAGER, PRESIDIUM_MEMBER и назначение нескольких ролей.",
   },
   {
     slug: "tournament-results-excel",

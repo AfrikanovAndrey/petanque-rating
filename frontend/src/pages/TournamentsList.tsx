@@ -241,6 +241,16 @@ const TournamentsList: React.FC = () => {
                     <div className="border-t border-gray-200 px-4 sm:px-6 pb-4 sm:pb-6">
                       {details ? (
                         <div className="pt-4">
+                          {details.tournament.status ===
+                            TournamentStatus.FINISHED &&
+                            !details.tournament.results_validated_at &&
+                            (details.tournament.teams_count ?? 0) > 0 && (
+                            <p className="mb-4 text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                              Этот турнир ещё не признан президиумом для рейтинга:
+                              итоги доступны ниже, но в сумму очков общего рейтинга
+                              они пока не входят.
+                            </p>
+                          )}
                           {(() => {
                             // Группируем результаты по кубкам
                             const cupA = details.results.filter(

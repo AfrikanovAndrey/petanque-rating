@@ -29,8 +29,9 @@ const AdminLogin: React.FC = () => {
     let path = "/admin/dashboard";
     if (raw) {
       try {
-        const u = JSON.parse(raw) as { role?: UserRole };
-        if (u?.role) path = getAdminHomePath(u.role);
+        const u = JSON.parse(raw) as { role?: UserRole; roles?: UserRole[] };
+        if (u?.roles?.length) path = getAdminHomePath(u.roles);
+        else if (u?.role) path = getAdminHomePath(u.role);
       } catch {
         /* ignore */
       }
@@ -65,7 +66,13 @@ const AdminLogin: React.FC = () => {
 
         toast.success("Успешная авторизация!");
         const u = response.data.user;
-        navigate(u?.role ? getAdminHomePath(u.role) : "/admin/dashboard");
+        navigate(
+          u?.roles?.length
+            ? getAdminHomePath(u.roles)
+            : u?.role
+              ? getAdminHomePath(u.role)
+              : "/admin/dashboard"
+        );
       } else {
         toast.error(response.data.message || "Ошибка авторизации");
       }

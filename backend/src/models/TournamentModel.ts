@@ -249,9 +249,42 @@ export class TournamentModel {
   }
 
   static async deleteTournamentResult(id: number): Promise<boolean> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      "SELECT tournament_id FROM tournament_results WHERE id = ?",
+      [id],
+    );
+    if (rows.length === 0) {
+      return false;
+    }
+    const tournamentId = rows[0].tournament_id as number;
     const [result] = await pool.execute<ResultSetHeader>(
       "DELETE FROM tournament_results WHERE id = ?",
       [id],
+    );
+    if (result.affectedRows > 0) {
+      await TournamentModel.clearResultsValidation(tournamentId);
+      return true;
+    }
+    return false;
+  }
+
+  /** Снять признание результатов (после правок состава результатов). */
+  static async clearResultsValidation(
+    tournamentId: number,
+    connection?: PoolConnection,
+  ): Promise<void> {
+    const executor = connection || pool;
+    await executor.execute(
+      "UPDATE tournaments SET results_validated_at = NULL WHERE id = ?",
+      [tournamentId],
+    );
+  }
+
+  /** Признать результаты турнира для учёта в рейтинге. */
+  static async markResultsValidated(tournamentId: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      "UPDATE tournaments SET results_validated_at = NOW() WHERE id = ?",
+      [tournamentId],
     );
     return result.affectedRows > 0;
   }
@@ -511,7 +544,7 @@ export class TournamentModel {
       JOIN tournaments t ON tr.tournament_id = t.id
       JOIN team_players tp ON tm.id = tp.team_id
       JOIN players p ON tp.player_id = p.id
-      WHERE tr.cup IS NOT NULL
+      WHERE tr.cup IS NOT NULL AND t.results_validated_at IS NOT NULL
       GROUP BY tr.id, t.name, t.date
       ORDER BY t.date DESC, tr.cup, tr.cup_position
       `,
@@ -536,6 +569,7 @@ export class TournamentModel {
       JOIN team_players tp ON tm.id = tp.team_id
       JOIN players p ON tp.player_id = p.id
       WHERE tr.tournament_id = ? AND tr.cup IS NOT NULL
+        AND t.results_validated_at IS NOT NULL
       GROUP BY tr.id, t.name, t.date
       ORDER BY tr.cup, tr.cup_position
       `,
@@ -556,9 +590,11 @@ export class TournamentModel {
         GROUP_CONCAT(p.name ORDER BY p.name SEPARATOR ', ') as team_players
       FROM tournament_results tr
       JOIN teams tm ON tr.team_id = tm.id
+      JOIN tournaments t ON tr.tournament_id = t.id
       JOIN team_players tp ON tm.id = tp.team_id
       JOIN players p ON tp.player_id = p.id
       WHERE tr.tournament_id = ? AND tr.cup = ?
+        AND t.results_validated_at IS NOT NULL
       GROUP BY tr.id
       ORDER BY tr.cup_position
       `,

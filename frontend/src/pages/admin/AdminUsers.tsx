@@ -12,7 +12,7 @@ interface UserFormData {
   name: string;
   username: string;
   password: string;
-  role: UserRole;
+  roles: UserRole[];
 }
 
 const AdminUsers: React.FC = () => {
@@ -25,7 +25,7 @@ const AdminUsers: React.FC = () => {
     name: "",
     username: "",
     password: "",
-    role: UserRole.MANAGER,
+    roles: [UserRole.MANAGER],
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -54,7 +54,7 @@ const AdminUsers: React.FC = () => {
       name: "",
       username: "",
       password: "",
-      role: UserRole.MANAGER,
+      roles: [UserRole.MANAGER],
     });
     setFormErrors({});
     setShowModal(true);
@@ -66,7 +66,10 @@ const AdminUsers: React.FC = () => {
       name: user.name,
       username: user.username,
       password: "",
-      role: user.role,
+      roles:
+        user.roles && user.roles.length > 0
+          ? [...new Set(user.roles)]
+          : [user.role],
     });
     setFormErrors({});
     setShowModal(true);
@@ -79,7 +82,7 @@ const AdminUsers: React.FC = () => {
       name: "",
       username: "",
       password: "",
-      role: UserRole.MANAGER,
+      roles: [UserRole.MANAGER],
     });
     setFormErrors({});
   };
@@ -102,6 +105,9 @@ const AdminUsers: React.FC = () => {
     if (formData.password && formData.password.length < 6) {
       errors.password = "Пароль должен содержать минимум 6 символов";
     }
+    if (!formData.roles || formData.roles.length === 0) {
+      errors.roles = "Выберите хотя бы одну роль";
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -119,7 +125,8 @@ const AdminUsers: React.FC = () => {
         const updateData: UpdateUserRequest = {
           name: formData.name,
           username: formData.username,
-          role: formData.role,
+          role: formData.roles[0],
+          roles: formData.roles,
         };
         if (formData.password) {
           updateData.password = formData.password;
@@ -131,7 +138,8 @@ const AdminUsers: React.FC = () => {
           name: formData.name,
           username: formData.username,
           password: formData.password,
-          role: formData.role,
+          role: formData.roles[0],
+          roles: formData.roles,
         };
         await adminApi.createUser(createData);
         alert("Пользователь успешно создан");
@@ -165,9 +173,24 @@ const AdminUsers: React.FC = () => {
         return "bg-purple-100 text-purple-800";
       case UserRole.LICENSE_MANAGER:
         return "bg-amber-100 text-amber-900";
+      case UserRole.PRESIDIUM_MEMBER:
+        return "bg-indigo-100 text-indigo-900";
       default:
         return "bg-green-100 text-green-800";
     }
+  };
+
+  const toggleRole = (role: UserRole) => {
+    setFormData((prev) => {
+      const exists = prev.roles.includes(role);
+      const roles = exists
+        ? prev.roles.filter((r) => r !== role)
+        : [...prev.roles, role];
+      return {
+        ...prev,
+        roles,
+      };
+    });
   };
 
   if (loading) {
@@ -207,7 +230,7 @@ const AdminUsers: React.FC = () => {
                 Логин
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Роль
+                Роли
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Дата создания
@@ -229,13 +252,21 @@ const AdminUsers: React.FC = () => {
                   <div className="text-sm text-gray-500">{user.username}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${roleBadgeClass(
-                      user.role
-                    )}`}
-                  >
-                    {getUserRoleLabel(user.role)}
-                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {(user.roles && user.roles.length > 0
+                      ? user.roles
+                      : [user.role]
+                    ).map((role) => (
+                      <span
+                        key={`${user.id}-${role}`}
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${roleBadgeClass(
+                          role
+                        )}`}
+                      >
+                        {getUserRoleLabel(role)}
+                      </span>
+                    ))}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(user.created_at).toLocaleDateString("ru-RU")}
@@ -345,58 +376,49 @@ const AdminUsers: React.FC = () => {
 
               <div className="mb-6">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
-                  Роль *
+                  Роли *
                 </label>
                 <div className="space-y-2">
                   <label className="flex items-center">
                     <input
-                      type="radio"
-                      name="role"
-                      value={UserRole.MANAGER}
-                      checked={formData.role === UserRole.MANAGER}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          role: e.target.value as UserRole,
-                        })
-                      }
+                      type="checkbox"
+                      checked={formData.roles.includes(UserRole.MANAGER)}
+                      onChange={() => toggleRole(UserRole.MANAGER)}
                       className="mr-2"
                     />
                     <span>{getUserRoleLabel(UserRole.MANAGER)}</span>
                   </label>
                   <label className="flex items-center">
                     <input
-                      type="radio"
-                      name="role"
-                      value={UserRole.LICENSE_MANAGER}
-                      checked={formData.role === UserRole.LICENSE_MANAGER}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          role: e.target.value as UserRole,
-                        })
-                      }
+                      type="checkbox"
+                      checked={formData.roles.includes(UserRole.LICENSE_MANAGER)}
+                      onChange={() => toggleRole(UserRole.LICENSE_MANAGER)}
                       className="mr-2"
                     />
                     <span>{getUserRoleLabel(UserRole.LICENSE_MANAGER)}</span>
                   </label>
                   <label className="flex items-center">
                     <input
-                      type="radio"
-                      name="role"
-                      value={UserRole.ADMIN}
-                      checked={formData.role === UserRole.ADMIN}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          role: e.target.value as UserRole,
-                        })
-                      }
+                      type="checkbox"
+                      checked={formData.roles.includes(UserRole.PRESIDIUM_MEMBER)}
+                      onChange={() => toggleRole(UserRole.PRESIDIUM_MEMBER)}
+                      className="mr-2"
+                    />
+                    <span>{getUserRoleLabel(UserRole.PRESIDIUM_MEMBER)}</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.roles.includes(UserRole.ADMIN)}
+                      onChange={() => toggleRole(UserRole.ADMIN)}
                       className="mr-2"
                     />
                     <span>{getUserRoleLabel(UserRole.ADMIN)}</span>
                   </label>
                 </div>
+                {formErrors.roles && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.roles}</p>
+                )}
               </div>
 
               <div className="flex justify-end space-x-4">

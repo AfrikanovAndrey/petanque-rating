@@ -295,6 +295,7 @@ export class TeamController {
           FROM tournament_results tr
           JOIN tournaments t ON tr.tournament_id = t.id
           WHERE tr.team_id = ?
+            AND t.results_validated_at IS NOT NULL
           ORDER BY tr.points DESC, t.date DESC
         `,
           [team.team_id]

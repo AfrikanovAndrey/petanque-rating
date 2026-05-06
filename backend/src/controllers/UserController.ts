@@ -4,6 +4,33 @@ import { AuthRequest } from "../middleware/auth";
 import { CreateUserRequest, UpdateUserRequest, UserRole } from "../types";
 
 export class UserController {
+  private static readonly ALLOWED_ROLES: UserRole[] = [
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.LICENSE_MANAGER,
+    UserRole.PRESIDIUM_MEMBER,
+  ];
+
+  private static resolveRoles(input: {
+    role?: UserRole;
+    roles?: UserRole[];
+  }): UserRole[] {
+    const source =
+      input.roles && input.roles.length > 0
+        ? input.roles
+        : input.role
+          ? [input.role]
+          : [];
+    return [...new Set(source)];
+  }
+
+  private static isValidRoles(roles: UserRole[]): boolean {
+    return (
+      roles.length > 0 &&
+      roles.every((role) => UserController.ALLOWED_ROLES.includes(role))
+    );
+  }
+
   /**
    * Получить всех пользователей (только для ADMIN)
    */
@@ -72,10 +99,12 @@ export class UserController {
    */
   static async createUser(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { name, username, password, role }: CreateUserRequest = req.body;
+      const { name, username, password, role, roles }: CreateUserRequest =
+        req.body;
+      const resolvedRoles = UserController.resolveRoles({ role, roles });
 
       // Валидация
-      if (!name || !username || !password || !role) {
+      if (!name || !username || !password || resolvedRoles.length === 0) {
         res.status(400).json({
           success: false,
           message: "Все поля обязательны для заполнения",
@@ -83,15 +112,10 @@ export class UserController {
         return;
       }
 
-      const allowedRoles = [
-        UserRole.ADMIN,
-        UserRole.MANAGER,
-        UserRole.LICENSE_MANAGER,
-      ];
-      if (!allowedRoles.includes(role)) {
+      if (!UserController.isValidRoles(resolvedRoles)) {
         res.status(400).json({
           success: false,
-          message: "Недопустимая роль",
+          message: "Недопустимая роль (или набор ролей)",
         });
         return;
       }
@@ -119,7 +143,8 @@ export class UserController {
         name,
         username,
         password,
-        role,
+        role: resolvedRoles[0],
+        roles: resolvedRoles,
       });
       res.status(201).json({
         success: true,
@@ -150,16 +175,18 @@ export class UserController {
       }
 
       const data: UpdateUserRequest = req.body;
+      const hasRoles = data.roles !== undefined || data.role !== undefined;
+      const resolvedRoles = hasRoles
+        ? UserController.resolveRoles({ role: data.role, roles: data.roles })
+        : undefined;
 
-      const assignableRoles = [
-        UserRole.ADMIN,
-        UserRole.MANAGER,
-        UserRole.LICENSE_MANAGER,
-      ];
-      if (data.role && !assignableRoles.includes(data.role)) {
+      if (
+        resolvedRoles !== undefined &&
+        !UserController.isValidRoles(resolvedRoles)
+      ) {
         res.status(400).json({
           success: false,
-          message: "Недопустимая роль",
+          message: "Недопустимая роль (или набор ролей)",
         });
         return;
       }
@@ -194,7 +221,11 @@ export class UserController {
         }
       }
 
-      const success = await UserModel.updateUser(userId, data);
+      const success = await UserModel.updateUser(userId, {
+        ...data,
+        role: resolvedRoles?.[0] ?? data.role,
+        roles: resolvedRoles ?? data.roles,
+      });
       if (success) {
         res.json({
           success: true,

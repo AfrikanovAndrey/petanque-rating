@@ -1131,6 +1131,10 @@ export class TournamentController {
             "DELETE FROM tournament_results WHERE tournament_id = ?",
             [tournamentId]
           );
+          await TournamentModel.clearResultsValidation(
+            tournamentId,
+            connection,
+          );
         } else {
           tournamentId = await TournamentModel.createTournament(
             tournamentName,

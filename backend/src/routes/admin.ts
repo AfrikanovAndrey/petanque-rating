@@ -13,6 +13,8 @@ import {
   authenticateAdmin,
   requireAdmin,
   requireTournamentStaff,
+  requireTournamentViewer,
+  requirePresidiumOrAdmin,
   requirePlayersSectionAccess,
   requireLicensedPlayersEditor,
 } from "../middleware/auth";
@@ -128,7 +130,7 @@ router.post(
 // GET /api/admin/tournaments - получить все турниры
 router.get(
   "/tournaments",
-  requireTournamentStaff,
+  requireTournamentViewer,
   AdminController.getTournaments,
 );
 
@@ -249,8 +251,22 @@ router.delete(
 // GET /api/admin/tournaments/:tournamentId - получить турнир с результатами
 router.get(
   "/tournaments/:tournamentId",
-  requireTournamentStaff,
+  requireTournamentViewer,
   AdminController.getTournamentDetails,
+);
+
+// POST /api/admin/tournaments/:tournamentId/validate-results — признать результаты для рейтинга
+router.post(
+  "/tournaments/:tournamentId/validate-results",
+  requirePresidiumOrAdmin,
+  auditLog({
+    action: "VALIDATE_TOURNAMENT_RESULTS",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Признание результатов турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.validateTournamentResults,
 );
 
 // PUT /api/admin/tournaments/:tournamentId - обновить турнир (ADMIN и MANAGER)

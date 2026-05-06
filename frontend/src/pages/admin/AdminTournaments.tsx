@@ -4,6 +4,7 @@ import {
   CalendarIcon,
   PencilIcon,
   PlusIcon,
+  ShieldCheckIcon,
   TrashIcon,
   TrophyIcon,
 } from "@heroicons/react/24/outline";
@@ -15,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "react-query";
 import { adminApi, createBlankTournament } from "../../services/api";
 import {
   getCupPositionText,
+  Tournament,
   TournamentStatus,
   TournamentType,
   UserRole,
@@ -26,6 +28,7 @@ import {
   getTornamentCategoryText,
   getTournamentStatusText,
   getTournamentTypeIcons,
+  hasAnyUserRole,
   handleApiError,
 } from "../../utils";
 import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
@@ -92,9 +95,20 @@ const AdminTournaments: React.FC = () => {
     { staleTime: 60_000 }
   );
 
-  const canCreateBlankTournament =
-    currentUser?.role === UserRole.ADMIN ||
-    currentUser?.role === UserRole.MANAGER;
+  const canCreateBlankTournament = hasAnyUserRole(currentUser, [
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+  ]);
+
+  const canManageTournaments = hasAnyUserRole(currentUser, [
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+  ]);
+
+  const canValidateResults = hasAnyUserRole(currentUser, [
+    UserRole.ADMIN,
+    UserRole.PRESIDIUM_MEMBER,
+  ]);
 
   // Загружаем список турниров
   const {
@@ -105,10 +119,29 @@ const AdminTournaments: React.FC = () => {
     const response = await adminApi.getTournaments();
     const data = response.data.data || [];
     // Сортируем по дате проведения, самые свежие вверху
-    return data.sort((a: any, b: any) => {
+    return (data as Tournament[]).sort((a, b) => {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   });
+
+  const validateMutation = useMutation(
+    async (tournamentId: number) => {
+      return await adminApi.validateTournamentResults(tournamentId);
+    },
+    {
+      onSuccess: () => {
+        toast.success(
+          "Результаты турнира признаны и учитываются в рейтинге"
+        );
+        queryClient.invalidateQueries("tournaments");
+        queryClient.invalidateQueries("fullRating");
+        queryClient.invalidateQueries("dashboardRating");
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
 
   const createBlankMutation = useMutation(
     async (data: TournamentCreateBlankForm) => {
@@ -325,14 +358,16 @@ const AdminTournaments: React.FC = () => {
               Создать новый турнир
             </button>
           )}
-          <button
-            type="button"
-            onClick={handleOpenUploadModal}
-            className="btn-primary inline-flex shrink-0 items-center"
-          >
-            <PlusIcon className="h-5 w-5 mr-2 shrink-0" />
-            Загрузить турнир
-          </button>
+          {canManageTournaments && (
+            <button
+              type="button"
+              onClick={handleOpenUploadModal}
+              className="btn-primary inline-flex shrink-0 items-center"
+            >
+              <PlusIcon className="h-5 w-5 mr-2 shrink-0" />
+              Загрузить турнир
+            </button>
+          )}
         </div>
       </div>
 
@@ -361,6 +396,9 @@ const AdminTournaments: React.FC = () => {
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Количество команд
                   </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Учёт в рейтинге
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата загрузки
                   </th>
@@ -370,7 +408,7 @@ const AdminTournaments: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {tournaments.map((tournament) => {
+                {tournaments.map((tournament: Tournament) => {
                   const isRegistration =
                     tournament.status === TournamentStatus.REGISTRATION;
                   const isInProgress =
@@ -476,6 +514,25 @@ const AdminTournaments: React.FC = () => {
                         {tournament.teams_count ?? 0}
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center justify-center">
+                        {tournament.status === TournamentStatus.FINISHED ? (
+                          tournament.results_validated_at ? (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                              Признан
+                            </span>
+                          ) : (tournament.teams_count ?? 0) > 0 ? (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-900">
+                              Ожидает
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateTime(tournament.created_at)}
                     </td>
@@ -484,63 +541,94 @@ const AdminTournaments: React.FC = () => {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex justify-end space-x-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            recalculateMutation.mutate(tournament.id)
-                          }
-                          disabled={
-                            tournament.manual ||
-                            (recalculateMutation.isLoading &&
-                              recalculateMutation.variables === tournament.id)
-                          }
-                          className={`p-1 rounded ${
-                            tournament.manual
-                              ? "text-gray-300 cursor-not-allowed"
-                              : "text-amber-600 hover:text-amber-900 hover:bg-amber-50"
-                          }`}
-                          title={
-                            tournament.manual
-                              ? "Недоступно для турниров с ручным вводом"
-                              : "Пересчитать очки турнира"
-                          }
-                        >
-                          <ArrowPathIcon
-                            className={`h-4 w-4 ${
-                              recalculateMutation.isLoading &&
-                              recalculateMutation.variables === tournament.id
-                                ? "animate-spin"
-                                : ""
-                            }`}
-                          />
-                        </button>
-                        {tournament.status === TournamentStatus.FINISHED && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openReplaceResultsModal({
-                                id: tournament.id,
-                                name: tournament.name,
-                                date: tournament.date,
-                                type: tournament.type,
-                                category: tournament.category,
-                              })
-                            }
-                            className="text-emerald-600 hover:text-emerald-900 p-1 rounded hover:bg-emerald-50"
-                            title="Заменить результаты турнира (Excel или Google Таблицы)"
-                          >
-                            <ArrowUpTrayIcon className="h-4 w-4" />
-                          </button>
+                        {canValidateResults &&
+                          tournament.status === TournamentStatus.FINISHED &&
+                          (tournament.teams_count ?? 0) > 0 &&
+                          !tournament.results_validated_at && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                validateMutation.mutate(tournament.id)
+                              }
+                              disabled={
+                                validateMutation.isLoading &&
+                                validateMutation.variables === tournament.id
+                              }
+                              className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50 disabled:opacity-50"
+                              title="Признать результаты для учёта в рейтинге"
+                            >
+                              <ShieldCheckIcon
+                                className={`h-4 w-4 ${
+                                  validateMutation.isLoading &&
+                                  validateMutation.variables === tournament.id
+                                    ? "animate-pulse"
+                                    : ""
+                                }`}
+                              />
+                            </button>
+                          )}
+                        {canManageTournaments && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                recalculateMutation.mutate(tournament.id)
+                              }
+                              disabled={
+                                tournament.manual ||
+                                (recalculateMutation.isLoading &&
+                                  recalculateMutation.variables ===
+                                    tournament.id)
+                              }
+                              className={`p-1 rounded ${
+                                tournament.manual
+                                  ? "text-gray-300 cursor-not-allowed"
+                                  : "text-amber-600 hover:text-amber-900 hover:bg-amber-50"
+                              }`}
+                              title={
+                                tournament.manual
+                                  ? "Недоступно для турниров с ручным вводом"
+                                  : "Пересчитать очки турнира"
+                              }
+                            >
+                              <ArrowPathIcon
+                                className={`h-4 w-4 ${
+                                  recalculateMutation.isLoading &&
+                                  recalculateMutation.variables === tournament.id
+                                    ? "animate-spin"
+                                    : ""
+                                }`}
+                              />
+                            </button>
+                            {tournament.status === TournamentStatus.FINISHED && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openReplaceResultsModal({
+                                    id: tournament.id,
+                                    name: tournament.name,
+                                    date: tournament.date,
+                                    type: tournament.type,
+                                    category: tournament.category,
+                                  })
+                                }
+                                className="text-emerald-600 hover:text-emerald-900 p-1 rounded hover:bg-emerald-50"
+                                title="Заменить результаты турнира (Excel или Google Таблицы)"
+                              >
+                                <ArrowUpTrayIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(tournament)}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                              title="Редактировать турнир"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(tournament)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
-                          title="Редактировать турнир"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        {currentUser?.role === UserRole.ADMIN && (
+                        {hasAnyUserRole(currentUser, [UserRole.ADMIN]) && (
                           <button
                             type="button"
                             onClick={() =>
@@ -580,13 +668,15 @@ const AdminTournaments: React.FC = () => {
                   Создать новый турнир
                 </button>
               )}
-              <button
-                type="button"
-                onClick={handleOpenUploadModal}
-                className="btn-primary"
-              >
-                Загрузить турнир
-              </button>
+              {canManageTournaments && (
+                <button
+                  type="button"
+                  onClick={handleOpenUploadModal}
+                  className="btn-primary"
+                >
+                  Загрузить турнир
+                </button>
+              )}
             </div>
           </div>
         )}

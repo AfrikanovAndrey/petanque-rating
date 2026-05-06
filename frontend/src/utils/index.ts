@@ -110,18 +110,35 @@ export function isAuthenticated(): boolean {
   return !!localStorage.getItem("admin_token");
 }
 
-/** Стартовая страница админки после входа в зависимости от роли */
-export function getAdminHomePath(role: UserRole): string {
-  switch (role) {
-    case UserRole.ADMIN:
-      return "/admin/dashboard";
-    case UserRole.MANAGER:
-      return "/admin/tournaments";
-    case UserRole.LICENSE_MANAGER:
-      return "/admin/players";
-    default:
-      return "/admin/tournaments";
-  }
+/** Возвращает нормализованный список ролей пользователя. */
+export function getUserRoles(input: {
+  role?: UserRole;
+  roles?: UserRole[];
+} | UserRole | null | undefined): UserRole[] {
+  if (!input) return [];
+  if (typeof input === "string") return [input];
+  const fromArray = input.roles && input.roles.length > 0 ? input.roles : [];
+  const merged = fromArray.length > 0 ? fromArray : input.role ? [input.role] : [];
+  return [...new Set(merged)];
+}
+
+/** Проверка наличия хотя бы одной роли у пользователя. */
+export function hasAnyUserRole(
+  user: { role?: UserRole; roles?: UserRole[] } | null | undefined,
+  allowedRoles: UserRole[]
+): boolean {
+  const roles = getUserRoles(user);
+  return allowedRoles.some((role) => roles.includes(role));
+}
+
+/** Стартовая страница админки после входа в зависимости от роли(ей) */
+export function getAdminHomePath(roleOrRoles: UserRole | UserRole[]): string {
+  const roles = Array.isArray(roleOrRoles) ? roleOrRoles : [roleOrRoles];
+  if (roles.includes(UserRole.ADMIN)) return "/admin/dashboard";
+  if (roles.includes(UserRole.MANAGER)) return "/admin/tournaments";
+  if (roles.includes(UserRole.LICENSE_MANAGER)) return "/admin/players";
+  if (roles.includes(UserRole.PRESIDIUM_MEMBER)) return "/admin/tournaments";
+  return "/admin/tournaments";
 }
 
 export function getUserRoleLabel(role: UserRole): string {
@@ -132,9 +149,16 @@ export function getUserRoleLabel(role: UserRole): string {
       return "Организатор турнира";
     case UserRole.LICENSE_MANAGER:
       return "Менеджер лицензий";
+    case UserRole.PRESIDIUM_MEMBER:
+      return "Член президиума";
     default:
       return String(role);
   }
+}
+
+export function getUserRolesLabel(roles: UserRole[]): string {
+  if (roles.length === 0) return "—";
+  return roles.map((role) => getUserRoleLabel(role)).join(", ");
 }
 
 // Выход из системы

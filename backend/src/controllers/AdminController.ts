@@ -993,6 +993,62 @@ export class AdminController {
     }
   }
 
+  /** Признание результатов турнира для учёта в рейтинге (ADMIN и член президиума). */
+  static async validateTournamentResults(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (Number.isNaN(tournamentId) || tournamentId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.FINISHED) {
+        res.status(400).json({
+          success: false,
+          message: "Признание доступно только для завершённых турниров",
+        });
+        return;
+      }
+
+      const teamsCount =
+        await TournamentModel.getTournamentTeamsCount(tournamentId);
+      if (teamsCount === 0) {
+        res.status(400).json({
+          success: false,
+          message: "Нет загруженных результатов для признания",
+        });
+        return;
+      }
+
+      await TournamentModel.markResultsValidated(tournamentId);
+      res.json({
+        success: true,
+        message: "Результаты турнира признаны и учитываются в рейтинге",
+      });
+    } catch (error) {
+      console.error("Ошибка признания результатов турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка признания результатов турнира",
+      });
+    }
+  }
+
   /**
    * Данные страницы регистрации: турнир (в статусе REGISTRATION) + список записанных команд.
    */
