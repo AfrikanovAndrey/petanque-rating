@@ -308,9 +308,6 @@ const AdminTournamentRegistration: React.FC = () => {
   const { tournament, teams } = data;
   const confirmedTeamsCount = teams.filter((team) => team.is_confirmed).length;
 
-  const formatPlayerWithRating = (playerName: string) =>
-    `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
-
   const getTeamTotalRating = (players: string[]) => {
     const sortedRatings = players
       .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
@@ -328,7 +325,7 @@ const AdminTournamentRegistration: React.FC = () => {
     const lines = [
       "№,состав команды,рейтинг",
       ...teams.map((team, index) => {
-        const teamPlayers = team.players.map(formatPlayerWithRating).join(", ");
+        const teamPlayers = team.players.join(", ");
         return `${index + 1},${CsvUtils.escapeCsvField(teamPlayers)},${getTeamTotalRating(
           team.players
         )}`;
@@ -643,7 +640,7 @@ const AdminTournamentRegistration: React.FC = () => {
                       {index + 1}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {team.players.map(formatPlayerWithRating).join(", ")}
+                      {team.players.join(", ")}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                       {getTeamTotalRating(team.players)}

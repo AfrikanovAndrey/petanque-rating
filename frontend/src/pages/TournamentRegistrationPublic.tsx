@@ -105,9 +105,6 @@ const TournamentRegistrationPublic: React.FC = () => {
 
   const { tournament, teams } = data;
 
-  const formatPlayerWithRating = (playerName: string) =>
-    `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
-
   const getTeamTotalRating = (players: string[]) => {
     const sortedRatings = players
       .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
@@ -236,7 +233,7 @@ const TournamentRegistrationPublic: React.FC = () => {
                       {index + 1}
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                      {team.players.map(formatPlayerWithRating).join(", ")}
+                      {team.players.join(", ")}
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                       {getTeamTotalRating(team.players)}

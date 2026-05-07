@@ -113,15 +113,29 @@ export class TeamModel {
       const teamId = teamResult.insertId;
 
       if (playerIds.length > 0) {
+        const firstIndex = new Map<number, number>();
+        for (let i = 0; i < playerIds.length; i++) {
+          const id = playerIds[i];
+          if (!firstIndex.has(id)) {
+            firstIndex.set(id, i);
+          }
+        }
+
         const [playerRows] = await conn.execute<RowDataPacket[]>(
           `SELECT id, name FROM players WHERE id IN (${playerIds
             .map(() => "?")
-            .join(",")}) ORDER BY name ASC`,
+            .join(",")})`,
           playerIds
         );
 
-        for (let i = 0; i < playerRows.length; i++) {
-          const player = playerRows[i] as any;
+        const ordered = [...playerRows].sort(
+          (a: RowDataPacket, b: RowDataPacket) =>
+            (firstIndex.get(a.id as number) ?? 0) -
+            (firstIndex.get(b.id as number) ?? 0),
+        );
+
+        for (let i = 0; i < ordered.length; i++) {
+          const player = ordered[i] as { id: number };
           await conn.execute(
             `INSERT INTO team_players (team_id, player_id, position) VALUES (?, ?, ?)`,
             [teamId, player.id, i + 1]

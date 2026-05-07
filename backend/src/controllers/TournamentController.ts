@@ -35,7 +35,6 @@ import {
   buildStoredRosterFromRequestSlots,
   legacyPlayerIdsToRequestSlots,
   parseRegistrationRosterRequestSlots,
-  registrationRosterHasNewPlayer,
   validateRegistrationRequestSlotsShape,
   type RegistrationRosterRequestSlot,
 } from "../utils/registrationRosterUtils";
@@ -726,10 +725,6 @@ export class TournamentController {
           : await TeamModel.createTeam(uniqueDb, connection);
       }
 
-      const rosterForDb = registrationRosterHasNewPlayer(stored)
-        ? stored
-        : null;
-
       const already = await TournamentRegistrationModel.isTeamRegistered(
         tournamentId,
         teamId,
@@ -748,7 +743,7 @@ export class TournamentController {
         tournamentId,
         teamId,
         connection,
-        rosterForDb,
+        stored,
       );
       await connection.commit();
       res.json({ success: true, message: "Команда успешно зарегистрирована" });
