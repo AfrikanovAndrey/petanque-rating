@@ -1108,7 +1108,7 @@ export class AdminController {
   }
 
   /**
-   * Черновик турнира: параметры и регламент без списка заявок (статус DRAFT).
+   * Черновик турнира: параметры и описание без списка заявок (статус DRAFT).
    */
   static async getTournamentDraftPage(
     req: Request,

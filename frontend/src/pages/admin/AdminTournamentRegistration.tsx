@@ -24,7 +24,6 @@ import {
   formatDateTime,
   formatDateForInput,
   getTornamentCategoryText,
-  getTournamentStatusText,
   handleApiError,
 } from "../../utils";
 import CsvUtils from "../../utils/csv";
@@ -35,7 +34,6 @@ interface TournamentParamsForm {
   type: TournamentType;
   category: string;
   status: TournamentStatus;
-  manual: boolean;
   regulations: string;
 }
 
@@ -112,7 +110,6 @@ const AdminTournamentRegistration: React.FC = () => {
       status: isDraftPage
         ? TournamentStatus.DRAFT
         : TournamentStatus.REGISTRATION,
-      manual: false,
       regulations: "",
     },
   });
@@ -129,7 +126,6 @@ const AdminTournamentRegistration: React.FC = () => {
         (isDraftPage
           ? TournamentStatus.DRAFT
           : TournamentStatus.REGISTRATION)) as TournamentStatus,
-      manual: !!t.manual,
       regulations: t.regulations ?? "",
     });
   }, [data, reset, isDraftPage]);
@@ -142,7 +138,6 @@ const AdminTournamentRegistration: React.FC = () => {
         category: form.category,
         date: form.date,
         status: form.status,
-        manual: form.manual,
         regulations: form.regulations.trim() === "" ? null : form.regulations,
       });
     },
@@ -436,103 +431,76 @@ const AdminTournamentRegistration: React.FC = () => {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Дата проведения
-            </label>
-            <input
-              type="date"
-              className={`input-field ${errors.date ? "border-red-300" : ""}`}
-              {...register("date", { required: "Укажите дату" })}
-            />
-            {errors.date && (
-              <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>
-            )}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Дата проведения
+              </label>
+              <input
+                type="date"
+                className={`input-field ${errors.date ? "border-red-300" : ""}`}
+                {...register("date", { required: "Укажите дату" })}
+              />
+              {errors.date && (
+                <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Тип турнира
+              </label>
+              <select
+                className={`input-field ${errors.type ? "border-red-300" : ""}`}
+                {...register("type", { required: true })}
+              >
+                <option value={TournamentType.TRIPLETTE}>Триплеты</option>
+                <option value={TournamentType.DOUBLETTE_MALE}>
+                  Дуплеты мужские
+                </option>
+                <option value={TournamentType.DOUBLETTE_FEMALE}>
+                  Дуплеты женские
+                </option>
+                <option value={TournamentType.DOUBLETTE_MIXT}>
+                  Дуплеты микст
+                </option>
+                <option value={TournamentType.TET_A_TET_MALE}>
+                  Тет-а-тет мужской
+                </option>
+                <option value={TournamentType.TET_A_TET_FEMALE}>
+                  Тет-а-тет женский
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Категория
+              </label>
+              <select
+                className={`input-field ${errors.category ? "border-red-300" : ""}`}
+                {...register("category", { required: true })}
+              >
+                <option value="1">
+                  1-я категория ({getTornamentCategoryText("FEDERAL")})
+                </option>
+                <option value="2">
+                  2-я категория ({getTornamentCategoryText("REGIONAL")})
+                </option>
+              </select>
+            </div>
           </div>
+
+          <input type="hidden" {...register("status", { required: true })} />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Тип турнира
-            </label>
-            <select
-              className={`input-field ${errors.type ? "border-red-300" : ""}`}
-              {...register("type", { required: true })}
-            >
-              <option value={TournamentType.TRIPLETTE}>Триплеты</option>
-              <option value={TournamentType.DOUBLETTE_MALE}>
-                Дуплеты мужские
-              </option>
-              <option value={TournamentType.DOUBLETTE_FEMALE}>
-                Дуплеты женские
-              </option>
-              <option value={TournamentType.DOUBLETTE_MIXT}>
-                Дуплеты микст
-              </option>
-              <option value={TournamentType.TET_A_TET_MALE}>
-                Тет-а-тет мужской
-              </option>
-              <option value={TournamentType.TET_A_TET_FEMALE}>
-                Тет-а-тет женский
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Категория
-            </label>
-            <select
-              className={`input-field ${errors.category ? "border-red-300" : ""}`}
-              {...register("category", { required: true })}
-            >
-              <option value="1">1-я категория ({getTornamentCategoryText("FEDERAL")})</option>
-              <option value="2">2-я категория ({getTornamentCategoryText("REGIONAL")})</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Статус
-            </label>
-            <select
-              className={`input-field ${errors.status ? "border-red-300" : ""}`}
-              {...register("status", { required: true })}
-            >
-              <option value={TournamentStatus.DRAFT}>
-                {getTournamentStatusText(TournamentStatus.DRAFT)}
-              </option>
-              <option value={TournamentStatus.REGISTRATION}>
-                {getTournamentStatusText(TournamentStatus.REGISTRATION)}
-              </option>
-              <option value={TournamentStatus.IN_PROGRESS}>
-                {getTournamentStatusText(TournamentStatus.IN_PROGRESS)}
-              </option>
-              <option value={TournamentStatus.FINISHED}>
-                {getTournamentStatusText(TournamentStatus.FINISHED)}
-              </option>
-            </select>
-          </div>
-
-          <div className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              id="manual-mode"
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600"
-              {...register("manual")}
-            />
-            <label htmlFor="manual-mode" className="text-sm text-gray-700">
-              Ручной режим загрузки результатов
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Регламент
+              Описание
             </label>
             <textarea
               rows={6}
               className={`input-field font-mono text-sm ${errors.regulations ? "border-red-300" : ""}`}
-              placeholder="Текст регламента для участников…"
+              placeholder="Описание для участников…"
               {...register("regulations")}
             />
             <p className="mt-1 text-xs text-gray-500">
@@ -546,12 +514,21 @@ const AdminTournamentRegistration: React.FC = () => {
               </a>      
             </p>
           </div>
-
-          <p className="mb-2 text-sm font-medium text-gray-700">Предпросмотр</p>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <RegulationsMarkdown source={watch("regulations")} className="text-sm" />
+          <div>
+            {isDraftPage && tournament.status === TournamentStatus.DRAFT && (
+              <>
+                <p className="mb-2 text-sm font-medium text-gray-700">
+                  Предпросмотр
+                </p>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <RegulationsMarkdown
+                    source={watch("regulations")}
+                    className="text-sm"
+                  />
+                </div>
+              </>
+            )}
           </div>
-
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
             <button
               type="button"
@@ -569,7 +546,6 @@ const AdminTournamentRegistration: React.FC = () => {
                     (isDraftPage
                       ? TournamentStatus.DRAFT
                       : TournamentStatus.REGISTRATION)) as TournamentStatus,
-                  manual: !!t.manual,
                   regulations: t.regulations ?? "",
                 });
               }}

@@ -263,7 +263,7 @@ const AdminTournamentInProgress: React.FC = () => {
           </div>
         </dl>
         <div className="pt-2 border-t border-gray-100">
-          <p className="text-sm font-medium text-gray-700">Регламент</p>
+          <p className="text-sm font-medium text-gray-700">Описание</p>
           <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-4">
             {tournament.regulations?.trim() ? (
               <RegulationsMarkdown

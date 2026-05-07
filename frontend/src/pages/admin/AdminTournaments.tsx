@@ -95,11 +95,6 @@ const AdminTournaments: React.FC = () => {
     { staleTime: 60_000 }
   );
 
-  const canCreateBlankTournament = hasAnyUserRole(currentUser, [
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-  ]);
-
   const canManageTournaments = hasAnyUserRole(currentUser, [
     UserRole.ADMIN,
     UserRole.MANAGER,
@@ -348,7 +343,7 @@ const AdminTournaments: React.FC = () => {
           </p>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          {canCreateBlankTournament && (
+          {canManageTournaments && (
             <button
               type="button"
               onClick={handleOpenCreateModal}
@@ -365,7 +360,7 @@ const AdminTournaments: React.FC = () => {
               className="btn-primary inline-flex shrink-0 items-center"
             >
               <PlusIcon className="h-5 w-5 mr-2 shrink-0" />
-              Загрузить турнир
+              Загрузить результаты турнира
             </button>
           )}
         </div>
@@ -659,7 +654,7 @@ const AdminTournaments: React.FC = () => {
               Загрузите первый турнир для начала работы с рейтингом
             </p>
             <div className="flex flex-wrap gap-3 justify-center">
-              {canCreateBlankTournament && (
+              {canManageTournaments && (
                 <button
                   type="button"
                   onClick={handleOpenCreateModal}
@@ -803,12 +798,11 @@ const AdminTournaments: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Регламент
+                Описание
                 </label>
                 <textarea
                   rows={5}
                   className="input-field"
-                  placeholder="Текст регламента (необязательно)"
                   {...registerCreate("regulations")}
                 />
               </div>

@@ -48,20 +48,9 @@ function getSlotConfig(type: TournamentType): SlotCfg {
     case TournamentType.DOUBLETTE_FEMALE:
       return { slots: 2, min: 2, max: 2, genders: ["female", "female"] };
     case TournamentType.DOUBLETTE_MIXT:
-      return {
-        slots: 2,
-        min: 2,
-        max: 2,
-        genders: ["male", "female"],
-      };
+      return { slots: 2, min: 2, max: 2, genders: ["female", "male"] };
     case TournamentType.TRIPLETTE:
-      return {
-        slots: 4,
-        min: 3,
-        max: 4,
-        genders: [undefined, undefined, undefined, undefined],
-        tripletteHint: true,
-      };
+      return { slots: 4, min: 3, max: 4, genders: [undefined, undefined, undefined, undefined], tripletteHint: true };
     default:
       return { slots: 1, min: 1, max: 1, genders: [undefined] };
   }
@@ -302,10 +291,8 @@ export const RegisterTeamModal: React.FC<Props> = ({
                 </>
               ) : (
                 <>
-                  Если участника ещё нет в базе рейтинга, отметьте «Новый игрок»
-                  и введите ФИО. Организатор сможет подтвердить заявку только
-                  после того, как все игроки будут заведены в базу и выбраны из
-                  списка.
+                  Заполните участников команды выбором из списка.<br/>Если участник не найден - отметьте его как «Новый игрок»
+                  и укажите данные.
                 </>
               )}
             </p>
@@ -397,7 +384,7 @@ export const RegisterTeamModal: React.FC<Props> = ({
                         })
                       }
                       disabled={submitting}
-                      placeholder="Как в заявке, например Иванов Иван"
+                      placeholder="Иванов Иван Иванович"
                       autoComplete="off"
                     />
                   </div>

@@ -25,7 +25,7 @@ export async function up(pool: Pool): Promise<void> {
   await pool.execute(`
     ALTER TABLE tournaments 
     ADD COLUMN regulations TEXT NULL 
-    COMMENT 'Регламент турнира (текст)' 
+    COMMENT 'Описание турнира (текст)' 
     AFTER status
   `);
 

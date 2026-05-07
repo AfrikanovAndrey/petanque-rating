@@ -355,7 +355,7 @@ export class TournamentController {
       res.json({
         success: true,
         data: {
-          ...tournament,
+          tournament,
           results: sortedResults,
         },
       });
