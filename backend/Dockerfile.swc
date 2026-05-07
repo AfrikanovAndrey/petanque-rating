@@ -1,6 +1,8 @@
+# syntax=docker/dockerfile:1
 # Dockerfile с использованием SWC (очень быстрый и легкий компилятор)
 # Требует намного меньше памяти чем TypeScript (< 256 MB)
 # Использование: docker build -f Dockerfile.swc .
+# Кэш npm (--mount=type=cache) ускоряет повторные сборки; нужен BuildKit (Docker 23+ / compose v2 по умолчанию).
 
 FROM node:18-alpine AS builder
 
@@ -11,7 +13,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Устанавливаем все зависимости строго по lock-файлу (включая dev для сборки SWC)
-RUN npm ci && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm,id=npm-backend \
+    npm ci
 
 # Копируем исходный код и конфигурацию SWC
 COPY . .
@@ -29,7 +32,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Production-зависимости по lock-файлу (typescript и ts-node уже в dependencies)
-RUN npm ci --omit=dev && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm,id=npm-backend \
+    npm ci --omit=dev
 
 # Копируем скомпилированный код из builder stage
 COPY --from=builder /app/dist ./dist
