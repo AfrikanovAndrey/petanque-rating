@@ -50,9 +50,7 @@ export type ManualInputTeam = {
 };
 
 export function generateTeamDescription(team: TeamPlayers): string {
-  return `Team #${team.orderNum + 1} (${team.players
-    .map((player) => player.name)
-    .join(", ")})`;
+  return team.players.map((player) => player.name).join(", ");
 }
 
 export type TeamQualifyingResults = {
