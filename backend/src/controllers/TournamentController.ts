@@ -1180,7 +1180,9 @@ export class TournamentController {
                 team
               )}`
             );
-            throw new Error("Не может такого быть ))");
+            throw new Error(
+              `Не найдены результаты для команды #${generateTeamDescription(team)}`
+          );
           }
 
           // Рассчитываем количество рейтинговых очков
