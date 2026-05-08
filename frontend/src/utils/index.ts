@@ -44,9 +44,9 @@ export function formatDateForInput(dateString: string): string {
 
 export function getTornamentCategoryText(category: TournamentCategory) {
   if (category === "FEDERAL") {
-    return "Рейтинговый РФП";
+    return "РФП";
   } else if (category === "REGIONAL") {
-    return "Региональный рейтинговый";
+    return "Региональный";
   }
 }
 

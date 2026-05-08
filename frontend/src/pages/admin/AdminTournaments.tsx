@@ -393,12 +393,12 @@ const AdminTournaments: React.FC = () => {
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Учёт в рейтинге
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Дата загрузки
-                  </th>
+                  </th>      
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Дата обновления
                   </th>
                 </tr>
               </thead>
@@ -497,7 +497,7 @@ const AdminTournaments: React.FC = () => {
                                 : "bg-green-100 text-green-800"
                             }`}
                           >
-                            {tournament.manual ? "Ручной" : "Автоматический"}
+                            {tournament.manual ? "Ручной" : "Авторасчёт"}
                           </span>
                         ) : (
                           <span className="text-gray-400">–</span>
@@ -527,9 +527,6 @@ const AdminTournaments: React.FC = () => {
                           <span className="text-gray-400">—</span>
                         )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDateTime(tournament.created_at)}
                     </td>
                     <td
                       className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
@@ -637,6 +634,9 @@ const AdminTournaments: React.FC = () => {
                           </button>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDateTime(tournament.updated_at)}
                     </td>
                   </tr>
                   );
