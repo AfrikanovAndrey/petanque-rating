@@ -9,7 +9,7 @@ export const REGISTRATION_LIST = "Регистрация";
 export const SWISS_RESULTS_LIST = "Итоги швейцарки";
 export const GROUP_RESULTS_LIST_REGEXP = /группа [a-zа-я]/;
 export const BUTTING_MATCH_LIST = "Стык AB";
-export const BUTTING_MATCH_LIST_REGEXP = /стык [aа][bб]/;
+export const BUTTING_MATCH_LIST_REGEXP = /стык [aа][bбв]/;
 export const MANUAL_INPUT_LIST = "Ручной ввод";
 
 // Нормализация имени игрока для сравнения
@@ -29,7 +29,7 @@ export function getCupListName(cup: Cup) {
     case "A":
       return `^Кубок [AaАа]$`;
     case "B":
-      return `^Кубок [BbБб]$`;
+      return `^Кубок [BbБбВв]$`;
     case "C":
       return `^Кубок [CcСс]$`;
   }
