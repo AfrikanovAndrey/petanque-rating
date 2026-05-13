@@ -1,6 +1,7 @@
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import toast from "react-hot-toast";
 import { useQueryClient } from "react-query";
 import { registerTeamForTournamentPublic } from "../services/api";
 import {
@@ -228,6 +229,11 @@ export const RegisterTeamModal: React.FC<Props> = ({
         ([["publicTournamentRegistration", tournamentId]] as const);
       for (const key of keysToInvalidate) {
         await queryClient.invalidateQueries(key);
+      }
+      if (context === "public") {
+        toast.success(
+          "Заявка успешно подана. Ожидайте подтверждения от организатора"
+        );
       }
       onClose();
     } catch (err: unknown) {

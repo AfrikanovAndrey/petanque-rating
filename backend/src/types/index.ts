@@ -39,6 +39,8 @@ export interface Tournament {
   updated_at: Date;
   /** См. TournamentModel.getAllTournaments: DRAFT/REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */
   teams_count?: number;
+  /** Неподтверждённые заявки на регистрацию (getAllTournaments) */
+  pending_registration_teams_count?: number;
 }
 
 export interface TournamentResult {

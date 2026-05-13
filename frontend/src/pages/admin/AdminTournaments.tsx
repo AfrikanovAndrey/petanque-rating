@@ -1,6 +1,7 @@
 import {
   ArrowPathIcon,
   ArrowUpTrayIcon,
+  BellAlertIcon,
   CalendarIcon,
   PencilIcon,
   PlusIcon,
@@ -470,7 +471,7 @@ const AdminTournaments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center justify-center gap-1.5">
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded-full ${
                             tournament.status === TournamentStatus.DRAFT
@@ -485,6 +486,22 @@ const AdminTournaments: React.FC = () => {
                         >
                           {getTournamentStatusText(tournament.status)}
                         </span>
+                        {isRegistration &&
+                          (tournament.pending_registration_teams_count ?? 0) >
+                            0 && (
+                          <span
+                            className="inline-flex shrink-0"
+                            title="Есть заявки, ожидающие подтверждения"
+                          >
+                            <BellAlertIcon
+                              className="h-5 w-5 text-amber-600"
+                              aria-hidden
+                            />
+                            <span className="sr-only">
+                              Есть заявки, ожидающие подтверждения
+                            </span>
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

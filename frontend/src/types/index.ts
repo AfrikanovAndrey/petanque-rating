@@ -50,6 +50,8 @@ export interface Tournament {
   updated_at: string;
   /** Для FINISHED — команды с результатами; для DRAFT / REGISTRATION / IN_PROGRESS — только подтверждённые заявки */
   teams_count?: number;
+  /** Неподтверждённые заявки (список турниров в админке) */
+  pending_registration_teams_count?: number;
 }
 
 /** Слот состава в заявке (ответ API регистрации). */
