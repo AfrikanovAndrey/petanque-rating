@@ -89,6 +89,7 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
       [CupPosition.WINNER, 9], // П
       [CupPosition.RUNNER_UP, 7], // Ф
       [CupPosition.ROUND_OF_4, 6], // 1/2
+      [CupPosition.ROUND_OF_8, 5], // 1/4
     ]),
   ],
   [
