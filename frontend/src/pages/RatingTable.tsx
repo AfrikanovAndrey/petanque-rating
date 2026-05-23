@@ -226,25 +226,10 @@ const RatingTable: React.FC = () => {
     );
   }
 
-  const getRatingTitle = () => {
-    switch (ratingView) {
-      case "male":
-        return "Мужской рейтинг";
-      case "female":
-        return "Женский рейтинг";
-      default:
-        return "Мужской рейтинг";
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Заголовок и переключатель */}
       <div className="text-center">
-        {/* <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 px-2">
-          {getRatingTitle()}
-        </h1> */}
-
         {/* Переключатель типа рейтинга */}
         <div className="flex justify-center mb-4 px-2">
           <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
