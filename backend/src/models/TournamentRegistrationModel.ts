@@ -28,6 +28,8 @@ export interface RegisteredTeamRow {
   is_confirmed: boolean;
   roster_slots: RegistrationRosterSlotDto[];
   has_pending_new_players: boolean;
+  /** Имена игроков из базы, уже записанных в другой заявке на этот турнир */
+  players_registered_in_other_teams: string[];
 }
 
 function storedSlotToDto(
@@ -195,6 +197,53 @@ export class TournamentRegistrationModel {
         players,
         roster_slots,
         has_pending_new_players,
+        players_registered_in_other_teams: [],
+      };
+    });
+  }
+
+  /**
+   * Для каждой заявки — игроки из базы, которые уже есть в составе другой команды на том же турнире.
+   */
+  static annotatePlayersInOtherTeams(
+    teams: RegisteredTeamRow[],
+  ): RegisteredTeamRow[] {
+    const playerIdToTeamIds = new Map<number, Set<number>>();
+    const playerIdToName = new Map<number, string>();
+
+    for (const team of teams) {
+      for (const slot of team.roster_slots) {
+        if (slot.kind === "player") {
+          playerIdToName.set(slot.player_id, slot.name);
+          if (!playerIdToTeamIds.has(slot.player_id)) {
+            playerIdToTeamIds.set(slot.player_id, new Set());
+          }
+          playerIdToTeamIds.get(slot.player_id)!.add(team.team_id);
+        }
+      }
+    }
+
+    return teams.map((team) => {
+      const duplicateNames: string[] = [];
+      const seen = new Set<number>();
+
+      for (const playerId of team.player_ids) {
+        if (seen.has(playerId)) {
+          continue;
+        }
+        seen.add(playerId);
+        const teamIds = playerIdToTeamIds.get(playerId);
+        if (!teamIds || teamIds.size <= 1) {
+          continue;
+        }
+        duplicateNames.push(
+          playerIdToName.get(playerId) ?? `Игрок #${playerId}`,
+        );
+      }
+
+      return {
+        ...team,
+        players_registered_in_other_teams: duplicateNames,
       };
     });
   }

@@ -1085,11 +1085,12 @@ export class AdminController {
         return;
       }
 
-      const teams =
+      const teams = TournamentRegistrationModel.annotatePlayersInOtherTeams(
         await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
           tournamentId,
           tournament.type as TournamentType,
-        );
+        ),
+      );
 
       res.json({
         success: true,

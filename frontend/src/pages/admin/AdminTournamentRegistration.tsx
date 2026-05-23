@@ -665,6 +665,15 @@ const AdminTournamentRegistration: React.FC = () => {
                               Есть игрок не из базы — сначала правка состава
                             </span>
                           )}
+                          {(team.players_registered_in_other_teams?.length ??
+                            0) > 0 && (
+                            <span className="text-xs text-orange-800">
+                              Участник уже в другой заявке:{" "}
+                              {team.players_registered_in_other_teams!.join(
+                                ", "
+                              )}
+                            </span>
+                          )}
                         </div>
                       )}
                     </td>

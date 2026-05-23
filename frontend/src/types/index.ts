@@ -88,6 +88,8 @@ export interface TournamentRegisteredTeam {
   /** Слоты состава; при отсутствии в ответе API считать устаревшим форматом. */
   roster_slots?: RegistrationRosterSlotDto[];
   has_pending_new_players?: boolean;
+  /** Игроки из базы, уже записанные в другой заявке на этот турнир */
+  players_registered_in_other_teams?: string[];
 }
 
 export interface TournamentRegistrationPageData {
