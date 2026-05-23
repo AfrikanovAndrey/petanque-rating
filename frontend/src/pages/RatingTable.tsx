@@ -241,16 +241,16 @@ const RatingTable: React.FC = () => {
     <div className="space-y-6">
       {/* Заголовок и переключатель */}
       <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 px-2">
+        {/* <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 px-2">
           {getRatingTitle()}
-        </h1>
+        </h1> */}
 
         {/* Переключатель типа рейтинга */}
         <div className="flex justify-center mb-4 px-2">
           <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
             <button
               onClick={() => setRatingView("male")}
-              className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-md text-base sm:text-lg font-medium transition-colors ${
                 ratingView === "male"
                   ? "bg-white text-blue-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
@@ -260,7 +260,7 @@ const RatingTable: React.FC = () => {
             </button>
             <button
               onClick={() => setRatingView("female")}
-              className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-md text-base sm:text-lg font-medium transition-colors ${
                 ratingView === "female"
                   ? "bg-white text-pink-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
@@ -289,45 +289,64 @@ const RatingTable: React.FC = () => {
           {lastTournamentDate ? formatDate(lastTournamentDate) : "—"}
         </p>
 
-        <div className="flex justify-center mt-4 px-2">
-          <button
-            type="button"
-            onClick={() =>
-              downloadPublicRatingCsv(ratingData, ratingView, ratingDate)
-            }
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <ArrowDownTrayIcon className="h-5 w-5 text-gray-500" />
-            Скачать CSV
-          </button>
-        </div>
-
-        {/* Фильтры */}
+        {/* Фильтры и экспорт */}
         <div className="flex justify-center mt-6 px-2">
-          <div className="card w-full max-w-2xl p-4 sm:p-5 text-left">
-            <button
-              type="button"
-              onClick={() => setFiltersExpanded((v) => !v)}
-              className="w-full flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-md"
-              aria-expanded={filtersExpanded}
-              aria-controls="rating-filters-panel"
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-gray-900">
-                  Фильтры
-                </span>
-                {hasActiveFilters && !filtersExpanded && (
-                  <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
-                    активны
-                  </span>
+          <div
+            className={`card w-full max-w-2xl text-left ${
+              filtersExpanded ? "p-4 sm:p-5" : "px-3 py-1.5 sm:px-4 sm:py-2"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setFiltersExpanded((v) => !v)}
+                className={`flex-1 min-w-0 flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-md ${
+                  filtersExpanded ? "py-1" : "py-0"
+                }`}
+                aria-expanded={filtersExpanded}
+                aria-controls="rating-filters-panel"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                {filtersExpanded ? (
+                  <ChevronUpIcon className="h-5 w-5 text-gray-400 shrink-0" />
+                ) : (
+                  <ChevronDownIcon className="h-4 w-4 text-gray-400 shrink-0" />
                 )}
-              </span>
-              {filtersExpanded ? (
-                <ChevronUpIcon className="h-5 w-5 text-gray-400 shrink-0" />
-              ) : (
-                <ChevronDownIcon className="h-5 w-5 text-gray-400 shrink-0" />
-              )}
-            </button>
+                  <span
+                    className={`font-semibold text-gray-900 ${
+                      filtersExpanded ? "text-sm" : "text-sm leading-tight"
+                    }`}
+                  >
+                    Фильтры
+                  </span>
+                  {hasActiveFilters && !filtersExpanded && (
+                    <span className="text-[10px] sm:text-xs font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full shrink-0 leading-none">
+                      активны
+                    </span>
+                  )}
+                </span>
+                
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  downloadPublicRatingCsv(ratingData, ratingView, ratingDate)
+                }
+                className={`inline-flex shrink-0 items-center gap-1 sm:gap-1.5 font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                  filtersExpanded
+                    ? "px-3 sm:px-4 py-2 text-sm"
+                    : "px-2.5 py-1 text-xs sm:text-sm"
+                }`}
+              >
+                <ArrowDownTrayIcon
+                  className={`text-gray-500 shrink-0 ${
+                    filtersExpanded ? "h-5 w-5" : "h-4 w-4"
+                  }`}
+                />
+                <span className="hidden sm:inline">Скачать CSV</span>
+                <span className="sm:hidden">CSV</span>
+              </button>
+            </div>
 
             {filtersExpanded && (
               <div

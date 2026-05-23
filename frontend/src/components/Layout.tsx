@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import PublicNavigation from "./PublicNavigation";
 
 interface LayoutProps {
@@ -11,18 +10,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
       <PublicNavigation />
-
-      {/* Admin Link */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-4">
-        <div className="flex justify-end">
-          <Link
-            to="/admin"
-            className="text-xs sm:text-sm text-gray-600 hover:text-primary-600 font-medium transition-colors duration-200"
-          >
-            Админ панель →
-          </Link>
-        </div>
-      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 pb-8">
