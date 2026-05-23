@@ -2,23 +2,31 @@ import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
   InformationCircleIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import RatingDatePicker from "../components/RatingDatePicker";
 import React, { useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { adminApi, ratingApi } from "../services/api";
 import { PlayerRating, getCupPositionText } from "../types";
 import CsvUtils from "../utils/csv";
-import { formatDate, formatNumber, handleApiError } from "../utils";
+import {
+  formatDate,
+  formatNumber,
+  handleApiError,
+  todayDateStr,
+} from "../utils";
 import { getTournamentTypeIcons } from "../utils/tournamentIcons";
 
 type RatingViewType = "male" | "female";
 
 function downloadPublicRatingCsv(
   players: PlayerRating[],
-  ratingView: RatingViewType
+  ratingView: RatingViewType,
+  ratingDate: string
 ): void {
   const lines = [
     "ФИО,текущий рейтинг",
@@ -34,7 +42,7 @@ function downloadPublicRatingCsv(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Рейтинг-${suffix}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `Рейтинг-${suffix}-${ratingDate}.csv`;
   a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
@@ -99,6 +107,12 @@ const RatingTable: React.FC = () => {
   );
   const [ratingView, setRatingView] = useState<RatingViewType>("male");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [ratingDate, setRatingDate] = useState<string>(() => todayDateStr());
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  const isHistoricalRating = ratingDate !== todayDateStr();
+  const hasActiveFilters =
+    searchTerm.trim().length > 0 || isHistoricalRating;
 
   const {
     data: ratingData,
@@ -106,9 +120,11 @@ const RatingTable: React.FC = () => {
     error,
     refetch,
   } = useQuery<PlayerRating[]>(
-    ["rating", ratingView],
+    ["rating", ratingView, ratingDate],
     async () => {
-      const response = await ratingApi.getRatingsByGender(ratingView);
+      const response = await ratingApi.getRatingsByGender(ratingView, {
+        date: ratingDate,
+      });
       return response.data?.data || [];
     },
     {
@@ -256,8 +272,17 @@ const RatingTable: React.FC = () => {
         </div>
 
         <p className="text-sm sm:text-base text-gray-600 px-2">
-          Рейтинг основан на {bestResultsCount} лучших результатах (
-          {ratingData?.length || 0} игроков)
+          {isHistoricalRating ? (
+            <>
+              Рейтинг на {formatDate(ratingDate)} (турниры за последние 365
+              дней)
+            </>
+          ) : (
+            <>Рейтинг на сегодня</>
+          )}
+          {" — "}
+          {bestResultsCount} лучших результатов ({ratingData?.length || 0}{" "}
+          игроков)
         </p>
         <p className="text-xs sm:text-sm text-gray-500 mt-1 px-2">
           Последнее обновление рейтинга:{" "}
@@ -267,7 +292,9 @@ const RatingTable: React.FC = () => {
         <div className="flex justify-center mt-4 px-2">
           <button
             type="button"
-            onClick={() => downloadPublicRatingCsv(ratingData, ratingView)}
+            onClick={() =>
+              downloadPublicRatingCsv(ratingData, ratingView, ratingDate)
+            }
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <ArrowDownTrayIcon className="h-5 w-5 text-gray-500" />
@@ -275,42 +302,108 @@ const RatingTable: React.FC = () => {
           </button>
         </div>
 
-        {/* Поле поиска */}
+        {/* Фильтры */}
         <div className="flex justify-center mt-6 px-2">
-          <div className="relative max-w-md w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              placeholder="Поиск игрока по имени..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                <button
-                  onClick={clearSearch}
-                  className="text-gray-400 hover:text-gray-600 focus:outline-none"
+          <div className="card w-full max-w-2xl p-4 sm:p-5 text-left">
+            <button
+              type="button"
+              onClick={() => setFiltersExpanded((v) => !v)}
+              className="w-full flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-md"
+              aria-expanded={filtersExpanded}
+              aria-controls="rating-filters-panel"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-semibold text-gray-900">
+                  Фильтры
+                </span>
+                {hasActiveFilters && !filtersExpanded && (
+                  <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
+                    активны
+                  </span>
+                )}
+              </span>
+              {filtersExpanded ? (
+                <ChevronUpIcon className="h-5 w-5 text-gray-400 shrink-0" />
+              ) : (
+                <ChevronDownIcon className="h-5 w-5 text-gray-400 shrink-0" />
+              )}
+            </button>
+
+            {filtersExpanded && (
+              <div
+                id="rating-filters-panel"
+                className="mt-4 grid gap-4 sm:grid-cols-2"
+              >
+              <div>
+                <label
+                  htmlFor="rating-search"
+                  className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
+                  Поиск игрока по имени
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="rating-search"
+                    type="text"
+                    className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    placeholder="Введите имя..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      <button
+                        type="button"
+                        onClick={clearSearch}
+                        className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                        aria-label="Очистить поиск"
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {searchTerm.trim() && (
+                  <p className="mt-1.5 text-xs text-gray-600">
+                    {filteredRatingData.length > 0
+                      ? `Найдено игроков: ${filteredRatingData.length}`
+                      : "Игроки не найдены"}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Дата расчёта рейтинга
+                </p>
+                <p className="text-sm text-gray-900 mb-2">
+                  Выбрано: {formatDate(ratingDate)}
+                </p>
+                <RatingDatePicker
+                  value={ratingDate}
+                  onChange={setRatingDate}
+                  maxDate={todayDateStr()}
+                />
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Учитываются турниры за 365 дней до выбранной даты включительно
+                </p>
+                {isHistoricalRating && (
+                  <button
+                    type="button"
+                    onClick={() => setRatingDate(todayDateStr())}
+                    className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Вернуться к сегодняшнему рейтингу
+                  </button>
+                )}
+              </div>
               </div>
             )}
           </div>
         </div>
-
-        {/* Результаты поиска */}
-        {searchTerm.trim() && (
-          <div className="text-center mt-2 px-2">
-            <p className="text-xs sm:text-sm text-gray-600">
-              {filteredRatingData.length > 0
-                ? `Найдено игроков: ${filteredRatingData.length}`
-                : "Игроки не найдены"}
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Таблица рейтинга */}

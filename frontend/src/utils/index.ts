@@ -29,6 +29,15 @@ export function formatDate(dateString: string): string {
   }
 }
 
+/** Сегодня в формате YYYY-MM-DD (локальная дата) */
+export function todayDateStr(): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 // Форматирование даты для input[type="date"] (YYYY-MM-DD)
 export function formatDateForInput(dateString: string): string {
   try {

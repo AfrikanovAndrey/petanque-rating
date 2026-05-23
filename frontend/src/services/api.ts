@@ -72,9 +72,15 @@ export const ratingApi = {
 
   // Получить рейтинги разделенные по полу
   getRatingsByGender: (
-    gender?: string
-  ): Promise<AxiosResponse<ApiResponse<any>>> =>
-    api.get("/rating/by-gender" + (gender ? `?gender=${gender}` : "")),
+    gender?: string,
+    options?: { date?: string }
+  ): Promise<AxiosResponse<ApiResponse<any>>> => {
+    const params = new URLSearchParams();
+    if (gender) params.set("gender", gender);
+    if (options?.date) params.set("date", options.date);
+    const qs = params.toString();
+    return api.get("/rating/by-gender" + (qs ? `?${qs}` : ""));
+  },
 
   // Действующие лицензии на текущий календарный год
   getActiveLicenses: (): Promise<

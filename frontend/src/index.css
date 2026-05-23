@@ -38,7 +38,7 @@
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200;
   }
-  
+
   .table-row {
     @apply border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150;
   }
