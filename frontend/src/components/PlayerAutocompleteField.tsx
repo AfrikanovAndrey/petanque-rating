@@ -4,33 +4,63 @@ import { PlayerSearchResult } from "../types";
 
 type Props = {
   label: string;
+  /** Не рендерить подпись над полем (подпись задаётся снаружи) */
+  hideLabel?: boolean;
   gender?: "male" | "female";
   value: PlayerSearchResult | null;
   onChange: (player: PlayerSearchResult | null) => void;
   excludeIds?: number[];
   disabled?: boolean;
   error?: string;
+  /** После дебаунса ввода: можно показать «нет в списке» (есть подсказка выбора из списка) */
+  onNotInListOptionChange?: (visible: boolean) => void;
+  /** Начальный/восстановленный текст в поле (если игрок не выбран) */
+  draftValue?: string;
+  onInputChange?: (text: string) => void;
 };
 
 export const PlayerAutocompleteField: React.FC<Props> = ({
   label,
+  hideLabel = false,
   gender,
   value,
   onChange,
   excludeIds = [],
   disabled,
   error,
+  onNotInListOptionChange,
+  draftValue = "",
+  onInputChange,
 }) => {
-  const [localInput, setLocalInput] = useState(value?.name ?? "");
+  const SEARCH_DEBOUNCE_MS = 280;
+  const [localInput, setLocalInput] = useState(
+    value?.name ?? draftValue ?? ""
+  );
+  const [debouncedQuery, setDebouncedQuery] = useState(() =>
+    (value?.name ?? "").trim()
+  );
   const [suggestions, setSuggestions] = useState<PlayerSearchResult[]>([]);
   const [showList, setShowList] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  const onInputChangeRef = useRef(onInputChange);
+  onInputChangeRef.current = onInputChange;
+
   useEffect(() => {
-    setLocalInput(value?.name ?? "");
+    const text = value?.name ?? "";
+    setLocalInput(text);
+    onInputChangeRef.current?.(text);
   }, [value?.id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedQuery(localInput.trim()),
+      SEARCH_DEBOUNCE_MS
+    );
+    return () => window.clearTimeout(timer);
+  }, [localInput]);
 
   const excludeKey = excludeIds.slice().sort((a, b) => a - b).join(",");
 
@@ -60,12 +90,23 @@ export const PlayerAutocompleteField: React.FC<Props> = ({
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }, 280);
+    }, SEARCH_DEBOUNCE_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
   }, [localInput, gender, excludeKey]);
+
+  /** Подсказка «выберите из списка» — после дебаунса ввода и завершения поиска */
+  const hasSelectionHint =
+    !value && debouncedQuery.length >= 2 && !loading;
+
+  const onNotInListOptionChangeRef = useRef(onNotInListOptionChange);
+  onNotInListOptionChangeRef.current = onNotInListOptionChange;
+
+  useEffect(() => {
+    onNotInListOptionChangeRef.current?.(hasSelectionHint);
+  }, [hasSelectionHint]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -79,6 +120,7 @@ export const PlayerAutocompleteField: React.FC<Props> = ({
 
   const handleInputChange = (raw: string) => {
     setLocalInput(raw);
+    onInputChange?.(raw);
     setShowList(true);
     if (value && raw !== value.name) {
       onChange(null);
@@ -127,10 +169,12 @@ export const PlayerAutocompleteField: React.FC<Props> = ({
 
   return (
     <div ref={wrapRef} className="relative">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      {!hideLabel && (
+        <label className="block text-sm font-medium text-gray-700">{label}</label>
+      )}
       <input
         type="text"
-        className={`mt-1 block w-full border rounded-md px-3 py-2 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
+        className={`${hideLabel ? "" : "mt-1 "}block w-full border rounded-md px-3 py-2 text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
           value ? "border-green-600 bg-green-50/50" : "border-gray-300"
         } ${error ? "border-red-500" : ""}`}
         value={localInput}

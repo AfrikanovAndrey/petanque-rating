@@ -50,7 +50,7 @@ function getSlotConfig(type: TournamentType): SlotCfg {
         slots: 2,
         min: 2,
         max: 2,
-        genders: ["male", "female"],
+        genders: ["female", "male"],
       };
     case TournamentType.TRIPLETTE:
       return {

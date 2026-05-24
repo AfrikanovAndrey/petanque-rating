@@ -89,6 +89,12 @@ export const RegisterTeamModal: React.FC<Props> = ({
   const [asNew, setAsNew] = useState<boolean[]>(() =>
     Array.from({ length: cfg.slots }, () => false)
   );
+  const [showNotInListOption, setShowNotInListOption] = useState<boolean[]>(
+    () => Array.from({ length: cfg.slots }, () => false)
+  );
+  const [fioDraft, setFioDraft] = useState<string[]>(() =>
+    Array.from({ length: cfg.slots }, () => "")
+  );
   const [newNames, setNewNames] = useState<string[]>(() =>
     Array.from({ length: cfg.slots }, () => "")
   );
@@ -113,6 +119,8 @@ export const RegisterTeamModal: React.FC<Props> = ({
   useEffect(() => {
     setSlots(Array.from({ length: cfg.slots }, () => null));
     setAsNew(Array.from({ length: cfg.slots }, () => false));
+    setShowNotInListOption(Array.from({ length: cfg.slots }, () => false));
+    setFioDraft(Array.from({ length: cfg.slots }, () => ""));
     setNewNames(Array.from({ length: cfg.slots }, () => ""));
     setNewLicenses(Array.from({ length: cfg.slots }, () => ""));
     setNewCities(Array.from({ length: cfg.slots }, () => ""));
@@ -290,14 +298,14 @@ export const RegisterTeamModal: React.FC<Props> = ({
             <p className="mt-2 text-sm text-gray-600">
               {context === "admin" ? (
                 <>
-                  Участника нет в базе — отметьте «Новый игрок» и введите ФИО.
+                  Участника нет в базе — отметьте «нет в списке» и введите ФИО.
                   Такую заявку можно подтвердить только когда все игроки есть в
                   базе (через «Изменить состав»). Если все выбраны из списка,
                   подтвердите заявку кнопкой «Подтвердить».
                 </>
               ) : (
                 <>
-                  Заполните участников команды выбором из списка.<br/>Если участник не найден - отметьте его как «Новый игрок»
+                  Заполните участников команды выбором из списка.<br/>Если участник не найден — отметьте «нет в списке»
                   и укажите данные.
                 </>
               )}
@@ -318,82 +326,138 @@ export const RegisterTeamModal: React.FC<Props> = ({
               <div className="text-sm font-medium text-gray-900">
                 {buildPlayerFieldLabel(i, cfg.slots, cfg.genders[i])}
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-800">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600"
-                  checked={asNew[i]}
-                  disabled={submitting}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setAsNew((prev) => {
-                      const next = [...prev];
-                      next[i] = checked;
-                      return next;
-                    });
-                    if (checked) {
-                      setSlots((prev) => {
-                        const next = [...prev];
-                        next[i] = null;
-                        return next;
-                      });
-                      setNewGenders((prev) => {
-                        const next = [...prev];
-                        const g = cfg.genders[i];
-                        next[i] =
-                          g === "male" || g === "female" ? g : null;
-                        return next;
-                      });
-                    } else {
-                      setNewNames((prev) => {
-                        const next = [...prev];
-                        next[i] = "";
-                        return next;
-                      });
-                      setNewLicenses((prev) => {
-                        const next = [...prev];
-                        next[i] = "";
-                        return next;
-                      });
-                      setNewCities((prev) => {
-                        const next = [...prev];
-                        next[i] = "";
-                        return next;
-                      });
-                      setNewGenders((prev) => {
-                        const next = [...prev];
-                        const g = cfg.genders[i];
-                        next[i] =
-                          g === "male" || g === "female" ? g : null;
-                        return next;
-                      });
-                    }
-                  }}
-                />
-                <span>Новый игрок</span>
-              </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  ФИО
+                </label>
+                <div className="mt-1 flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    {asNew[i] ? (
+                      <input
+                        type="text"
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
+                        value={newNames[i]}
+                        onChange={(e) => {
+                          const text = e.target.value;
+                          setNewNames((prev) => {
+                            const next = [...prev];
+                            next[i] = text;
+                            return next;
+                          });
+                          setFioDraft((prev) => {
+                            const next = [...prev];
+                            next[i] = text;
+                            return next;
+                          });
+                        }}
+                        disabled={submitting}
+                        placeholder="Иванов Иван Иванович"
+                        autoComplete="off"
+                      />
+                    ) : (
+                      <PlayerAutocompleteField
+                        key={`fio-search-${i}`}
+                        label="ФИО"
+                        hideLabel
+                        gender={cfg.genders[i]}
+                        value={slot}
+                        draftValue={fioDraft[i]}
+                        onInputChange={(text) => {
+                          setFioDraft((prev) => {
+                            const next = [...prev];
+                            next[i] = text;
+                            return next;
+                          });
+                        }}
+                        onChange={(p) => {
+                          setSlots((prev) => {
+                            const next = [...prev];
+                            next[i] = p;
+                            return next;
+                          });
+                        }}
+                        excludeIds={excludeIdsFor(i)}
+                        disabled={submitting}
+                        onNotInListOptionChange={(visible) => {
+                          setShowNotInListOption((prev) => {
+                            const next = [...prev];
+                            next[i] = visible;
+                            return next;
+                          });
+                        }}
+                      />
+                    )}
+                  </div>
+                  {(asNew[i] || showNotInListOption[i]) && (
+                  <label className="flex shrink-0 items-start gap-2 text-sm text-gray-800">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                      checked={asNew[i]}
+                      disabled={submitting}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAsNew((prev) => {
+                          const next = [...prev];
+                          next[i] = checked;
+                          return next;
+                        });
+                        if (checked) {
+                          setNewNames((prev) => {
+                            const next = [...prev];
+                            next[i] = fioDraft[i] ?? prev[i] ?? "";
+                            return next;
+                          });
+                          setSlots((prev) => {
+                            const next = [...prev];
+                            next[i] = null;
+                            return next;
+                          });
+                          setNewGenders((prev) => {
+                            const next = [...prev];
+                            const g = cfg.genders[i];
+                            next[i] =
+                              g === "male" || g === "female" ? g : null;
+                            return next;
+                          });
+                        } else {
+                          setFioDraft((prev) => {
+                            const next = [...prev];
+                            next[i] = newNames[i] ?? prev[i] ?? "";
+                            return next;
+                          });
+                          setNewNames((prev) => {
+                            const next = [...prev];
+                            next[i] = "";
+                            return next;
+                          });
+                          setNewLicenses((prev) => {
+                            const next = [...prev];
+                            next[i] = "";
+                            return next;
+                          });
+                          setNewCities((prev) => {
+                            const next = [...prev];
+                            next[i] = "";
+                            return next;
+                          });
+                          setNewGenders((prev) => {
+                            const next = [...prev];
+                            const g = cfg.genders[i];
+                            next[i] =
+                              g === "male" || g === "female" ? g : null;
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                    <span>нет в списке</span>
+                  </label>
+                  )}
+                </div>
+              </div>
               {asNew[i] ? (
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      ФИО
-                    </label>
-                    <input
-                      type="text"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
-                      value={newNames[i]}
-                      onChange={(e) =>
-                        setNewNames((prev) => {
-                          const next = [...prev];
-                          next[i] = e.target.value;
-                          return next;
-                        })
-                      }
-                      disabled={submitting}
-                      placeholder="Иванов Иван Иванович"
-                      autoComplete="off"
-                    />
-                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       Номер лицензии
@@ -481,22 +545,7 @@ export const RegisterTeamModal: React.FC<Props> = ({
                     />
                   </div>
                 </div>
-              ) : (              
-                <PlayerAutocompleteField
-                  label='ФИО'                  
-                  gender={cfg.genders[i]}
-                  value={slot}
-                  onChange={(p) => {
-                    setSlots((prev) => {
-                      const next = [...prev];
-                      next[i] = p;
-                      return next;
-                    });
-                  }}
-                  excludeIds={excludeIdsFor(i)}
-                  disabled={submitting}
-                />
-              )}
+              ) : null}
             </div>
           ))}
 
