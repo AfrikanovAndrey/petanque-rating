@@ -974,6 +974,8 @@ export class TournamentParser {
       errors.push(`Не найден столбец с заголовком ${teamWinsColumnHeader}`);
     }
 
+    let maxQualifyingWins;
+
     if (teamNameColumnCell && teamWinsColumnCell) {
       for (
         let rowIndex = teamNameColumnCell?.rowIndex + 1;
@@ -1003,9 +1005,13 @@ export class TournamentParser {
               swissSheet[`${teamWinsColumnCell.column}${rowIndex}`].v
             );
 
+            if (!maxQualifyingWins || qualifying_wins > maxQualifyingWins) {
+              maxQualifyingWins = qualifying_wins;
+            }
+
             teamResults.set(team.orderNum, {
               wins: qualifying_wins,
-              loses: 5 - qualifying_wins,
+              loses: maxQualifyingWins - qualifying_wins,
             });
           } catch (error) {
             errors.push((error as Error).message);
