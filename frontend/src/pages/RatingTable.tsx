@@ -389,7 +389,6 @@ const RatingTable: React.FC = () => {
                 <RatingDatePicker
                   value={ratingDate}
                   onChange={setRatingDate}
-                  maxDate={todayDateStr()}
                 />
                 <p className="mt-1.5 text-xs text-gray-500">
                   Учитываются турниры за 365 дней до выбранной даты включительно

@@ -3,7 +3,6 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import React, { useEffect, useMemo, useState } from "react";
-import { todayDateStr } from "../utils";
 
 type RatingDatePickerProps = {
   value: string;
@@ -41,7 +40,6 @@ const RatingDatePicker: React.FC<RatingDatePickerProps> = ({
   onChange,
   maxDate,
 }) => {
-  const max = maxDate ?? todayDateStr();
   const selected = parseYmd(value);
   const [viewYear, setViewYear] = useState(selected.y);
   const [viewMonth, setViewMonth] = useState(selected.m);
@@ -86,10 +84,15 @@ const RatingDatePicker: React.FC<RatingDatePickerProps> = ({
     }
   };
 
-  const maxParsed = parseYmd(max);
-  const canGoNext =
-    viewYear < maxParsed.y ||
-    (viewYear === maxParsed.y && viewMonth < maxParsed.m);
+  const canGoNext = maxDate
+    ? (() => {
+        const maxParsed = parseYmd(maxDate);
+        return (
+          viewYear < maxParsed.y ||
+          (viewYear === maxParsed.y && viewMonth < maxParsed.m)
+        );
+      })()
+    : true;
 
   return (
     <div className="border border-gray-200 rounded-md p-3 bg-white">
@@ -130,7 +133,7 @@ const RatingDatePicker: React.FC<RatingDatePickerProps> = ({
             <button
               key={cell.key}
               type="button"
-              disabled={cell.date > max}
+              disabled={maxDate != null && cell.date > maxDate}
               onClick={() => onChange(cell.date!)}
               className={`h-8 w-full text-sm rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:text-gray-300 disabled:cursor-not-allowed ${
                 cell.date === value

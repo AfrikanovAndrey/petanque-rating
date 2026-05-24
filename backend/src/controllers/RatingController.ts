@@ -54,14 +54,6 @@ export class RatingController {
       return { ok: false, message: "Некорректная дата" };
     }
 
-    const todayStr = RatingController.todayDateStr();
-    if (refDateStr > todayStr) {
-      return {
-        ok: false,
-        message: "Дата расчёта рейтинга не может быть в будущем",
-      };
-    }
-
     return {
       ok: true,
       ctx: {
