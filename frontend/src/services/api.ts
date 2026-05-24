@@ -331,6 +331,13 @@ export const adminApi = {
       { timeout: 120_000 }
     ),
 
+  // Зарегистрировать команду на турнир (админка)
+  registerTournamentTeam: (
+    tournamentId: number,
+    slots: RegisterTournamentSlotPayload[]
+  ): Promise<AxiosResponse<ApiResponse<unknown>>> =>
+    api.post(`/admin/tournaments/${tournamentId}/registration`, { slots }),
+
   // Подтвердить заявку команды на турнир
   confirmTournamentRegistration: (
     tournamentId: number,

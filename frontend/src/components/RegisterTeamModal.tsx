@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import { useQueryClient } from "react-query";
-import { registerTeamForTournamentPublic } from "../services/api";
+import { adminApi, registerTeamForTournamentPublic } from "../services/api";
 import {
   PlayerSearchResult,
   RegisterTournamentSlotPayload,
@@ -227,7 +227,10 @@ export const RegisterTeamModal: React.FC<Props> = ({
 
     try {
       setSubmitting(true);
-      const res = await registerTeamForTournamentPublic(tournamentId, payload);
+      const res =
+        context === "admin"
+          ? await adminApi.registerTournamentTeam(tournamentId, payload)
+          : await registerTeamForTournamentPublic(tournamentId, payload);
       if (!res.data.success) {
         setFormError(String(res.data.message || "Ошибка регистрации"));
         return;

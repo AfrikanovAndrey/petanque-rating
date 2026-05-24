@@ -227,10 +227,31 @@ router.post(
   AdminController.replaceFinishedTournamentResultsFromGoogleSheets,
 );
 
+// POST /api/admin/tournaments/:tournamentId/registration — зарегистрировать команду на турнир
+router.post(
+  "/tournaments/:tournamentId/registration",
+  requireTournamentStaff,
+  auditLog({
+    action: "REGISTER_TOURNAMENT_TEAM",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Регистрация команды на турнир ID ${req.params.tournamentId}`,
+  }),
+  AdminController.registerTournamentTeam,
+);
+
 // POST /api/admin/tournaments/:tournamentId/registration/:teamId/confirm — подтвердить заявку команды
 router.post(
   "/tournaments/:tournamentId/registration/:teamId/confirm",
   requireTournamentStaff,
+  auditLog({
+    action: "CONFIRM_TOURNAMENT_REGISTRATION",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Подтверждение заявки команды #${req.params.teamId} на турнир ID ${req.params.tournamentId}`,
+  }),
   AdminController.confirmTournamentRegistration,
 );
 
@@ -245,6 +266,13 @@ router.put(
 router.delete(
   "/tournaments/:tournamentId/registration/:teamId",
   requireTournamentStaff,
+  auditLog({
+    action: "DELETE_TOURNAMENT_REGISTRATION",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Удаление заявки команды #${req.params.teamId} с турнира ID ${req.params.tournamentId}`,
+  }),
   AdminController.deleteTournamentRegistration,
 );
 

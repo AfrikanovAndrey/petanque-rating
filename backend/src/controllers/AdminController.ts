@@ -1219,6 +1219,17 @@ export class AdminController {
   }
 
   /**
+   * Зарегистрировать команду на турнир (админка).
+   */
+  static async registerTournamentTeam(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    req.params.id = req.params.tournamentId;
+    return TournamentController.registerPublicTeam(req, res);
+  }
+
+  /**
    * Подтвердить заявку команды на турнир.
    */
   static async confirmTournamentRegistration(

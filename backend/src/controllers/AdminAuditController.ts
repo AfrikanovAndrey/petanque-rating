@@ -222,6 +222,18 @@ export class AdminAuditController {
         { value: "CREATE_TEAM", label: "Создание команды" },
         { value: "UPDATE_TEAM", label: "Редактирование команды" },
         { value: "DELETE_TEAM", label: "Удаление команды" },
+        {
+          value: "REGISTER_TOURNAMENT_TEAM",
+          label: "Регистрация команды на турнир",
+        },
+        {
+          value: "CONFIRM_TOURNAMENT_REGISTRATION",
+          label: "Подтверждение заявки команды на турнир",
+        },
+        {
+          value: "DELETE_TOURNAMENT_REGISTRATION",
+          label: "Удаление заявки команды с турнира",
+        },
       ];
 
       return res.json({
