@@ -160,6 +160,34 @@ export class TeamModel {
   }
 
   /**
+   * Найти существующую команду с тем же составом игроков в том же порядке.
+   */
+  static async findExistingTeamWithOrder(
+    playerIds: number[],
+    connection?: PoolConnection
+  ): Promise<Team | null> {
+    if (playerIds.length < 1 || playerIds.length > 4) {
+      return null;
+    }
+
+    const executor = connection || pool;
+    const orderKey = playerIds.join(",");
+
+    const [rows] = await executor.execute<Team[] & RowDataPacket[]>(
+      `SELECT t.* FROM teams t
+       WHERE (
+         SELECT GROUP_CONCAT(player_id ORDER BY position SEPARATOR ',')
+         FROM team_players
+         WHERE team_id = t.id
+       ) = ?
+       LIMIT 1`,
+      [orderKey]
+    );
+
+    return rows[0] || null;
+  }
+
+  /**
    * Найти существующую команду по составу игроков
    */
   static async findExistingTeam(

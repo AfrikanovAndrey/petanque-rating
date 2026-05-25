@@ -1452,7 +1452,10 @@ export class AdminController {
         return;
       }
 
-      let team = await TeamModel.findExistingTeam(playerIds, connection);
+      let team = await TeamModel.findExistingTeamWithOrder(
+        playerIds,
+        connection
+      );
       let nextTeamId: number;
       if (team) {
         nextTeamId = team.id;
