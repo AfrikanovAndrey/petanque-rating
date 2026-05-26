@@ -139,11 +139,11 @@ const TournamentRegistrationPublic: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4 sm:p-6 space-y-6">
+      <div className="min-w-0 bg-white rounded-lg shadow p-4 sm:p-6 space-y-6">
         <h2 className="text-lg font-semibold text-gray-900">
           Сведения о турнире
         </h2>
-        <dl className="grid gap-4 sm:grid-cols-2">
+        <dl className="grid min-w-0 gap-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs font-medium uppercase text-gray-500">
               Название
@@ -173,11 +173,11 @@ const TournamentRegistrationPublic: React.FC = () => {
               {getTornamentCategoryText(tournament.category)}
             </dd>
           </div>
-          <div className="sm:col-span-2">
+          <div className="min-w-0 sm:col-span-2">
             <dt className="text-xs font-medium uppercase text-gray-500">
               Описание
             </dt>
-            <dd className="mt-1 text-gray-900">
+            <dd className="mt-1 min-w-0 text-gray-900">
               <RegulationsMarkdown source={tournament.regulations} />
             </dd>
           </div>

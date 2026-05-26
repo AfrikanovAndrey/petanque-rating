@@ -8,6 +8,9 @@ type RatingDatePickerProps = {
   value: string;
   onChange: (date: string) => void;
   maxDate?: string;
+  todayDate?: string;
+  onSelectToday?: () => void;
+  embedded?: boolean;
 };
 
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -39,6 +42,9 @@ const RatingDatePicker: React.FC<RatingDatePickerProps> = ({
   value,
   onChange,
   maxDate,
+  todayDate,
+  onSelectToday,
+  embedded = false,
 }) => {
   const selected = parseYmd(value);
   const [viewYear, setViewYear] = useState(selected.y);
@@ -94,8 +100,16 @@ const RatingDatePicker: React.FC<RatingDatePickerProps> = ({
       })()
     : true;
 
+  const isTodaySelected = todayDate != null && value === todayDate;
+
   return (
-    <div className="border border-gray-200 rounded-md p-3 bg-white">
+    <div
+      className={
+        embedded
+          ? "bg-white"
+          : "border border-gray-200 rounded-md p-3 bg-white"
+      }
+    >
       <div className="flex items-center justify-between mb-3">
         <button
           type="button"
@@ -128,26 +142,46 @@ const RatingDatePicker: React.FC<RatingDatePickerProps> = ({
             {wd}
           </div>
         ))}
-        {cells.map((cell) =>
-          cell.date ? (
+        {cells.map((cell) => {
+          if (!cell.date) {
+            return <span key={cell.key} className="h-8" aria-hidden />;
+          }
+
+          const isSelected = cell.date === value;
+          const isToday = todayDate != null && cell.date === todayDate;
+
+          return (
             <button
               key={cell.key}
               type="button"
               disabled={maxDate != null && cell.date > maxDate}
               onClick={() => onChange(cell.date!)}
               className={`h-8 w-full text-sm rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:text-gray-300 disabled:cursor-not-allowed ${
-                cell.date === value
+                isSelected
                   ? "bg-blue-600 text-white font-semibold"
-                  : "text-gray-900 hover:bg-gray-100"
+                  : isToday
+                    ? "text-blue-700 font-semibold ring-2 ring-inset ring-blue-400 hover:bg-blue-50"
+                    : "text-gray-900 hover:bg-gray-100"
               }`}
             >
               {cell.day}
             </button>
-          ) : (
-            <span key={cell.key} className="h-8" aria-hidden />
-          )
-        )}
+          );
+        })}
       </div>
+
+      {onSelectToday && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={onSelectToday}
+            disabled={isTodaySelected}
+            className="w-full px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-default disabled:hover:bg-blue-50"
+          >
+            Сегодня
+          </button>
+        </div>
+      )}
     </div>
   );
 };

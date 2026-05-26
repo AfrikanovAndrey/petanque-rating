@@ -233,7 +233,7 @@ const AdminTournamentInProgress: React.FC = () => {
         </div>
       </div>
 
-      <div className="card p-6 space-y-4">
+      <div className="card min-w-0 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Параметры турнира</h2>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>
@@ -264,7 +264,7 @@ const AdminTournamentInProgress: React.FC = () => {
         </dl>
         <div className="pt-2 border-t border-gray-100">
           <p className="text-sm font-medium text-gray-700">Описание</p>
-          <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-4">
+          <div className="mt-2 min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-4">
             {tournament.regulations?.trim() ? (
               <RegulationsMarkdown
                 source={tournament.regulations}

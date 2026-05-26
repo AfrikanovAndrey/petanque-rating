@@ -454,7 +454,7 @@ const AdminTournamentRegistration: React.FC = () => {
         </div>
       </div>
 
-      <div className="card p-6 space-y-6">
+      <div className="card min-w-0 p-6 space-y-6">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
             Параметры турнира
@@ -571,7 +571,7 @@ const AdminTournamentRegistration: React.FC = () => {
                 <p className="mb-2 text-sm font-medium text-gray-700">
                   Предпросмотр
                 </p>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <RegulationsMarkdown
                     source={watch("regulations")}
                     className="text-sm"
