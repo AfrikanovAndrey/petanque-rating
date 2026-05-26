@@ -1,12 +1,14 @@
 import {
   ArrowDownTrayIcon,
   ArrowLeftIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   ClipboardDocumentListIcon,
   PencilSquareIcon,
   TrashIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
@@ -37,6 +39,9 @@ interface TournamentParamsForm {
   regulations: string;
 }
 
+type TeamsSortColumn = "rating" | "updated_at" | "status";
+type SortDirection = "asc" | "desc";
+
 const AdminTournamentRegistration: React.FC = () => {
   const { tournamentId: tournamentIdParam } = useParams<{
     tournamentId: string;
@@ -50,6 +55,11 @@ const AdminTournamentRegistration: React.FC = () => {
     null
   );
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const [teamsSortColumn, setTeamsSortColumn] = useState<TeamsSortColumn | null>(
+    null
+  );
+  const [teamsSortDirection, setTeamsSortDirection] =
+    useState<SortDirection>("desc");
 
   const pageQueryKey = isDraftPage
     ? (["tournamentDraft", tournamentId] as const)
@@ -94,6 +104,59 @@ const AdminTournamentRegistration: React.FC = () => {
       ),
     [fullRating]
   );
+
+  const teams = data?.teams ?? [];
+  const tournamentType = data?.tournament?.type ?? TournamentType.TRIPLETTE;
+
+  const getTeamTotalRating = useCallback(
+    (players: string[]) => {
+      const sortedRatings = players
+        .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
+        .sort((a, b) => b - a);
+
+      const ratingValues =
+        tournamentType === TournamentType.TRIPLETTE && sortedRatings.length > 3
+          ? sortedRatings.slice(0, 3)
+          : sortedRatings;
+
+      return ratingValues.reduce((sum, value) => sum + value, 0);
+    },
+    [ratingByPlayerName, tournamentType]
+  );
+
+  const handleTeamsSortClick = useCallback(
+    (column: TeamsSortColumn) => {
+      if (teamsSortColumn === column) {
+        setTeamsSortDirection((direction) =>
+          direction === "asc" ? "desc" : "asc"
+        );
+        return;
+      }
+      setTeamsSortColumn(column);
+      setTeamsSortDirection(column === "status" ? "asc" : "desc");
+    },
+    [teamsSortColumn]
+  );
+
+  const sortedTeams = useMemo(() => {
+    if (!teamsSortColumn) {
+      return teams;
+    }
+
+    return [...teams].sort((a, b) => {
+      let comparison = 0;
+      if (teamsSortColumn === "rating") {
+        comparison =
+          getTeamTotalRating(a.players) - getTeamTotalRating(b.players);
+      } else if (teamsSortColumn === "updated_at") {
+        comparison =
+          new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+      } else {
+        comparison = Number(a.is_confirmed) - Number(b.is_confirmed);
+      }
+      return teamsSortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [teams, teamsSortColumn, teamsSortDirection, getTeamTotalRating]);
 
   const {
     register,
@@ -305,26 +368,17 @@ const AdminTournamentRegistration: React.FC = () => {
     return null;
   }
 
-  const { tournament, teams } = data;
+  const { tournament } = data;
   const confirmedTeamsCount = teams.filter((team) => team.is_confirmed).length;
 
-  const getTeamTotalRating = (players: string[]) => {
-    const sortedRatings = players
-      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
-      .sort((a, b) => b - a);
-
-    const ratingValues =
-      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
-        ? sortedRatings.slice(0, 3)
-        : sortedRatings;
-
-    return ratingValues.reduce((sum, value) => sum + value, 0);
-  };
-
   const downloadTeamsCsv = () => {
+    const teamsByRating = [...teams].sort(
+      (a, b) =>
+        getTeamTotalRating(b.players) - getTeamTotalRating(a.players)
+    );
     const lines = [
       "№,состав команды,рейтинг",
-      ...teams.map((team, index) => {
+      ...teamsByRating.map((team, index) => {
         const teamPlayers = team.players.join(", ");
         return `${index + 1},${CsvUtils.escapeCsvField(teamPlayers)},${getTeamTotalRating(
           team.players
@@ -619,14 +673,68 @@ const AdminTournamentRegistration: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Состав команды
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Рейтинг команды
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer select-none hover:bg-gray-100"
+                    onClick={() => handleTeamsSortClick("rating")}
+                    aria-sort={
+                      teamsSortColumn === "rating"
+                        ? teamsSortDirection === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Рейтинг команды
+                      {teamsSortColumn === "rating" &&
+                        (teamsSortDirection === "asc" ? (
+                          <ChevronUpIcon className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+                        ))}
+                    </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Обновлено
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer select-none hover:bg-gray-100"
+                    onClick={() => handleTeamsSortClick("updated_at")}
+                    aria-sort={
+                      teamsSortColumn === "updated_at"
+                        ? teamsSortDirection === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Дата заявки
+                      {teamsSortColumn === "updated_at" &&
+                        (teamsSortDirection === "asc" ? (
+                          <ChevronUpIcon className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+                        ))}
+                    </span>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Статус
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer select-none hover:bg-gray-100"
+                    onClick={() => handleTeamsSortClick("status")}
+                    aria-sort={
+                      teamsSortColumn === "status"
+                        ? teamsSortDirection === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      Статус
+                      {teamsSortColumn === "status" &&
+                        (teamsSortDirection === "asc" ? (
+                          <ChevronUpIcon className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDownIcon className="h-4 w-4 text-gray-500" />
+                        ))}
+                    </span>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Действие
@@ -634,7 +742,7 @@ const AdminTournamentRegistration: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {teams.map((team, index) => (
+                {sortedTeams.map((team, index) => (
                   <tr key={team.team_id}>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {index + 1}
