@@ -2,7 +2,6 @@ import {
   ArrowPathIcon,
   ArrowUpTrayIcon,
   BellAlertIcon,
-  CalendarIcon,
   PencilIcon,
   PlusIcon,
   ShieldCheckIcon,
