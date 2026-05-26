@@ -387,10 +387,10 @@ const AdminTournaments: React.FC = () => {
                     Статус
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Режим загрузки
+                    Количество команд
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Количество команд
+                    Режим загрузки
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Учёт в рейтинге
@@ -434,8 +434,7 @@ const AdminTournaments: React.FC = () => {
                     }
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <TrophyIcon className="h-6 w-6 text-gray-400 mr-3" />
+                      <div className="flex items-center">                    
                         <div className="flex items-center">
                           {opensSnapshotView ? (
                             <span className="text-sm font-medium text-gray-900">
@@ -460,8 +459,7 @@ const AdminTournaments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 text-gray-400 mr-2" />
+                      <div className="flex items-center">                      
                         {formatDate(tournament.date)}
                       </div>
                     </td>
@@ -506,6 +504,11 @@ const AdminTournaments: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center justify-center">
+                        {tournament.teams_count ?? 0}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center justify-center">
                         {tournament.status === TournamentStatus.FINISHED ? (
                           <span
                             className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -519,11 +522,6 @@ const AdminTournaments: React.FC = () => {
                         ) : (
                           <span className="text-gray-400">–</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center justify-center">
-                        {tournament.teams_count ?? 0}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

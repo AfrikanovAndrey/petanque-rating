@@ -21,7 +21,7 @@ export function formatDate(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleDateString("ru-RU", {
       year: "numeric",
-      month: "long",
+      month: "numeric",
       day: "numeric",
     });
   } catch {
@@ -99,7 +99,7 @@ export function formatDateTime(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleString("ru-RU", {
       year: "numeric",
-      month: "short",
+      month: "numeric",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
