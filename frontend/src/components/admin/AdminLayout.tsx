@@ -172,7 +172,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Mobile sidebar backdrop */}
       {isSidebarOpen && (
         <div

@@ -7,23 +7,26 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Navigation */}
       <PublicNavigation />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 pb-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-[100px] pb-8">
         {children}
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-8 sm:mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <div className="text-center text-gray-500">
-            <p className="text-xs sm:text-sm">
+      <footer className="bg-[#6789DC] mt-8 sm:mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-[100px] py-6 sm:py-8">
+          <div className="text-center">
+            <p className="text-sm sm:text-base font-semibold text-white">
+              Российская федерация петанка
+            </p>
+            <p className="text-xs sm:text-sm text-white/80 mt-3">
               © {new Date().getFullYear()} Система рейтинга игроков в петанк.
             </p>
-            <p className="text-xs mt-2">
+            <p className="text-xs text-white/70 mt-2">
               Разработано для автоматического подсчета рейтинга игроков.
             </p>
           </div>

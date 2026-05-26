@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import {
   TrophyIcon,
@@ -14,7 +15,6 @@ import { cn } from "../utils";
 const PublicNavigation: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
-
   const navigationItems = [
     {
       name: "Рейтинг игроков",
@@ -50,34 +50,53 @@ const PublicNavigation: React.FC = () => {
 
   const closeSidebar = () => setIsSidebarOpen(false);
 
-  return (
-    <>
-      {/* Mobile sidebar backdrop */}
+  const brandBlock = (
+    <Link
+      to="/"
+      className="flex items-center gap-3 sm:gap-4 min-w-0"
+      onClick={closeSidebar}
+    >
+      <img
+        src="/rfp_logo.png"
+        alt="Логотип Российской федерации петанка"
+        className="h-16 w-16 sm:h-20 sm:w-20 lg:h-20 lg:w-20 shrink-0 object-contain"
+      />
+      <h1 className="text-lg sm:text-xl lg:text-xl xl:text-2xl font-bold text-white leading-tight text-center">
+        <span className="block">Российская федерация</span>
+        <span className="block">петанка</span>
+      </h1>
+    </Link>
+  );
+
+  const mobileMenu = (
+    <div className="lg:hidden">
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-gray-600 bg-opacity-50 lg:hidden"
+          className="fixed inset-0 z-[100] bg-gray-600/50"
           onClick={closeSidebar}
+          aria-hidden="true"
         />
       )}
 
-      {/* Mobile sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-80 max-w-[85vw] bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:hidden",
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 left-0 z-[110] w-80 max-w-[85vw] bg-white shadow-xl transition-transform duration-300 ease-in-out",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
         )}
+        aria-hidden={!isSidebarOpen}
       >
-        <div className="flex items-center justify-end min-h-[4.5rem] py-3 px-5 border-b border-gray-200 gap-2">
+        <div className="flex items-center justify-end min-h-[4.5rem] py-3 px-5 border-b border-gray-200">
           <button
             type="button"
             className="p-1 rounded-md text-gray-400 hover:text-gray-600 shrink-0"
             onClick={closeSidebar}
+            aria-label="Закрыть меню"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        <nav className="mt-4 px-3">
+        <nav className="mt-4 px-3 font-yanone">
           <div className="space-y-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
@@ -88,10 +107,11 @@ const PublicNavigation: React.FC = () => {
                   className={cn(
                     "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200",
                     item.current
-                      ? "bg-primary-100 text-primary-700 border border-primary-200"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      ? "bg-primary-100 text-black border border-primary-200"
+                      : "text-black hover:bg-gray-50"
                   )}
                   onClick={closeSidebar}
+                  tabIndex={isSidebarOpen ? undefined : -1}
                 >
                   <Icon className="mr-3 h-5 w-5 shrink-0" />
                   {item.name}
@@ -101,56 +121,36 @@ const PublicNavigation: React.FC = () => {
           </div>
         </nav>
       </div>
+    </div>
+  );
 
-      <nav className="bg-white shadow mb-4 sm:mb-8">
-        {/* Mobile top bar */}
-        <div className="sticky top-0 z-10 border-b border-gray-200 lg:hidden">
-          <div className="flex items-center justify-between min-h-[4.5rem] py-2 px-4 sm:px-6">
-            <button
-              type="button"
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 shrink-0"
-              onClick={() => setIsSidebarOpen(true)}
-            >
-              <Bars3Icon className="h-6 w-6" />
-            </button>
+  return (
+    <>
+      {createPortal(mobileMenu, document.body)}
 
-            <Link
-              to="/"
-              className="flex items-center gap-3 min-w-0 mx-2"
-              onClick={closeSidebar}
-            >
-              <img
-                src="/logo.png"
-                alt="Логотип Российской федерации петанка"
-                className="h-20 w-20 shrink-0"
-              />
-              <h1 className="text-sm sm:text-base font-semibold text-primary-600 leading-tight text-center">
-                Российская федерация
-                <br />
-                петанка
-              </h1>
-            </Link>
-
-            <div className="w-10 shrink-0" aria-hidden="true" />
-          </div>
-        </div>
-
-        {/* Desktop header */}
-        <div className="hidden lg:block max-w-7xl mx-auto px-4 lg:px-8">
-          <div className="flex items-center gap-4 py-4 min-w-0">
-            <div className="flex items-center gap-3 min-w-0 max-w-[45%]">
-              <img
-                src="/logo.png"
-                alt="Логотип Российской федерации петанка"
-                className="h-24 w-24 xl:h-28 xl:w-28 shrink-0"
-              />
-              <h1 className="text-sm xl:text-base font-bold text-primary-600 truncate min-w-0">
-                Российская федерация петанка
-              </h1>
+      <header className="sticky top-0 z-40 mb-4 sm:mb-6 w-full font-yanone shadow-md">
+          {/* Mobile */}
+          <div className="w-full bg-[#6789DC] lg:hidden">
+            <div className="flex items-center justify-between gap-2 px-4 sm:px-8 py-3">
+              <button
+                type="button"
+                className="p-2 rounded-md text-white hover:bg-white/10 shrink-0"
+                onClick={() => setIsSidebarOpen(true)}
+                aria-label="Открыть меню"
+              >
+                <Bars3Icon className="h-6 w-6" />
+              </button>
+              <div className="flex-1 flex justify-center min-w-0">{brandBlock}</div>
+              <div className="w-10 shrink-0" aria-hidden="true" />
             </div>
+          </div>
 
-            <div
-              className="ml-auto flex flex-1 min-w-0 items-center flex-nowrap justify-end gap-1 xl:gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          {/* Desktop */}
+          <div className="hidden lg:flex w-full bg-[#6789DC] items-center justify-between gap-6 px-4 sm:px-8 lg:px-[150px] py-4">
+            {brandBlock}
+
+            <nav
+              className="flex items-center flex-wrap justify-end gap-x-3 xl:gap-x-5 gap-y-2 shrink-0"
               aria-label="Основная навигация"
             >
               {navigationItems.map((item) => {
@@ -161,21 +161,20 @@ const PublicNavigation: React.FC = () => {
                     to={item.href}
                     title={item.name}
                     className={cn(
-                      "inline-flex items-center shrink-0 px-2 py-1.5 border-b-2 text-xs xl:text-sm font-medium transition-colors duration-200 whitespace-nowrap",
+                      "inline-flex items-center gap-1.5 px-2 py-1.5 border-b-2 text-sm xl:text-base font-medium text-black whitespace-nowrap transition-colors duration-200",
                       item.current
-                        ? "border-primary-500 text-gray-900"
-                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                        ? "border-white"
+                        : "border-transparent hover:border-white/60"
                     )}
                   >
-                    <Icon className="h-5 w-5 mr-1 shrink-0" />
+                    <Icon className="h-5 w-5 shrink-0" />
                     {item.name}
                   </Link>
                 );
               })}
-            </div>
+            </nav>
           </div>
-        </div>
-      </nav>
+      </header>
     </>
   );
 };

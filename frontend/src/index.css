@@ -11,6 +11,21 @@
   
   body {
     @apply bg-gray-50 text-gray-900;
+    position: relative;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: url("/background.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.2;
+    pointer-events: none;
   }
 }
 
