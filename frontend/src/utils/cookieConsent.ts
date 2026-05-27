@@ -2,39 +2,13 @@ import {
   COOKIE_CONSENT_NAME,
   TOURNAMENT_FILTERS_COOKIE_NAME,
 } from "./cookieNames";
+import { clearCookie, getCookie, setCookie } from "./cookieStorage";
 
 const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 365;
 
 export type CookieConsentStatus = "accepted" | "rejected";
 
 export const COOKIE_CONSENT_RESET_EVENT = "petanque-cookie-consent-reset";
-
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`));
-  if (!match) {
-    return null;
-  }
-  return decodeURIComponent(match.slice(name.length + 1));
-}
-
-function setCookie(name: string, value: string, maxAgeSec: number): void {
-  if (typeof document === "undefined") {
-    return;
-  }
-  document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSec}; SameSite=Lax`;
-}
-
-function clearCookie(name: string): void {
-  if (typeof document === "undefined") {
-    return;
-  }
-  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
-}
 
 function parseConsentValue(raw: string | null): CookieConsentStatus | null {
   if (raw === "accepted" || raw === "rejected") {
@@ -44,6 +18,12 @@ function parseConsentValue(raw: string | null): CookieConsentStatus | null {
     return "accepted";
   }
   return null;
+}
+
+function notifyCookieConsentChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_RESET_EVENT));
+  }
 }
 
 export function getCookieConsentStatus(): CookieConsentStatus | null {
@@ -58,10 +38,6 @@ export function canUsePreferenceCookies(): boolean {
   return getCookieConsentStatus() === "accepted";
 }
 
-export function hasCookieConsentAcknowledged(): boolean {
-  return hasCookieConsentDecision();
-}
-
 export function acceptCookieConsent(): void {
   setCookie(COOKIE_CONSENT_NAME, "accepted", COOKIE_MAX_AGE_SEC);
 }
@@ -69,6 +45,7 @@ export function acceptCookieConsent(): void {
 export function rejectCookieConsent(): void {
   setCookie(COOKIE_CONSENT_NAME, "rejected", COOKIE_MAX_AGE_SEC);
   clearCookie(TOURNAMENT_FILTERS_COOKIE_NAME);
+  notifyCookieConsentChanged();
 }
 
 export function revokeCookieConsent(): void {
@@ -78,11 +55,5 @@ export function revokeCookieConsent(): void {
 
 export function resetCookieConsentChoice(): void {
   revokeCookieConsent();
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_RESET_EVENT));
-  }
-}
-
-export function acknowledgeCookieConsent(): void {
-  acceptCookieConsent();
+  notifyCookieConsentChanged();
 }

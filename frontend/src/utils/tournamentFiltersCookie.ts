@@ -9,6 +9,7 @@ import {
   ADMIN_TOURNAMENT_FILTERS_COOKIE_NAME,
   TOURNAMENT_FILTERS_COOKIE_NAME,
 } from "./cookieNames";
+import { clearCookie, getCookie, setCookie } from "./cookieStorage";
 
 const PUBLIC_FILTERS_COOKIE_NAME = TOURNAMENT_FILTERS_COOKIE_NAME;
 const ADMIN_FILTERS_COOKIE_NAME = ADMIN_TOURNAMENT_FILTERS_COOKIE_NAME;
@@ -92,32 +93,10 @@ function parseFiltersJson(
   }
 }
 
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`));
-  if (!match) {
-    return null;
-  }
-  return decodeURIComponent(match.slice(name.length + 1));
-}
-
 function setFiltersCookie(name: string, filters: TournamentListFilters): void {
-  if (typeof document === "undefined") {
-    return;
-  }
-  const value = encodeURIComponent(JSON.stringify(filters));
-  document.cookie = `${name}=${value}; path=/; max-age=${COOKIE_MAX_AGE_SEC}; SameSite=Lax`;
-}
-
-function clearFiltersCookie(name: string): void {
-  if (typeof document === "undefined") {
-    return;
-  }
-  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+  setCookie(name, JSON.stringify(filters), COOKIE_MAX_AGE_SEC, {
+    encode: true,
+  });
 }
 
 function loadFiltersFromCookie(
@@ -173,7 +152,7 @@ export function saveTournamentFiltersToCookie(
 }
 
 export function clearTournamentFiltersCookie(): void {
-  clearFiltersCookie(PUBLIC_FILTERS_COOKIE_NAME);
+  clearCookie(PUBLIC_FILTERS_COOKIE_NAME);
 }
 
 export function loadAdminTournamentFiltersFromCookie(): TournamentListFilters {
@@ -200,7 +179,7 @@ export function saveAdminTournamentFiltersToCookie(
 }
 
 export function clearAdminTournamentFiltersCookie(): void {
-  clearFiltersCookie(ADMIN_FILTERS_COOKIE_NAME);
+  clearCookie(ADMIN_FILTERS_COOKIE_NAME);
 }
 
 /** @deprecated используйте loadAdminTournamentFiltersFromCookie */

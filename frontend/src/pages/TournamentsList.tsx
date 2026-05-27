@@ -19,6 +19,7 @@ import {
   applyTournamentListFilters,
   buildYearTabs,
   cn,
+  EMPTY_TOURNAMENT_LIST_FILTERS,
   filterTournamentsByYear,
   formatDate,
   getTornamentCategoryText,
@@ -29,6 +30,10 @@ import {
   saveTournamentFiltersToCookie,
   type TournamentListFilters,
 } from "../utils";
+import {
+  canUsePreferenceCookies,
+  COOKIE_CONSENT_RESET_EVENT,
+} from "../utils/cookieConsent";
 import { getCupPositionText } from "../types";
 
 const TournamentsList: React.FC = () => {
@@ -69,6 +74,25 @@ const TournamentsList: React.FC = () => {
   }, [yearTabs]);
 
   useEffect(() => {
+    const resetFiltersOnConsentChange = () => {
+      setFilters({ ...EMPTY_TOURNAMENT_LIST_FILTERS });
+    };
+    window.addEventListener(
+      COOKIE_CONSENT_RESET_EVENT,
+      resetFiltersOnConsentChange
+    );
+    return () => {
+      window.removeEventListener(
+        COOKIE_CONSENT_RESET_EVENT,
+        resetFiltersOnConsentChange
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canUsePreferenceCookies()) {
+      return;
+    }
     saveTournamentFiltersToCookie(filters);
   }, [filters]);
 

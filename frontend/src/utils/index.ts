@@ -16,9 +16,10 @@ export {
   getTournamentYear,
 } from "./tournamentYearTabs";
 
+import { clearAdminTournamentFiltersCookie } from "./tournamentFiltersCookie";
+
 export {
   applyTournamentListFilters,
-  clearAdminTournamentFiltersCookie,
   EMPTY_TOURNAMENT_LIST_FILTERS,
   hasActiveTournamentFilters,
   loadAdminTournamentFiltersFromCookie,
@@ -193,6 +194,7 @@ export function getUserRolesLabel(roles: UserRole[]): string {
 export function logout(): void {
   localStorage.removeItem("admin_token");
   localStorage.removeItem("current_user");
+  clearAdminTournamentFiltersCookie();
   window.location.href = "/admin/login";
 }
 
