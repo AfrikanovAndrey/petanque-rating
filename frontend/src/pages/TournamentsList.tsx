@@ -5,9 +5,10 @@ import {
   TrophyIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { Link } from "react-router-dom";
+import TournamentListFiltersPanel from "../components/TournamentListFiltersPanel";
 import { tournamentsApi } from "../services/api";
 import {
   TournamentResult,
@@ -15,21 +16,33 @@ import {
   TournamentWithResults,
 } from "../types";
 import {
+  applyTournamentListFilters,
+  buildYearTabs,
+  cn,
+  filterTournamentsByYear,
   formatDate,
   getTornamentCategoryText,
   getTournamentStatusText,
   getTournamentTypeIcons,
   handleApiError,
+  loadTournamentFiltersFromCookie,
+  saveTournamentFiltersToCookie,
+  type TournamentListFilters,
 } from "../utils";
 import { getCupPositionText } from "../types";
 
 const TournamentsList: React.FC = () => {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [expandedTournament, setExpandedTournament] = useState<number | null>(
     null
   );
   const [tournamentDetails, setTournamentDetails] = useState<
     Record<number, TournamentWithResults>
   >({});
+  const [filters, setFilters] = useState<TournamentListFilters>(() =>
+    loadTournamentFiltersFromCookie()
+  );
 
   // Загружаем список турниров
   const {
@@ -40,6 +53,40 @@ const TournamentsList: React.FC = () => {
     const response = await tournamentsApi.getAllTournaments();
     return response.data.data || [];
   });
+
+  const yearTabs = useMemo(
+    () => (tournaments?.length ? buildYearTabs(tournaments, currentYear) : []),
+    [tournaments, currentYear]
+  );
+
+  useEffect(() => {
+    if (yearTabs.length === 0) {
+      return;
+    }
+    setSelectedYear((prev) =>
+      prev !== null && yearTabs.includes(prev) ? prev : yearTabs[0]
+    );
+  }, [yearTabs]);
+
+  useEffect(() => {
+    saveTournamentFiltersToCookie(filters);
+  }, [filters]);
+
+  useEffect(() => {
+    setExpandedTournament(null);
+  }, [selectedYear, filters]);
+
+  const yearTournaments = useMemo(() => {
+    if (!tournaments || selectedYear === null) {
+      return [];
+    }
+    return filterTournamentsByYear(tournaments, selectedYear);
+  }, [tournaments, selectedYear]);
+
+  const displayedTournaments = useMemo(
+    () => applyTournamentListFilters(yearTournaments, filters),
+    [yearTournaments, filters]
+  );
 
   // Загружаем детали конкретного турнира
   const loadTournamentDetails = async (
@@ -110,42 +157,47 @@ const TournamentsList: React.FC = () => {
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
           Турниры
         </h1>
-        <p className="text-sm sm:text-base text-gray-600">
-          История турниров с детальными результатами
-        </p>
       </div>
 
-      {/* Статистика */}
-      <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="text-center">
-            <TrophyIcon className="h-6 w-6 sm:h-8 sm:w-8 text-primary-600 mx-auto mb-2" />
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">
-              {tournaments?.length || 0}
-            </p>
-            <p className="text-xs sm:text-sm text-gray-500">Всего турниров</p>
-          </div>
-          <div className="text-center">
-            <CalendarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 mx-auto mb-2" />
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">
-              {tournaments?.filter(
-                (t) =>
-                  new Date(t.date).getFullYear() === new Date().getFullYear()
-              ).length || 0}
-            </p>
-            <p className="text-xs sm:text-sm text-gray-500">В этом году</p>
-          </div>
+      {/* Вкладки по годам */}
+      {yearTabs.length > 0 && selectedYear !== null && (
+        <div
+          className="flex flex-wrap justify-center gap-2"
+          role="tablist"
+          aria-label="Турниры по годам"
+        >
+          {yearTabs.map((year) => (
+            <button
+              key={year}
+              type="button"
+              role="tab"
+              aria-selected={selectedYear === year}
+              onClick={() => setSelectedYear(year)}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                selectedYear === year
+                  ? "bg-primary-600 text-white shadow"
+                  : "bg-white text-gray-700 shadow hover:bg-gray-50"
+              )}
+            >
+              {year}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
+
+      {tournaments && tournaments.length > 0 && (
+        <div className="flex justify-center">
+          <TournamentListFiltersPanel filters={filters} onChange={setFilters} />
+        </div>
+      )}
 
       {/* Список турниров */}
       {tournaments && tournaments.length > 0 ? (
+        yearTournaments.length > 0 ? (
+        displayedTournaments.length > 0 ? (
         <div className="space-y-4">
-          {tournaments
-            .sort(
-              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-            )
-            .map((tournament) => {
+          {displayedTournaments.map((tournament) => {
               const isExpanded = expandedTournament === tournament.id;
               const details = tournamentDetails[tournament.id];
               const isRegistration =
@@ -388,6 +440,37 @@ const TournamentsList: React.FC = () => {
               );
             })}
         </div>
+        ) : (
+          <div className="text-center py-12">
+            <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Нет турниров
+            </h3>
+            <p className="text-gray-500 mb-4">
+              Нет турниров по выбранным фильтрам
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                setFilters({ statuses: [], types: [], categories: [] })
+              }
+              className="text-sm font-medium text-primary-600 hover:text-primary-800"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        )
+        ) : (
+          <div className="text-center py-12">
+            <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Нет турниров
+            </h3>
+            <p className="text-gray-500">
+              За {selectedYear} год турниры пока не проводились
+            </p>
+          </div>
+        )
       ) : (
         <div className="text-center py-12">
           <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />

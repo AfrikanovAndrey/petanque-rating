@@ -15,6 +15,7 @@ import TournamentRegistrationPublic from "./pages/TournamentRegistrationPublic";
 import TournamentInProgressPublic from "./pages/TournamentInProgressPublic";
 import RatingRules from "./pages/RatingRules";
 import Licenses from "./pages/Licenses";
+import PersonalDataPolicy from "./pages/PersonalDataPolicy";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTournaments from "./pages/admin/AdminTournaments";
@@ -32,6 +33,7 @@ import HelpUserRoles from "./pages/admin/help/HelpUserRoles";
 
 // Components
 import Layout from "./components/Layout";
+import CookieConsentBanner from "./components/CookieConsentBanner";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminRoleRoute from "./components/admin/AdminRoleRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -121,6 +123,15 @@ function App() {
               element={
                 <Layout>
                   <Licenses />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/personal-data-policy"
+              element={
+                <Layout>
+                  <PersonalDataPolicy />
                 </Layout>
               }
             />
@@ -321,6 +332,8 @@ function App() {
             />
           </Routes>
         </div>
+
+        <CookieConsentBanner />
 
         {/* Toast notifications */}
         <Toaster

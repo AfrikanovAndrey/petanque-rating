@@ -10,6 +10,25 @@ import { twMerge } from "tailwind-merge";
 // Реэкспорт функции для получения иконок типа турнира
 export { getTournamentTypeIcons } from "./tournamentIcons";
 
+export {
+  buildYearTabs,
+  filterTournamentsByYear,
+  getTournamentYear,
+} from "./tournamentYearTabs";
+
+export {
+  applyTournamentListFilters,
+  clearAdminTournamentFiltersCookie,
+  EMPTY_TOURNAMENT_LIST_FILTERS,
+  hasActiveTournamentFilters,
+  loadAdminTournamentFiltersFromCookie,
+  loadTournamentFiltersFromCookie,
+  saveAdminTournamentFiltersToCookie,
+  saveTournamentFiltersToCookie,
+  TOURNAMENT_FILTER_ADMIN_STATUS_OPTIONS,
+  type TournamentListFilters,
+} from "./tournamentFiltersCookie";
+
 // Утилита для объединения классов Tailwind
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

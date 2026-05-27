@@ -184,7 +184,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       <div className="lg:flex">
         {/* Sidebar */}
         <div
-          className={`fixed inset-y-0 left-0 z-30 w-80 max-w-[85vw] bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 lg:max-w-none ${
+          className={`fixed inset-y-0 left-0 z-30 flex w-80 shrink-0 flex-col bg-white shadow-lg transform transition-transform duration-300 ease-in-out max-w-[85vw] lg:static lg:inset-auto lg:h-screen lg:w-60 lg:min-w-60 lg:max-w-60 lg:translate-x-0 lg:overflow-y-auto ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -232,15 +232,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   <Link
                     key={item.name}
                     to={item.href}
-                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                    className={`flex items-center min-w-0 px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
                       current
                         ? "bg-primary-100 text-primary-700 border border-primary-200"
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                     }`}
                     onClick={() => setIsSidebarOpen(false)}
                   >
-                    <Icon className="mr-3 h-5 w-5" />
-                    {item.name}
+                    <Icon className="mr-3 h-5 w-5 shrink-0" />
+                    <span className="truncate">{item.name}</span>
                   </Link>
                 );
               })}
@@ -266,7 +266,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </div>
 
         {/* Main content */}
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           {/* Top bar - показываем только на мобильных */}
           <div className="sticky top-0 z-10 bg-white shadow-sm border-b border-gray-200 lg:hidden">
             <div className="flex items-center justify-between h-16 px-4 sm:px-6">

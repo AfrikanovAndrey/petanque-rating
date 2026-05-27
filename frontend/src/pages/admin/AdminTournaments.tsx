@@ -8,7 +8,7 @@ import {
   TrashIcon,
   TrophyIcon,
 } from "@heroicons/react/24/outline";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -22,6 +22,10 @@ import {
   UserRole,
 } from "../../types";
 import {
+  applyTournamentListFilters,
+  buildYearTabs,
+  cn,
+  filterTournamentsByYear,
   formatDate,
   formatDateForInput,
   formatDateTime,
@@ -30,8 +34,14 @@ import {
   getTournamentTypeIcons,
   hasAnyUserRole,
   handleApiError,
+  hasActiveTournamentFilters,
+  loadAdminTournamentFiltersFromCookie,
+  saveAdminTournamentFiltersToCookie,
+  TOURNAMENT_FILTER_ADMIN_STATUS_OPTIONS,
+  type TournamentListFilters,
 } from "../../utils";
 import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
+import TournamentListFiltersPanel from "../../components/TournamentListFiltersPanel";
 
 interface TournamentEditForm {
   name: string;
@@ -51,6 +61,11 @@ interface TournamentCreateBlankForm {
 
 const AdminTournaments: React.FC = () => {
   const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [filters, setFilters] = useState<TournamentListFilters>(() =>
+    loadAdminTournamentFiltersFromCookie()
+  );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [replaceResultsModalOpen, setReplaceResultsModalOpen] = useState(false);
@@ -118,6 +133,43 @@ const AdminTournaments: React.FC = () => {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   });
+
+  const yearTabs = useMemo(
+    () =>
+      tournaments?.length
+        ? buildYearTabs(tournaments, currentYear, {
+            includeNextYearWhenHasTournaments: true,
+          })
+        : [],
+    [tournaments, currentYear]
+  );
+
+  useEffect(() => {
+    if (yearTabs.length === 0) {
+      return;
+    }
+    setSelectedYear((prev) =>
+      prev !== null && yearTabs.includes(prev) ? prev : yearTabs[0]
+    );
+  }, [yearTabs]);
+
+  useEffect(() => {
+    saveAdminTournamentFiltersToCookie(filters);
+  }, [filters]);
+
+  const yearTournaments = useMemo(() => {
+    if (!tournaments || selectedYear === null) {
+      return [];
+    }
+    return filterTournamentsByYear(tournaments, selectedYear);
+  }, [tournaments, selectedYear]);
+
+  const displayedTournaments = useMemo(
+    () => applyTournamentListFilters(yearTournaments, filters),
+    [yearTournaments, filters]
+  );
+
+  const filtersActive = hasActiveTournamentFilters(filters);
 
   const validateMutation = useMutation(
     async (tournamentId: number) => {
@@ -366,9 +418,50 @@ const AdminTournaments: React.FC = () => {
         </div>
       </div>
 
+      {/* Вкладки по годам */}
+      {yearTabs.length > 0 && selectedYear !== null && (
+        <div
+          className="flex flex-wrap gap-2"
+          role="tablist"
+          aria-label="Турниры по годам"
+        >
+          {yearTabs.map((year) => (
+            <button
+              key={year}
+              type="button"
+              role="tab"
+              aria-selected={selectedYear === year}
+              onClick={() => setSelectedYear(year)}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                selectedYear === year
+                  ? "bg-primary-600 text-white shadow"
+                  : "bg-white text-gray-700 shadow hover:bg-gray-50"
+              )}
+            >
+              {year}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tournaments && tournaments.length > 0 && (
+        <div className="w-full">
+          <TournamentListFiltersPanel
+            filters={filters}
+            onChange={setFilters}
+            statusOptions={TOURNAMENT_FILTER_ADMIN_STATUS_OPTIONS}
+            panelId="admin-tournament-filters-panel"
+            adaptOptionsToViewport
+          />
+        </div>
+      )}
+
       {/* Список турниров */}
       <div className="card overflow-hidden">
         {tournaments && tournaments.length > 0 ? (
+          yearTournaments.length > 0 ? (
+          displayedTournaments.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -403,7 +496,7 @@ const AdminTournaments: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {tournaments.map((tournament: Tournament) => {
+                {displayedTournaments.map((tournament: Tournament) => {
                   const isRegistration =
                     tournament.status === TournamentStatus.REGISTRATION;
                   const isInProgress =
@@ -658,6 +751,41 @@ const AdminTournaments: React.FC = () => {
               </tbody>
             </table>
           </div>
+          ) : (
+            <div className="text-center py-12">
+              <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Нет турниров
+              </h3>
+              <p className="text-gray-500 mb-4">
+                {filtersActive
+                  ? "Нет турниров по выбранным фильтрам"
+                  : `За ${selectedYear} год турниры пока не созданы`}
+              </p>
+              {filtersActive && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilters({ statuses: [], types: [], categories: [] })
+                  }
+                  className="text-sm font-medium text-primary-600 hover:text-primary-800"
+                >
+                  Сбросить фильтры
+                </button>
+              )}
+            </div>
+          )
+          ) : (
+            <div className="text-center py-12">
+              <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Нет турниров
+              </h3>
+              <p className="text-gray-500">
+                За {selectedYear} год турниры пока не созданы
+              </p>
+            </div>
+          )
         ) : (
           <div className="text-center py-12">
             <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
