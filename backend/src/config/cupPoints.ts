@@ -175,9 +175,9 @@ export const CUP_POINTS: Map<CupPointsKey, Map<CupPosition, number>> = new Map([
  *    (в том случае, когда она проводится) дополнительно получает 1 очко
  *    относительно очков участника полуфинала
  *
- * 3) В случае проведения утешительного турнира (Кубка С), финалисты этого турнира
- *    дополнительно к очкам, заработанным на квалификационном этапе, получают
- *    по 2 очка, полуфиналисты - по 1 очку
+ * 3) В случае проведения утешительного турнира (Кубка С) при количестве участников
+ *    более 85, финалисты этого турнира дополнительно к очкам, заработанным на
+ *    квалификационном этапе, получают по 2 очка, полуфиналисты - по 1 очку
  *
  * 4) Участники кубков A и B получают очки в соответствии с таблицами
  *    (иногда очков за место в кубке может не быть)
@@ -212,9 +212,13 @@ export function getPoints(
     // Игрок вышел в плей-офф, проверяем наличие позиции
     throw new Error(`Рассчет очков: Не задана позиция в кубке ${cup}`);
   } else if (cup === "C") {
-    // ПРАВИЛО 3: Кубок С (утешительный турнир)
+    // ПРАВИЛО 3: Кубок С (утешительный турнир) при количестве участников более 85
     // Игроки получают квалификационные очки + бонус за позицию
-    points = calculateCupCPoints(qualifyingPoints, position);
+    const playersCount = getPlayersCount(totalTeams, tournamentType);
+    points =
+      playersCount >= 85
+        ? calculateCupCPoints(qualifyingPoints, position)
+        : qualifyingPoints;
   } else {
     // ПРАВИЛА 2 и 4: Кубки А и Б
     // Игроки получают очки по таблице, но если их нет - квалификационные очки
@@ -260,7 +264,7 @@ function calculateQualifyingPoints(
 
 /**
  * Расчет очков для Кубка С (утешительный турнир)
- * ПРАВИЛО 3: квалификационные очки + бонус за позицию
+ * ПРАВИЛО 3: при более 85 участников — квалификационные очки + бонус за позицию
  */
 function calculateCupCPoints(
   qualifyingPoints: number,
@@ -332,6 +336,23 @@ function calculateCupABPoints(
   return points;
 }
 
+function getPlayersCount(
+  totalTeams: number,
+  tournamentType: TournamentType,
+): number {
+  if (
+    tournamentType === TournamentType.DOUBLETTE_MALE ||
+    tournamentType === TournamentType.DOUBLETTE_FEMALE ||
+    tournamentType === TournamentType.DOUBLETTE_MIXT
+  ) {
+    return totalTeams * 2;
+  }
+  if (tournamentType === TournamentType.TRIPLETTE) {
+    return totalTeams * 3;
+  }
+  return totalTeams;
+}
+
 /**
  * Определяет диапазон количества игроков для выбора таблицы очков
  */
@@ -339,17 +360,7 @@ function getPlayersRange(
   totalTeams: number,
   tournamentType: TournamentType,
 ): PlayersRange {
-  let playersCount = totalTeams;
-
-  if (
-    tournamentType === TournamentType.DOUBLETTE_MALE ||
-    tournamentType === TournamentType.DOUBLETTE_FEMALE ||
-    tournamentType === TournamentType.DOUBLETTE_MIXT
-  ) {
-    playersCount = totalTeams * 2;
-  } else if (tournamentType === TournamentType.TRIPLETTE) {
-    playersCount = totalTeams * 3;
-  }
+  const playersCount = getPlayersCount(totalTeams, tournamentType);
 
   if (playersCount <= 60) {
     return "24-60";
