@@ -74,9 +74,31 @@ export class TournamentModel {
     return rows[0] || null;
   }
 
+  /**
+   * Число команд турнира для расчёта очков.
+   * Для DRAFT / REGISTRATION / IN_PROGRESS — подтверждённые заявки;
+   * для FINISHED — записи в tournament_results.
+   */
   static async getTournamentTeamsCount(tournamentId: number): Promise<number> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT COUNT(DISTINCT team_id) as teams_count FROM tournament_results WHERE tournament_id = ?",
+      `SELECT
+        CASE
+          WHEN t.status IN ('DRAFT', 'REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
+          ELSE COALESCE(res.cnt, 0)
+        END AS teams_count
+      FROM tournaments t
+      LEFT JOIN (
+        SELECT tournament_id, COUNT(DISTINCT team_id) AS cnt
+        FROM tournament_registrations
+        WHERE is_confirmed = 1
+        GROUP BY tournament_id
+      ) reg ON reg.tournament_id = t.id
+      LEFT JOIN (
+        SELECT tournament_id, COUNT(DISTINCT team_id) AS cnt
+        FROM tournament_results
+        GROUP BY tournament_id
+      ) res ON res.tournament_id = t.id
+      WHERE t.id = ?`,
       [tournamentId],
     );
     return (rows[0]?.teams_count as number) || 0;
