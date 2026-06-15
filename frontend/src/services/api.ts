@@ -5,8 +5,12 @@ import {
   LoginCredentials,
   AuthResponse,
   Tournament,
+  TournamentGroupDrawGroup,
+  TournamentPlayFormat,
+  TournamentRegisteredTeam,
   TournamentRegistrationPageData,
   TournamentWithResults,
+  TiebreakerCriterion,
   Player,
   PlayerSearchResult,
   RegisterTournamentSlotPayload,
@@ -376,6 +380,33 @@ export const adminApi = {
     }
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/tournaments/${tournamentId}`, data),
+
+  updateTournamentPlaySettings: (
+    tournamentId: number,
+    data: {
+      play_format: TournamentPlayFormat;
+      group_size?: number | null;
+      swiss_rounds?: number | null;
+      tiebreaker_order?: TiebreakerCriterion[] | null;
+    }
+  ): Promise<AxiosResponse<ApiResponse<Tournament>>> =>
+    api.put(`/admin/tournaments/${tournamentId}/play-settings`, data),
+
+  performTournamentGroupDraw: (
+    tournamentId: number
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        group_draw: TournamentGroupDrawGroup[];
+        teams: TournamentRegisteredTeam[];
+      }>
+    >
+  > => api.post(`/admin/tournaments/${tournamentId}/group-draw`),
+
+  startTournament: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.post(`/admin/tournaments/${tournamentId}/start`),
 
   // Удалить турнир
   deleteTournament: (

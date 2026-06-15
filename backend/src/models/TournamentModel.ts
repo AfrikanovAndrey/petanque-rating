@@ -3,16 +3,31 @@ import { getPoints } from "../config/cupPoints";
 import { pool } from "../config/database";
 
 import {
+  parseGroupDraw,
+  parseTiebreakerOrder,
+} from "../services/tournamentPlaySettings";
+import {
   Cup,
   CupPosition,
   Tournament,
   TournamentCategoryEnum,
+  TournamentGroupDrawGroup,
+  TournamentPlayFormat,
+  TiebreakerCriterion,
   TournamentResult,
   TournamentStatus,
   TournamentType,
 } from "../types";
 
 export class TournamentModel {
+  private static mapTournamentRow(row: Tournament & RowDataPacket): Tournament {
+    return {
+      ...row,
+      tiebreaker_order: parseTiebreakerOrder(row.tiebreaker_order),
+      group_draw: parseGroupDraw(row.group_draw),
+    };
+  }
+
   /**
    * Нормализовать дату к формату YYYY-MM-DD для SQL запросов
    */
@@ -63,7 +78,7 @@ export class TournamentModel {
       ) pend ON pend.tournament_id = t.id
       ORDER BY t.date DESC`,
     );
-    return rows;
+    return rows.map((row) => this.mapTournamentRow(row));
   }
 
   static async getTournamentById(id: number): Promise<Tournament | null> {
@@ -71,7 +86,7 @@ export class TournamentModel {
       "SELECT * FROM tournaments WHERE id = ?",
       [id],
     );
-    return rows[0] || null;
+    return rows[0] ? this.mapTournamentRow(rows[0]) : null;
   }
 
   static async getTournamentTeamsCount(tournamentId: number): Promise<number> {
@@ -169,6 +184,43 @@ export class TournamentModel {
       values,
     );
 
+    return result.affectedRows > 0;
+  }
+
+  static async updateTournamentPlaySettings(
+    id: number,
+    playFormat: TournamentPlayFormat,
+    groupSize: number | null,
+    swissRounds: number | null,
+    tiebreakerOrder: TiebreakerCriterion[] | null,
+  ): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE tournaments
+       SET play_format = ?,
+           group_size = ?,
+           swiss_rounds = ?,
+           tiebreaker_order = ?,
+           group_draw = NULL
+       WHERE id = ?`,
+      [
+        playFormat,
+        groupSize,
+        swissRounds,
+        tiebreakerOrder ? JSON.stringify(tiebreakerOrder) : null,
+        id,
+      ],
+    );
+    return result.affectedRows > 0;
+  }
+
+  static async saveTournamentGroupDraw(
+    id: number,
+    groupDraw: TournamentGroupDrawGroup[],
+  ): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE tournaments SET group_draw = ? WHERE id = ?`,
+      [JSON.stringify(groupDraw), id],
+    );
     return result.affectedRows > 0;
   }
 

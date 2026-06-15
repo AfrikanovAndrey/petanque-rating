@@ -13,6 +13,7 @@ import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import TournamentStartWizardModal from "../../components/admin/TournamentStartWizardModal";
 import { EditRegisteredTeamModal } from "../../components/EditRegisteredTeamModal";
 import { RegisterTeamModal } from "../../components/RegisterTeamModal";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
@@ -55,6 +56,7 @@ const AdminTournamentRegistration: React.FC = () => {
     null
   );
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const [startWizardOpen, setStartWizardOpen] = useState(false);
   const [teamsSortColumn, setTeamsSortColumn] = useState<TeamsSortColumn | null>(
     null
   );
@@ -273,32 +275,6 @@ const AdminTournamentRegistration: React.FC = () => {
     }
   );
 
-  const startTournamentMutation = useMutation(
-    async () =>
-      adminApi.updateTournament(tournamentId, {
-        status: TournamentStatus.IN_PROGRESS,
-      }),
-    {
-      onSuccess: (res) => {
-        if (res.data.success) {
-          toast.success("Турнир переведён в статус «В процессе»");
-          void queryClient.invalidateQueries([
-            "tournamentRegistration",
-            tournamentId,
-          ]);
-          void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
-          void queryClient.invalidateQueries("tournaments");
-          navigate("/admin/tournaments");
-        } else {
-          toast.error(res.data.message || "Не удалось начать турнир");
-        }
-      },
-      onError: (e) => {
-        toast.error(handleApiError(e));
-      },
-    }
-  );
-
   const openRegistrationMutation = useMutation(
     async () =>
       adminApi.updateTournament(tournamentId, {
@@ -442,12 +418,9 @@ const AdminTournamentRegistration: React.FC = () => {
                 <button
                   type="button"
                   className="btn-primary shrink-0"
-                  disabled={startTournamentMutation.isLoading}
-                  onClick={() => startTournamentMutation.mutate()}
+                  onClick={() => setStartWizardOpen(true)}
                 >
-                  {startTournamentMutation.isLoading
-                    ? "Сохранение…"
-                    : "Начать турнир"}
+                  Начать турнир
                 </button>
               )}
           </div>
@@ -861,6 +834,26 @@ const AdminTournamentRegistration: React.FC = () => {
           context="admin"
           invalidateQueryKeys={[["tournamentRegistration", tournamentId]]}
           onClose={() => setRegisterModalOpen(false)}
+        />
+      )}
+
+      {startWizardOpen && (
+        <TournamentStartWizardModal
+          open={startWizardOpen}
+          onClose={() => setStartWizardOpen(false)}
+          tournamentId={tournamentId}
+          tournament={tournament}
+          teams={teams}
+          confirmedTeamsCount={confirmedTeamsCount}
+          onSuccess={() => {
+            void queryClient.invalidateQueries([
+              "tournamentRegistration",
+              tournamentId,
+            ]);
+            void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
+            void queryClient.invalidateQueries("tournaments");
+            navigate(`/admin/tournaments/${tournamentId}/in-progress`);
+          }}
         />
       )}
     </div>

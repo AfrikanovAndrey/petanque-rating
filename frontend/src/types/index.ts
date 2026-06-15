@@ -34,6 +34,24 @@ export enum TournamentStatus {
   IN_PROGRESS = "IN_PROGRESS",
 }
 
+export enum TournamentPlayFormat {
+  GROUPS = "GROUPS",
+  SWISS = "SWISS",
+}
+
+export enum TiebreakerCriterion {
+  BUCHHOLZ = "BUCHHOLZ",
+  DOUBLE_BUCHHOLZ = "DOUBLE_BUCHHOLZ",
+  BERGER = "BERGER",
+  PROGRESS = "PROGRESS",
+  POINT_DIFF = "POINT_DIFF",
+}
+
+export interface TournamentGroupDrawGroup {
+  group_number: number;
+  team_ids: number[];
+}
+
 // Турнир
 export interface Tournament {
   id: number;
@@ -44,6 +62,11 @@ export interface Tournament {
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
   status: TournamentStatus;
   regulations?: string | null;
+  play_format?: TournamentPlayFormat | null;
+  group_size?: number | null;
+  swiss_rounds?: number | null;
+  tiebreaker_order?: TiebreakerCriterion[] | null;
+  group_draw?: TournamentGroupDrawGroup[] | null;
   /** Признание президиумом: учёт результатов в рейтинге */
   results_validated_at?: string | null;
   created_at: string;

@@ -11,7 +11,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
 import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
 import { adminApi, ratingApi } from "../../services/api";
-import { TournamentStatus, TournamentType } from "../../types";
+import {
+  TournamentPlayFormat,
+  TournamentStatus,
+  TournamentType,
+} from "../../types";
 import {
   formatDate,
   formatDateTime,
@@ -20,6 +24,11 @@ import {
   getTournamentTypeText,
   handleApiError,
 } from "../../utils";
+import {
+  getGroupLetter,
+  getPlayFormatLabel,
+  getTiebreakerLabel,
+} from "../../utils/tournamentPlaySettings";
 import CsvUtils from "../../utils/csv";
 
 const AdminTournamentInProgress: React.FC = () => {
@@ -137,6 +146,9 @@ const AdminTournamentInProgress: React.FC = () => {
 
   const { tournament, teams } = data;
   const confirmedTeamsCount = teams.filter((t) => t.is_confirmed).length;
+  const teamNameById = new Map(
+    teams.map((team) => [team.team_id, team.players.join(", ")])
+  );
 
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
@@ -261,7 +273,75 @@ const AdminTournamentInProgress: React.FC = () => {
               {tournament.manual ? "Ручной" : "Автоматический"}
             </dd>
           </div>
+          {tournament.play_format && (
+            <div>
+              <dt className="text-gray-500">Формат квалификации</dt>
+              <dd className="mt-0.5 font-medium text-gray-900">
+                {getPlayFormatLabel(tournament.play_format)}
+              </dd>
+            </div>
+          )}
+          {tournament.play_format === TournamentPlayFormat.GROUPS &&
+            tournament.group_size != null && (
+              <div>
+                <dt className="text-gray-500">Размер группы</dt>
+                <dd className="mt-0.5 font-medium text-gray-900">
+                  {tournament.group_size}
+                </dd>
+              </div>
+            )}
+          {tournament.play_format === TournamentPlayFormat.SWISS &&
+            tournament.swiss_rounds != null && (
+              <div>
+                <dt className="text-gray-500">Количество туров</dt>
+                <dd className="mt-0.5 font-medium text-gray-900">
+                  {tournament.swiss_rounds}
+                </dd>
+              </div>
+            )}
         </dl>
+        {tournament.play_format === TournamentPlayFormat.SWISS &&
+          tournament.tiebreaker_order &&
+          tournament.tiebreaker_order.length > 0 && (
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-700">
+                Порядок дополнительных показателей
+              </p>
+              <ol className="mt-2 list-decimal list-inside text-sm text-gray-700 space-y-1">
+                {tournament.tiebreaker_order.map((criterion) => (
+                  <li key={criterion}>{getTiebreakerLabel(criterion)}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+        {tournament.play_format === TournamentPlayFormat.GROUPS &&
+          tournament.group_draw &&
+          tournament.group_draw.length > 0 && (
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-700 mb-3">
+                Результат жеребьёвки
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {tournament.group_draw.map((group) => (
+                  <div
+                    key={group.group_number}
+                    className="rounded-lg border border-gray-100 bg-gray-50 p-3"
+                  >
+                    <p className="text-sm font-semibold text-gray-900 mb-2">
+                      Группа {getGroupLetter(group.group_number)}
+                    </p>
+                    <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1">
+                      {group.team_ids.map((teamId) => (
+                        <li key={teamId}>
+                          {teamNameById.get(teamId) ?? `Команда #${teamId}`}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         <div className="pt-2 border-t border-gray-100">
           <p className="text-sm font-medium text-gray-700">Описание</p>
           <div className="mt-2 min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-4">
