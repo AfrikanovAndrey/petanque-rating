@@ -20,6 +20,7 @@ import {
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
+import { TournamentSwissModel } from "../models/TournamentSwissModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
 import {
   Cup,
@@ -28,6 +29,7 @@ import {
   TournamentCategoryEnum,
   TournamentStatus,
   TournamentType,
+  TournamentPlayFormat,
 } from "../types";
 import ExcelUtils from "../utils/excelUtils";
 import {
@@ -460,11 +462,42 @@ export class TournamentController {
           { confirmedOnly: true },
         );
 
+      let swiss: {
+        rounds: Awaited<ReturnType<typeof TournamentSwissModel.getRounds>>;
+        matches: Awaited<ReturnType<typeof TournamentSwissModel.getMatches>>;
+        standings: Awaited<
+          ReturnType<typeof TournamentSwissModel.getStandings>
+        >;
+        initialized: boolean;
+      } | null = null;
+
+      if (tournament.play_format === TournamentPlayFormat.SWISS) {
+        const initialized =
+          await TournamentSwissModel.isInitialized(tournamentId);
+        if (initialized) {
+          await TournamentSwissModel.refreshStandings(tournamentId);
+          const [rounds, matches, standings] = await Promise.all([
+            TournamentSwissModel.getRounds(tournamentId),
+            TournamentSwissModel.getMatches(tournamentId),
+            TournamentSwissModel.getStandings(tournamentId),
+          ]);
+          swiss = { rounds, matches, standings, initialized: true };
+        } else {
+          swiss = {
+            rounds: [],
+            matches: [],
+            standings: [],
+            initialized: false,
+          };
+        }
+      }
+
       res.json({
         success: true,
         data: {
           tournament,
           teams,
+          swiss,
         },
       });
     } catch (error) {

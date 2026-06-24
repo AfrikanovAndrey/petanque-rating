@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { RatingController } from "../controllers/RatingController";
 import { TournamentController } from "../controllers/TournamentController";
+import { TournamentSwissController } from "../controllers/TournamentSwissController";
 
 const router = Router();
 
@@ -47,6 +48,11 @@ router.get(
 router.get(
   "/tournaments/:id/in-progress",
   TournamentController.getPublicTournamentInProgress,
+);
+
+router.get(
+  "/tournaments/:id/swiss",
+  TournamentSwissController.getPublicSwissPage,
 );
 
 // POST /api/rating/tournaments/:id/register-team — заявка команды (публичный доступ)

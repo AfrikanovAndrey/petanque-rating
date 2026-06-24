@@ -9,6 +9,7 @@ import { SettingsController } from "../controllers/SettingsController";
 import { TournamentController } from "../controllers/TournamentController";
 import { UserController } from "../controllers/UserController";
 import { AdminAuditController } from "../controllers/AdminAuditController";
+import { TournamentSwissController } from "../controllers/TournamentSwissController";
 import {
   authenticateAdmin,
   requireAdmin,
@@ -167,6 +168,36 @@ router.get(
   "/tournaments/:tournamentId/in-progress",
   requireTournamentStaff,
   AdminController.getTournamentInProgressPage,
+);
+
+router.get(
+  "/tournaments/:tournamentId/swiss",
+  requireTournamentStaff,
+  TournamentSwissController.getSwissPage,
+);
+
+router.put(
+  "/tournaments/:tournamentId/swiss/play-settings",
+  requireTournamentStaff,
+  TournamentSwissController.updatePlaySettings,
+);
+
+router.post(
+  "/tournaments/:tournamentId/swiss/initialize",
+  requireTournamentStaff,
+  TournamentSwissController.initializeSwiss,
+);
+
+router.put(
+  "/tournaments/:tournamentId/swiss/matches/:matchId",
+  requireTournamentStaff,
+  TournamentSwissController.updateMatchResult,
+);
+
+router.post(
+  "/tournaments/:tournamentId/swiss/rounds/:roundNumber/complete",
+  requireTournamentStaff,
+  TournamentSwissController.completeRound,
 );
 
 // POST /api/admin/tournaments/:tournamentId/complete-from-excel — завершить турнир «в процессе» загрузкой Excel

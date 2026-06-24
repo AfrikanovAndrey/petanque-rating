@@ -2,19 +2,21 @@ import {
   ArrowDownTrayIcon,
   ArrowLeftIcon,
   ArrowUturnLeftIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   DocumentArrowUpIcon,
 } from "@heroicons/react/24/outline";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
+import AdminSwissPanel from "../../components/admin/AdminSwissPanel";
 import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
 import { adminApi, ratingApi } from "../../services/api";
 import { TournamentStatus, TournamentType } from "../../types";
 import {
   formatDate,
-  formatDateTime,
   getTornamentCategoryText,
   getTournamentTypeIcons,
   getTournamentTypeText,
@@ -30,6 +32,9 @@ const AdminTournamentInProgress: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [completionModalOpen, setCompletionModalOpen] = useState(false);
+  const [tournamentDetailsExpanded, setTournamentDetailsExpanded] =
+    useState(false);
+  const [teamsListExpanded, setTeamsListExpanded] = useState(false);
 
   const { data, isLoading, error } = useQuery(
     ["tournamentInProgress", tournamentId],
@@ -89,6 +94,32 @@ const AdminTournamentInProgress: React.FC = () => {
     [fullRating]
   );
 
+  const getTeamTotalRating = useCallback(
+    (players: string[], tournamentType?: TournamentType) => {
+      const sortedRatings = players
+        .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
+        .sort((a, b) => b - a);
+      const ratingValues =
+        tournamentType === TournamentType.TRIPLETTE && sortedRatings.length > 3
+          ? sortedRatings.slice(0, 3)
+          : sortedRatings;
+      return ratingValues.reduce((sum, value) => sum + value, 0);
+    },
+    [ratingByPlayerName]
+  );
+
+  const sortedTeams = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    const tournamentType = data.tournament.type as TournamentType;
+    return [...data.teams].sort(
+      (a, b) =>
+        getTeamTotalRating(b.players, tournamentType) -
+        getTeamTotalRating(a.players, tournamentType)
+    );
+  }, [data, getTeamTotalRating]);
+
   if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
     return (
       <div className="space-y-4">
@@ -137,28 +168,19 @@ const AdminTournamentInProgress: React.FC = () => {
 
   const { tournament, teams } = data;
   const confirmedTeamsCount = teams.filter((t) => t.is_confirmed).length;
+  const tournamentType = tournament.type as TournamentType;
 
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
 
-  const getTeamTotalRating = (players: string[]) => {
-    const sortedRatings = players
-      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
-      .sort((a, b) => b - a);
-    const ratingValues =
-      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
-        ? sortedRatings.slice(0, 3)
-        : sortedRatings;
-    return ratingValues.reduce((sum, value) => sum + value, 0);
-  };
-
   const downloadTeamsCsv = () => {
     const lines = [
       "№,состав команды,рейтинг",
-      ...teams.map((team, index) => {
+      ...sortedTeams.map((team, index) => {
         const teamPlayers = team.players.map(formatPlayerWithRating).join(", ");
         return `${index + 1},${CsvUtils.escapeCsvField(teamPlayers)},${getTeamTotalRating(
-          team.players
+          team.players,
+          tournamentType
         )}`;
       }),
     ];
@@ -233,66 +255,102 @@ const AdminTournamentInProgress: React.FC = () => {
         </div>
       </div>
 
-      <div className="card min-w-0 p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Параметры турнира</h2>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <div>
-            <dt className="text-gray-500">Дата проведения</dt>
-            <dd className="mt-0.5 font-medium text-gray-900">
-              {formatDate(tournament.date)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Тип</dt>
-            <dd className="mt-0.5 font-medium text-gray-900 flex items-center flex-wrap gap-1">
-              {getTournamentTypeText(tournament.type as TournamentType)}
-              {getTournamentTypeIcons(tournament.type)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Категория</dt>
-            <dd className="mt-0.5 font-medium text-gray-900">
-              {getTornamentCategoryText(tournament.category)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Режим загрузки результатов</dt>
-            <dd className="mt-0.5 font-medium text-gray-900">
-              {tournament.manual ? "Ручной" : "Автоматический"}
-            </dd>
-          </div>
-        </dl>
-        <div className="pt-2 border-t border-gray-100">
-          <p className="text-sm font-medium text-gray-700">Описание</p>
-          <div className="mt-2 min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-4">
-            {tournament.regulations?.trim() ? (
-              <RegulationsMarkdown
-                source={tournament.regulations}
-                className="text-sm"
-              />
+      <div className="card min-w-0 overflow-hidden">
+        <div className="border-b border-gray-200 px-6 py-4">
+          <button
+            type="button"
+            onClick={() =>
+              setTournamentDetailsExpanded((expanded) => !expanded)
+            }
+            aria-expanded={tournamentDetailsExpanded}
+            className="flex w-full items-start gap-2 text-left"
+          >
+            {tournamentDetailsExpanded ? (
+              <ChevronUpIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
             ) : (
-              <p className="text-sm text-gray-500">Не указан</p>
+              <ChevronDownIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
             )}
-          </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Параметры турнира
+              </h2>
+              {!tournamentDetailsExpanded && (
+                <p className="mt-1 text-sm text-gray-500">
+                  {formatDate(tournament.date)} •{" "}
+                  {getTournamentTypeText(tournament.type as TournamentType)}
+                </p>
+              )}
+            </div>
+          </button>
         </div>
+        {tournamentDetailsExpanded && (
+          <div className="space-y-4 p-6">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div>
+                <dt className="text-gray-500">Дата проведения</dt>
+                <dd className="mt-0.5 font-medium text-gray-900">
+                  {formatDate(tournament.date)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-500">Тип</dt>
+                <dd className="mt-0.5 font-medium text-gray-900 flex items-center flex-wrap gap-1">
+                  {getTournamentTypeText(tournament.type as TournamentType)}
+                  {getTournamentTypeIcons(tournament.type)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-500">Категория</dt>
+                <dd className="mt-0.5 font-medium text-gray-900">
+                  {getTornamentCategoryText(tournament.category)}
+                </dd>
+              </div>
+            </dl>
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-700">Описание</p>
+              <div className="mt-2 min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                {tournament.regulations?.trim() ? (
+                  <RegulationsMarkdown
+                    source={tournament.regulations}
+                    className="text-sm"
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500">Не указан</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card overflow-hidden">
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Список заявок
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Всего: {teams.length} • Подтверждено: {confirmedTeamsCount}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setTeamsListExpanded((expanded) => !expanded)}
+              aria-expanded={teamsListExpanded}
+              className="flex min-w-0 flex-1 items-start gap-2 text-left"
+            >
+              {teamsListExpanded ? (
+                <ChevronUpIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+              ) : (
+                <ChevronDownIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+              )}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Команды
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Всего: {teams.length}
+                </p>
+              </div>
+            </button>
             {teams.length > 0 && (
               <button
                 type="button"
                 onClick={downloadTeamsCsv}
-                className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                className="inline-flex shrink-0 items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
               >
                 <ArrowDownTrayIcon className="h-5 w-5 text-gray-500" />
                 Скачать CSV
@@ -300,72 +358,48 @@ const AdminTournamentInProgress: React.FC = () => {
             )}
           </div>
         </div>
-        {teams.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-500">
-            Нет зарегистрированных команд.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    №
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Состав команды
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Рейтинг команды
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Обновлено
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Статус заявки
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {teams.map((team, index) => (
-                  <tr key={team.team_id}>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {index + 1}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {team.players.map(formatPlayerWithRating).join(", ")}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                      {getTeamTotalRating(team.players)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                      {formatDateTime(team.updated_at)}
-                    </td>
-                    <td className="px-6 py-4 text-sm whitespace-nowrap">
-                      {team.is_confirmed ? (
-                        <span className="inline-flex w-fit rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                          Подтверждена
-                        </span>
-                      ) : (
-                        <div className="flex flex-col gap-1">
-                          <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            Ожидает подтверждения
-                          </span>
-                          {!!team.has_pending_new_players && (
-                            <span className="text-xs text-amber-900">
-                              Есть игрок не из базы
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
+        {teamsListExpanded &&
+          (teams.length === 0 ? (
+            <div className="px-6 py-12 text-center text-gray-500">
+              Нет зарегистрированных команд.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      №
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Состав команды
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Рейтинг команды
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {sortedTeams.map((team, index) => (
+                    <tr key={team.team_id}>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {index + 1}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {team.players.map(formatPlayerWithRating).join(", ")}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {getTeamTotalRating(team.players, tournamentType)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
       </div>
+
+      <AdminSwissPanel tournamentId={tournamentId} />
 
       <TournamentResultsUploadModal
         variant="complete-in-progress"

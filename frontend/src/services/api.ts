@@ -6,6 +6,12 @@ import {
   AuthResponse,
   Tournament,
   TournamentRegistrationPageData,
+  TournamentInProgressPageData,
+  TournamentSwissMatch,
+  TournamentSwissPageData,
+  TournamentSwissStanding,
+  TiebreakerCriterion,
+  TournamentPlayFormat,
   TournamentWithResults,
   Player,
   PlayerSearchResult,
@@ -116,7 +122,7 @@ export const getPublicTournamentRegistration = (
 export const getPublicTournamentInProgress = (
   tournamentId: number
 ): Promise<
-  AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
+  AxiosResponse<ApiResponse<TournamentInProgressPageData>>
 > => api.get(`/rating/tournaments/${tournamentId}/in-progress`);
 
 /** Публичная заявка команды на турнир (статус REGISTRATION) */
@@ -274,6 +280,51 @@ export const adminApi = {
   ): Promise<
     AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
   > => api.get(`/admin/tournaments/${tournamentId}/in-progress`),
+
+  getTournamentSwissPage: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse<TournamentSwissPageData>>> =>
+    api.get(`/admin/tournaments/${tournamentId}/swiss`),
+
+  updateTournamentSwissPlaySettings: (
+    tournamentId: number,
+    data: {
+      play_format: TournamentPlayFormat;
+      swiss_rounds: number;
+      tiebreaker_order: TiebreakerCriterion[];
+    }
+  ): Promise<AxiosResponse<ApiResponse<Tournament>>> =>
+    api.put(`/admin/tournaments/${tournamentId}/swiss/play-settings`, data),
+
+  initializeTournamentSwiss: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.post(`/admin/tournaments/${tournamentId}/swiss/initialize`),
+
+  updateSwissMatchResult: (
+    tournamentId: number,
+    matchId: number,
+    data: { score_a: number; score_b: number }
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        match: TournamentSwissMatch;
+        standings: TournamentSwissStanding[];
+      }>
+    >
+  > =>
+    api.put(
+      `/admin/tournaments/${tournamentId}/swiss/matches/${matchId}`,
+      data
+    ),
+
+  completeSwissRound: (
+    tournamentId: number,
+    roundNumber: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.post(
+      `/admin/tournaments/${tournamentId}/swiss/rounds/${roundNumber}/complete`
+    ),
 
   /** Завершить турнир «в процессе»: записать результаты из Excel в этот же турнир */
   completeInProgressTournamentFromExcel: (

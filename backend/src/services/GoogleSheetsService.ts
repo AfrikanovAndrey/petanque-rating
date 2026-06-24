@@ -80,6 +80,55 @@ export class GoogleSheetsService {
   }
 
   /**
+   * Ошибка API: файл на Drive в формате Excel (.xlsx), а не нативная Google Таблица.
+   */
+  private static isOfficeFileError(error: unknown): boolean {
+    const msg = String((error as Error)?.message ?? error);
+    return (
+      msg.includes("Office file") ||
+      msg.includes("not supported for this document")
+    );
+  }
+
+  private static officeFileUserMessage(): string {
+    return (
+      "Файл на Google Диске сохранён в формате Excel (.xlsx), а не как Google Таблица. " +
+      "Google Sheets API не умеет читать такие файлы, даже если они открываются в браузере и доступны по ссылке. " +
+      'Откройте файл в Google Таблицах → «Файл» → «Сохранить как таблицу Google» (или создайте копию в формате Google Таблиц) и используйте ссылку на новый документ. ' +
+      "Либо скачайте .xlsx и загрузите файлом в систему."
+    );
+  }
+
+  /**
+   * Скачивание книги через публичный export (работает для нативных таблиц и части Excel на Drive).
+   */
+  private static async downloadWorkbookViaExport(
+    spreadsheetId: string
+  ): Promise<XLSX.WorkBook> {
+    const exportUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=xlsx`;
+    console.log(`Пробуем загрузить через export URL: ${exportUrl}`);
+
+    const response = await fetch(exportUrl, { redirect: "follow" });
+    if (!response.ok) {
+      throw new Error(`export HTTP ${response.status}`);
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("text/html")) {
+      throw new Error(
+        "export вернул HTML вместо файла — проверьте доступ на чтение по ссылке"
+      );
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length < 100) {
+      throw new Error("export вернул пустой или слишком короткий ответ");
+    }
+
+    return XLSX.read(buffer, { type: "buffer" });
+  }
+
+  /**
    * Получение списка листов в таблице
    */
   static async getSheetNames(spreadsheetId: string): Promise<string[]> {
@@ -99,8 +148,23 @@ export class GoogleSheetsService {
       return sheetNames;
     } catch (error) {
       console.error("Ошибка при получении списка листов:", error);
+
+      if (this.isOfficeFileError(error)) {
+        try {
+          const workbook = await this.downloadWorkbookViaExport(spreadsheetId);
+          const sheetNames = workbook.SheetNames;
+          console.log(
+            `✓ Листы получены через export (Excel на Drive): ${sheetNames.join(", ")}`
+          );
+          return sheetNames;
+        } catch (exportError) {
+          console.warn("Export fallback не сработал:", exportError);
+          throw new Error(this.officeFileUserMessage());
+        }
+      }
+
       throw new Error(
-        `Не удалось получить доступ к Google таблице. Убедитесь, что таблица публично доступна для чтения: ${
+        `Не удалось получить доступ к Google таблице. Убедитесь, что таблица доступна для чтения по ссылке: ${
           (error as Error).message
         }`
       );
@@ -157,6 +221,21 @@ export class GoogleSheetsService {
       console.log(
         `Начинаем конвертацию Google таблицы ${spreadsheetId} в XLSX Workbook`
       );
+
+      // Excel на Drive: getSheetNames уже мог загрузить книгу через export
+      try {
+        const sheets = this.getSheets();
+        await sheets.spreadsheets.get({
+          spreadsheetId,
+          fields: "spreadsheetId",
+        });
+      } catch (probeError) {
+        if (this.isOfficeFileError(probeError)) {
+          console.log("Обнаружен Excel на Drive — загружаем через export");
+          return await this.downloadWorkbookViaExport(spreadsheetId);
+        }
+        throw probeError;
+      }
 
       // Получаем список всех листов
       const sheetNames = await this.getSheetNames(spreadsheetId);

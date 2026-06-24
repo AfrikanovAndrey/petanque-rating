@@ -34,6 +34,25 @@ export enum TournamentStatus {
   IN_PROGRESS = "IN_PROGRESS",
 }
 
+export enum TournamentPlayFormat {
+  GROUPS = "GROUPS",
+  SWISS = "SWISS",
+}
+
+export enum TiebreakerCriterion {
+  BUCHHOLZ = "BUCHHOLZ",
+  DOUBLE_BUCHHOLZ = "DOUBLE_BUCHHOLZ",
+  BERGER = "BERGER",
+  PROGRESS = "PROGRESS",
+  POINT_DIFF = "POINT_DIFF",
+}
+
+export enum SwissRoundStatus {
+  PENDING = "PENDING",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
+}
+
 // Турнир
 export interface Tournament {
   id: number;
@@ -41,9 +60,14 @@ export interface Tournament {
   type: TournamentType;
   category: TournamentCategory;
   date: string;
-  manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
+  manual: boolean;
   status: TournamentStatus;
   regulations?: string | null;
+  play_format?: TournamentPlayFormat | null;
+  group_size?: number | null;
+  swiss_rounds?: number | null;
+  tiebreaker_order?: TiebreakerCriterion[] | null;
+  swiss_current_round?: number | null;
   /** Признание президиумом: учёт результатов в рейтинге */
   results_validated_at?: string | null;
   created_at: string;
@@ -95,6 +119,67 @@ export interface TournamentRegisteredTeam {
 export interface TournamentRegistrationPageData {
   tournament: Tournament;
   teams: TournamentRegisteredTeam[];
+}
+
+export interface TournamentSwissRound {
+  id: number;
+  tournament_id: number;
+  round_number: number;
+  status: SwissRoundStatus;
+  completed_at?: string | null;
+}
+
+export interface TournamentSwissMatch {
+  id: number;
+  tournament_id: number;
+  round_id: number;
+  round_number: number;
+  team_a_id: number;
+  team_b_id: number | null;
+  score_a: number | null;
+  score_b: number | null;
+  winner_team_id: number | null;
+  is_bye: boolean;
+  played_at?: string | null;
+  team_a_players?: string;
+  team_b_players?: string | null;
+}
+
+export interface TournamentSwissStanding {
+  id: number;
+  tournament_id: number;
+  team_id: number;
+  wins: number;
+  loses: number;
+  points_for: number;
+  points_against: number;
+  buchholz: number | null;
+  double_buchholz: number | null;
+  berger: number | null;
+  progress: number | null;
+  point_diff: number;
+  rank_position: number | null;
+  team_players?: string;
+}
+
+export interface TournamentSwissPageData {
+  tournament: Tournament;
+  teams: TournamentRegisteredTeam[];
+  rounds: TournamentSwissRound[];
+  matches: TournamentSwissMatch[];
+  standings: TournamentSwissStanding[];
+  initialized: boolean;
+}
+
+export interface TournamentSwissSnapshot {
+  rounds: TournamentSwissRound[];
+  matches: TournamentSwissMatch[];
+  standings: TournamentSwissStanding[];
+  initialized: boolean;
+}
+
+export interface TournamentInProgressPageData extends TournamentRegistrationPageData {
+  swiss?: TournamentSwissSnapshot | null;
 }
 
 /** Ответ GET /rating/players/search (автодополнение) */

@@ -21,8 +21,15 @@ const HelpTournamentResultsExcel: React.FC = () => {
         загрузкой по URL откройте для таблицы{" "}
         <strong className="text-gray-900">доступ на чтение</strong> хотя бы для
         всех, у кого есть ссылка (в интерфейсе Google: «Поделиться» / «Настройки
-        доступа» → уровень «Читатель» или «Просмотр»). Без публичного или
-        доступного по ссылке чтения сервис не сможет прочитать листы через API.
+        доступа» → уровень «Читатель» или «Просмотр»). Без доступа по ссылке
+        сервис не сможет прочитать листы.
+      </p>
+      <p className="text-sm text-gray-700 border-l-4 border-amber-300 pl-4 py-2 mb-6 bg-amber-50/60 rounded-r-lg">
+        <strong className="text-gray-900">Формат файла.</strong> Ссылка должна
+        вести на <strong className="text-gray-900">нативную Google Таблицу</strong>,
+        а не на загруженный на Диск файл Excel (.xlsx). Если файл был загружен
+        как .xlsx, откройте его в Google Таблицах и выберите «Файл» → «Сохранить
+        как таблицу Google», либо загрузите .xlsx напрямую через режим «Файл».
       </p>
 
       <h3 className="text-lg font-semibold text-gray-900 mt-8 mb-3">
@@ -134,7 +141,8 @@ const HelpTournamentResultsExcel: React.FC = () => {
               <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">
                 Команда
               </code>{" "}
-              (один игрок из состава — как в базе, по нему находится команда) и{" "}
+              (один игрок из состава или весь состав через запятую — как на листе
+              «Регистрация»; по любому найденному игроку определяется команда) и{" "}
               <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">
                 Результат
               </code>{" "}
@@ -150,7 +158,7 @@ const HelpTournamentResultsExcel: React.FC = () => {
               <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">
                 Команда
               </code>{" "}
-              и{" "}
+              (один игрок или состав через запятую) и{" "}
               <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">
                 победы
               </code>{" "}

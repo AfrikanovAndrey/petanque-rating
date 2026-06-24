@@ -1,13 +1,13 @@
-import { ArrowLeftIcon, PlayCircleIcon } from "@heroicons/react/24/outline";
-import React, { useMemo } from "react";
+import { ArrowLeftIcon, ChevronDownIcon, ChevronUpIcon, PlayCircleIcon } from "@heroicons/react/24/outline";
+import React, { useCallback, useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { Link, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../components/RegulationsMarkdown";
+import PublicSwissPanel from "../components/PublicSwissPanel";
 import { getPublicTournamentInProgress, ratingApi } from "../services/api";
 import { TournamentType } from "../types";
 import {
   formatDate,
-  formatDateTime,
   getTornamentCategoryText,
   getTournamentTypeIcons,
   getTournamentTypeText,
@@ -19,6 +19,9 @@ const TournamentInProgressPublic: React.FC = () => {
     tournamentId: string;
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
+  const [tournamentDetailsExpanded, setTournamentDetailsExpanded] =
+    useState(false);
+  const [teamsListExpanded, setTeamsListExpanded] = useState(false);
 
   const { data, isLoading, error } = useQuery(
     ["publicTournamentInProgress", tournamentId],
@@ -32,6 +35,7 @@ const TournamentInProgressPublic: React.FC = () => {
     {
       enabled: Number.isFinite(tournamentId) && tournamentId > 0,
       retry: false,
+      staleTime: 0,
     }
   );
 
@@ -57,6 +61,32 @@ const TournamentInProgressPublic: React.FC = () => {
       ),
     [fullRating]
   );
+
+  const getTeamTotalRating = useCallback(
+    (players: string[], tournamentType?: TournamentType) => {
+      const sortedRatings = players
+        .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
+        .sort((a, b) => b - a);
+      const ratingValues =
+        tournamentType === TournamentType.TRIPLETTE && sortedRatings.length > 3
+          ? sortedRatings.slice(0, 3)
+          : sortedRatings;
+      return ratingValues.reduce((sum, value) => sum + value, 0);
+    },
+    [ratingByPlayerName]
+  );
+
+  const sortedTeams = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    const tournamentType = data.tournament.type as TournamentType;
+    return [...data.teams].sort(
+      (a, b) =>
+        getTeamTotalRating(b.players, tournamentType) -
+        getTeamTotalRating(a.players, tournamentType)
+    );
+  }, [data, getTeamTotalRating]);
 
   if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
     return (
@@ -101,23 +131,11 @@ const TournamentInProgressPublic: React.FC = () => {
     return null;
   }
 
-  const { tournament, teams } = data;
+  const { tournament, teams, swiss } = data;
+  const tournamentType = tournament.type as TournamentType;
 
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
-
-  const getTeamTotalRating = (players: string[]) => {
-    const sortedRatings = players
-      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
-      .sort((a, b) => b - a);
-
-    const ratingValues =
-      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
-        ? sortedRatings.slice(0, 3)
-        : sortedRatings;
-
-    return ratingValues.reduce((sum, value) => sum + value, 0);
-  };
 
   return (
     <div className="space-y-6">
@@ -138,109 +156,150 @@ const TournamentInProgressPublic: React.FC = () => {
         </div>
       </div>
 
-      <div className="min-w-0 bg-white rounded-lg shadow p-4 sm:p-6 space-y-6">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Сведения о турнире
-        </h2>
-        <dl className="grid min-w-0 gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Название
-            </dt>
-            <dd className="mt-1 text-gray-900">{tournament.name}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Дата проведения
-            </dt>
-            <dd className="mt-1 text-gray-900">{formatDate(tournament.date)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Тип турнира
-            </dt>
-            <dd className="mt-1 flex items-center gap-2 text-gray-900">
-              {getTournamentTypeText(tournament.type) ?? tournament.type}
-              {getTournamentTypeIcons(tournament.type)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Категория
-            </dt>
-            <dd className="mt-1 text-gray-900">
-              {getTornamentCategoryText(tournament.category)}
-            </dd>
-          </div>
-          <div className="min-w-0 sm:col-span-2">
-            <dt className="text-xs font-medium uppercase text-gray-500">
-              Описание
-            </dt>
-            <dd className="mt-1 min-w-0 text-gray-900">
-              {tournament.regulations?.trim() ? (
-                <RegulationsMarkdown source={tournament.regulations} />
-              ) : (
-                <span className="text-gray-500">—</span>
+      <div className="min-w-0 overflow-hidden bg-white rounded-lg shadow">
+        <div className="border-b border-gray-200 px-4 sm:px-6 py-4">
+          <button
+            type="button"
+            onClick={() =>
+              setTournamentDetailsExpanded((expanded) => !expanded)
+            }
+            aria-expanded={tournamentDetailsExpanded}
+            className="flex w-full items-start gap-2 text-left"
+          >
+            {tournamentDetailsExpanded ? (
+              <ChevronUpIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+            ) : (
+              <ChevronDownIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+            )}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Сведения о турнире
+              </h2>
+              {!tournamentDetailsExpanded && (
+                <p className="mt-1 text-sm text-gray-500">
+                  {formatDate(tournament.date)} •{" "}
+                  {getTournamentTypeText(tournament.type) ?? tournament.type}
+                </p>
               )}
-            </dd>
+            </div>
+          </button>
+        </div>
+        {tournamentDetailsExpanded && (
+          <div className="space-y-6 p-4 sm:p-6">
+            <dl className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">
+                  Название
+                </dt>
+                <dd className="mt-1 text-gray-900">{tournament.name}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">
+                  Дата проведения
+                </dt>
+                <dd className="mt-1 text-gray-900">
+                  {formatDate(tournament.date)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">
+                  Тип турнира
+                </dt>
+                <dd className="mt-1 flex items-center gap-2 text-gray-900">
+                  {getTournamentTypeText(tournament.type) ?? tournament.type}
+                  {getTournamentTypeIcons(tournament.type)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">
+                  Категория
+                </dt>
+                <dd className="mt-1 text-gray-900">
+                  {getTornamentCategoryText(tournament.category)}
+                </dd>
+              </div>
+              <div className="min-w-0 sm:col-span-2">
+                <dt className="text-xs font-medium uppercase text-gray-500">
+                  Описание
+                </dt>
+                <dd className="mt-1 min-w-0 text-gray-900">
+                  {tournament.regulations?.trim() ? (
+                    <RegulationsMarkdown source={tournament.regulations} />
+                  ) : (
+                    <span className="text-gray-500">—</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
           </div>
-        </dl>
+        )}
       </div>
+
+      <PublicSwissPanel tournament={tournament} swiss={swiss} />
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="border-b border-gray-200 px-4 sm:px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Список заявок
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Публичный список — только подтверждённые заявки. Всего:{" "}
-            {teams.length}
-          </p>
+          <button
+            type="button"
+            onClick={() => setTeamsListExpanded((expanded) => !expanded)}
+            aria-expanded={teamsListExpanded}
+            className="flex w-full items-start gap-2 text-left"
+          >
+            {teamsListExpanded ? (
+              <ChevronUpIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+            ) : (
+              <ChevronDownIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+            )}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Список заявок
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Публичный список — только подтверждённые заявки. Всего:{" "}
+                {teams.length}
+              </p>
+            </div>
+          </button>
         </div>
-        {teams.length === 0 ? (
-          <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
-            Пока нет подтверждённых команд.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    №
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Состав команды
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Рейтинг команды
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Обновлено
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {teams.map((team, index) => (
-                  <tr key={team.team_id}>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                      {team.players.map(formatPlayerWithRating).join(", ")}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                      {getTeamTotalRating(team.players)}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                      {formatDateTime(team.updated_at)}
-                    </td>
+        {teamsListExpanded &&
+          (teams.length === 0 ? (
+            <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
+              Пока нет подтверждённых команд.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      №
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Состав команды
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Рейтинг команды
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {sortedTeams.map((team, index) => (
+                    <tr key={team.team_id}>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
+                        {index + 1}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
+                        {team.players.map(formatPlayerWithRating).join(", ")}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {getTeamTotalRating(team.players, tournamentType)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
       </div>
     </div>
   );

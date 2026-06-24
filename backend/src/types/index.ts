@@ -24,6 +24,72 @@ export enum TournamentStatus {
   IN_PROGRESS = "IN_PROGRESS",
 }
 
+export enum TournamentPlayFormat {
+  GROUPS = "GROUPS",
+  SWISS = "SWISS",
+}
+
+export enum TiebreakerCriterion {
+  BUCHHOLZ = "BUCHHOLZ",
+  DOUBLE_BUCHHOLZ = "DOUBLE_BUCHHOLZ",
+  BERGER = "BERGER",
+  PROGRESS = "PROGRESS",
+  POINT_DIFF = "POINT_DIFF",
+}
+
+export enum SwissRoundStatus {
+  PENDING = "PENDING",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
+}
+
+export interface TournamentSwissRound {
+  id: number;
+  tournament_id: number;
+  round_number: number;
+  status: SwissRoundStatus;
+  completed_at?: Date | string | null;
+}
+
+export interface TournamentSwissMatch {
+  id: number;
+  tournament_id: number;
+  round_id: number;
+  round_number: number;
+  team_a_id: number;
+  team_b_id: number | null;
+  score_a: number | null;
+  score_b: number | null;
+  winner_team_id: number | null;
+  is_bye: boolean;
+  played_at?: Date | string | null;
+  team_a_players?: string;
+  team_b_players?: string | null;
+}
+
+export interface TournamentSwissStanding {
+  id: number;
+  tournament_id: number;
+  team_id: number;
+  wins: number;
+  loses: number;
+  points_for: number;
+  points_against: number;
+  buchholz: number | null;
+  double_buchholz: number | null;
+  berger: number | null;
+  progress: number | null;
+  point_diff: number;
+  rank_position: number | null;
+  team_players?: string;
+}
+
+export interface TournamentPlaySettingsInput {
+  play_format: TournamentPlayFormat;
+  swiss_rounds?: number | null;
+  tiebreaker_order?: TiebreakerCriterion[];
+}
+
 export interface Tournament {
   id: number;
   name: string;
@@ -33,6 +99,11 @@ export interface Tournament {
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
   status: TournamentStatus;
   regulations?: string | null;
+  play_format?: TournamentPlayFormat | null;
+  group_size?: number | null;
+  swiss_rounds?: number | null;
+  tiebreaker_order?: TiebreakerCriterion[] | null;
+  swiss_current_round?: number | null;
   /** Признание президиумом / админом: только тогда результаты входят в публичный рейтинг */
   results_validated_at?: Date | string | null;
   created_at: Date;
