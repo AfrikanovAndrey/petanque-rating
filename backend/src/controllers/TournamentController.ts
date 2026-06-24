@@ -39,13 +39,11 @@ import {
   type RegistrationRosterRequestSlot,
 } from "../utils/registrationRosterUtils";
 
-function tournamentCategoryDbToEnum(
-  category: string
-): TournamentCategoryEnum {
-  const c = String(category).toUpperCase();
-  if (c === "REGIONAL" || c === "2") return TournamentCategoryEnum.REGIONAL;
-  return TournamentCategoryEnum.FEDERAL;
-}
+import {
+  parseTournamentCategoryInput,
+  tournamentCategoryDbToEnum,
+  isRatingTournamentCategory,
+} from "../utils/tournamentCategory";
 
 function sqlDateToYyyyMmDd(value: string | Date): string {
   if (value instanceof Date) {
@@ -63,11 +61,20 @@ export class TournamentController {
    */
   private static convertCategoryEnumToString(
     categoryEnum: TournamentCategoryEnum
-  ): "1" | "2" {
-    return categoryEnum === TournamentCategoryEnum.FEDERAL ||
+  ): "1" | "2" | "3" {
+    if (
+      categoryEnum === TournamentCategoryEnum.FEDERAL ||
       categoryEnum === (TournamentCategoryEnum.FEDERAL as number)
-      ? "1"
-      : "2";
+    ) {
+      return "1";
+    }
+    if (
+      categoryEnum === TournamentCategoryEnum.REGIONAL ||
+      categoryEnum === (TournamentCategoryEnum.REGIONAL as number)
+    ) {
+      return "2";
+    }
+    return "3";
   }
 
   /**
@@ -77,8 +84,13 @@ export class TournamentController {
   private static async getEffectiveTeamsCountForNewTournament(
     tournamentDate: string,
     tournamentType: TournamentType,
-    currentTeamsCount: number
+    currentTeamsCount: number,
+    tournamentCategory: TournamentCategoryEnum,
   ): Promise<number> {
+    if (!isRatingTournamentCategory(tournamentCategory)) {
+      return currentTeamsCount;
+    }
+
     // Проверяем, является ли турнир DOUBLETTE_MALE/FEMALE или TET_A_TET_MALE/FEMALE
     const isDoublette =
       tournamentType === TournamentType.DOUBLETTE_MALE ||
@@ -108,7 +120,7 @@ export class TournamentController {
     }
 
     const [pairTournaments] = await pool.execute<any[]>(
-      `SELECT id FROM tournaments WHERE date = ? AND type = ?`,
+      `SELECT id FROM tournaments WHERE date = ? AND type = ? AND category IN ('FEDERAL', 'REGIONAL')`,
       [tournamentDate, pairType]
     );
 
@@ -1146,7 +1158,8 @@ export class TournamentController {
           await TournamentController.getEffectiveTeamsCountForNewTournament(
             tournamentDate,
             tournamentType,
-            teams.length
+            teams.length,
+            tournamentCategory,
           );
 
         console.log(

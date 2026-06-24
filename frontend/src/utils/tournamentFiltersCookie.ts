@@ -43,7 +43,7 @@ const ADMIN_FILTER_STATUSES: TournamentStatus[] = [
 ];
 
 const ALL_TOURNAMENT_TYPES = Object.values(TournamentType);
-const ALL_CATEGORIES: TournamentCategory[] = ["FEDERAL", "REGIONAL"];
+const ALL_CATEGORIES: TournamentCategory[] = ["FEDERAL", "REGIONAL", "CLUB"];
 
 function isTournamentStatus(value: unknown): value is TournamentStatus {
   return (

@@ -199,6 +199,10 @@ export function getPoints(
   qualifyingWins: number = 0,
   teamPlayerCount?: number,
 ): number {
+  if (category === TournamentCategoryEnum.CLUB) {
+    return 0;
+  }
+
   // ПРАВИЛО 1: Расчет очков за квалификационный этап
   // (для игроков, не вышедших в плей-офф)
   const qualifyingPoints = calculateQualifyingPoints(category, qualifyingWins);

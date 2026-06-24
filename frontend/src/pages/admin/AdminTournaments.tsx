@@ -30,6 +30,7 @@ import {
   formatDateForInput,
   formatDateTime,
   getTornamentCategoryText,
+  tournamentCategoryToFormValue,
   getTournamentStatusText,
   getTournamentTypeIcons,
   hasAnyUserRole,
@@ -317,7 +318,7 @@ const AdminTournaments: React.FC = () => {
     resetEdit({
       name: tournament.name,
       type: tournament.type,
-      category: tournament.category === "FEDERAL" ? "1" : "2",
+      category: tournamentCategoryToFormValue(tournament.category),
       date: formatDateForInput(tournament.date),
       status: tournament.status ?? TournamentStatus.FINISHED,
     });
@@ -928,8 +929,9 @@ const AdminTournaments: React.FC = () => {
                     required: "Категория обязательна",
                   })}
                 >
-                  <option value="1">1-я категория</option>
-                  <option value="2">2-я категория</option>
+                  <option value="1">1-я категория (РФП)</option>
+                  <option value="2">2-я категория (Региональный)</option>
+                  <option value="3">Клубный</option>
                 </select>
                 {errorsCreate.category && (
                   <p className="mt-1 text-sm text-red-600">
@@ -1106,8 +1108,9 @@ const AdminTournaments: React.FC = () => {
                     required: "Категория турнира обязательна",
                   })}
                 >
-                  <option value="1">1-я категория</option>
-                  <option value="2">2-я категория</option>
+                  <option value="1">1-я категория (РФП)</option>
+                  <option value="2">2-я категория (Региональный)</option>
+                  <option value="3">Клубный</option>
                 </select>
                 {errorsEdit.category && (
                   <p className="mt-1 text-sm text-red-600">

@@ -26,6 +26,7 @@ import {
   formatDateTime,
   formatDateForInput,
   getTornamentCategoryText,
+  tournamentCategoryToFormValue,
   handleApiError,
 } from "../../utils";
 import CsvUtils from "../../utils/csv";
@@ -184,7 +185,7 @@ const AdminTournamentRegistration: React.FC = () => {
       name: t.name,
       date: formatDateForInput(t.date),
       type: t.type as TournamentType,
-      category: t.category === "FEDERAL" ? "1" : "2",
+      category: tournamentCategoryToFormValue(t.category),
       status: (t.status ??
         (isDraftPage
           ? TournamentStatus.DRAFT
@@ -538,6 +539,9 @@ const AdminTournamentRegistration: React.FC = () => {
                 <option value="2">
                   2-я категория ({getTornamentCategoryText("REGIONAL")})
                 </option>
+                <option value="3">
+                  {getTornamentCategoryText("CLUB")}
+                </option>
               </select>
             </div>
           </div>
@@ -592,7 +596,7 @@ const AdminTournamentRegistration: React.FC = () => {
                   name: t.name,
                   date: formatDateForInput(t.date),
                   type: t.type as TournamentType,
-                  category: t.category === "FEDERAL" ? "1" : "2",
+                  category: tournamentCategoryToFormValue(t.category),
                   status: (t.status ??
                     (isDraftPage
                       ? TournamentStatus.DRAFT

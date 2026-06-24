@@ -617,8 +617,9 @@ const TournamentResultsUploadModal: React.FC<
                   required: "Категория турнира обязательна",
                 })}
               >
-                <option value="1">1-я категория</option>
-                <option value="2">2-я категория</option>
+                <option value="1">1-я категория (РФП)</option>
+                <option value="2">2-я категория (Региональный)</option>
+                <option value="3">Клубный</option>
               </select>
               {errors.tournament_category && (
                 <p className="mt-1 text-sm text-red-600">

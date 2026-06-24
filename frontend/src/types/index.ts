@@ -104,7 +104,7 @@ export interface PlayerSearchResult {
   gender: "male" | "female" | null;
 }
 
-export type TournamentCategory = "FEDERAL" | "REGIONAL";
+export type TournamentCategory = "FEDERAL" | "REGIONAL" | "CLUB";
 
 // Enum для причин получения очков
 export enum CupPosition {

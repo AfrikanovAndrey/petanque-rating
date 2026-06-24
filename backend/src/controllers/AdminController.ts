@@ -15,6 +15,10 @@ import {
   TournamentType,
 } from "../types";
 import { TournamentController } from "./TournamentController";
+import {
+  parseTournamentCategoryInput,
+  tournamentCategoryDbToEnum,
+} from "../utils/tournamentCategory";
 
 // Настройка multer для загрузки файлов
 const storage = multer.memoryStorage();
@@ -166,10 +170,14 @@ export class AdminController {
 
       console.log(`🔗 Загружаем турнир из Google Sheets: ${google_sheets_url}`);
 
-      const requestedCategory =
-        tournament_category === "2" || tournament_category === 2
-          ? TournamentCategoryEnum.REGIONAL
-          : TournamentCategoryEnum.FEDERAL;
+      const requestedCategory = parseTournamentCategoryInput(tournament_category);
+      if (requestedCategory === null) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите категорию турнира (1, 2 или 3)",
+        });
+        return;
+      }
 
       const result = await TournamentController.parseTournamentFromGoogleSheets(
         google_sheets_url,
@@ -263,8 +271,14 @@ export class AdminController {
         return;
       }
 
-      // Проверяем и валидируем категорию турнира (но парсинг также может определить её из файла)
-      const requestedCategory = tournament_category === "2" ? 2 : 1;
+      const requestedCategory = parseTournamentCategoryInput(tournament_category);
+      if (requestedCategory === null) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите категорию турнира (1, 2 или 3)",
+        });
+        return;
+      }
       console.log(`Запрошенная категория турнира: ${requestedCategory}`);
 
       // Используем новый алгоритм парсинга с сохранением в БД
@@ -363,11 +377,9 @@ export class AdminController {
         return;
       }
 
-      const catRaw = String(tournament.category).toUpperCase();
-      const requestedCategory =
-        catRaw === "REGIONAL" || catRaw === "2"
-          ? TournamentCategoryEnum.REGIONAL
-          : TournamentCategoryEnum.FEDERAL;
+      const requestedCategory = tournamentCategoryDbToEnum(
+        String(tournament.category),
+      );
 
       const rawTournamentDate = tournament.date as unknown;
       const dateStr =
@@ -491,11 +503,9 @@ export class AdminController {
         return;
       }
 
-      const catRaw = String(tournament.category).toUpperCase();
-      const requestedCategory =
-        catRaw === "REGIONAL" || catRaw === "2"
-          ? TournamentCategoryEnum.REGIONAL
-          : TournamentCategoryEnum.FEDERAL;
+      const requestedCategory = tournamentCategoryDbToEnum(
+        String(tournament.category),
+      );
 
       const rawTournamentDate = tournament.date as unknown;
       const dateStr =
@@ -623,11 +633,9 @@ export class AdminController {
         return;
       }
 
-      const catRaw = String(tournament.category).toUpperCase();
-      const requestedCategory =
-        catRaw === "REGIONAL" || catRaw === "2"
-          ? TournamentCategoryEnum.REGIONAL
-          : TournamentCategoryEnum.FEDERAL;
+      const requestedCategory = tournamentCategoryDbToEnum(
+        String(tournament.category),
+      );
 
       const rawTournamentDate = tournament.date as unknown;
       const dateStr =
@@ -754,11 +762,9 @@ export class AdminController {
         return;
       }
 
-      const catRaw = String(tournament.category).toUpperCase();
-      const requestedCategory =
-        catRaw === "REGIONAL" || catRaw === "2"
-          ? TournamentCategoryEnum.REGIONAL
-          : TournamentCategoryEnum.FEDERAL;
+      const requestedCategory = tournamentCategoryDbToEnum(
+        String(tournament.category),
+      );
 
       const rawTournamentDate = tournament.date as unknown;
       const dateStr =
@@ -907,17 +913,12 @@ export class AdminController {
         return;
       }
 
-      const categoryEnum =
-        category === "1" || category === 1
-          ? TournamentCategoryEnum.FEDERAL
-          : category === "2" || category === 2
-            ? TournamentCategoryEnum.REGIONAL
-            : null;
+      const categoryEnum = parseTournamentCategoryInput(category);
 
       if (categoryEnum === null) {
         res.status(400).json({
           success: false,
-          message: "Укажите категорию турнира (1 или 2)",
+          message: "Укажите категорию турнира (1, 2 или 3)",
         });
         return;
       }
