@@ -990,13 +990,9 @@ export class TournamentParser {
           break; //прекращаем разбор таблицы, когда в столбце "Команда" встречаем пустую строку или "Свободен"
         } else {
           console.log(`Найдена команда: "${teamCellText}"`);
-          let player: Player;
           try {
-            const playerName = ExcelUtils.getCellText(teamCell);
-            player = await this.detectPlayer(playerName);
-
-            const team = this.detectPlayerTeamOrderNum(
-              player,
+            const team = await this.detectTeamFromCell(
+              teamCellText,
               teams,
               SWISS_RESULTS_LIST
             );
@@ -1096,21 +1092,12 @@ export class TournamentParser {
               }
             } else {
               emptyRows = 0;
-              let player: Player;
-              //try {
               const playerName = ExcelUtils.getCellText(teamCell);
-              player = await this.detectPlayer(playerName);
-
-              const team = this.detectPlayerTeamOrderNum(
-                player,
+              const team = await this.detectTeamFromCell(
+                playerName,
                 teams,
                 sheetName
               );
-              if (!team) {
-                throw new Error(
-                  `Игрок "${playerName}" с листа "${sheetName}" не найден среди игроков на Листе регистрации`
-                );
-              }
 
               // Парсим количество побед
               const qualifying_wins = Number(
@@ -1135,6 +1122,41 @@ export class TournamentParser {
     }
 
     return teamResults;
+  }
+
+  /**
+   * Определить команду по ячейке «Команда»: один игрок или состав через запятую.
+   * Достаточно, чтобы в базе и на листе регистрации нашёлся хотя бы один игрок из ячейки.
+   */
+  static async detectTeamFromCell(
+    teamCellText: string,
+    teams: TeamPlayers[],
+    sheetName: string
+  ): Promise<TeamPlayers> {
+    const candidates = teamCellText
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => normalizeName(part) !== "");
+
+    if (candidates.length === 0) {
+      throw new Error(`Пустое значение в столбце «Команда» (лист "${sheetName}")`);
+    }
+
+    const errors: string[] = [];
+    for (const playerName of candidates) {
+      try {
+        const player = await this.detectPlayer(playerName);
+        return this.detectPlayerTeamOrderNum(player, teams, sheetName);
+      } catch (error) {
+        errors.push((error as Error).message);
+      }
+    }
+
+    throw new Error(
+      candidates.length === 1
+        ? errors[0]!
+        : `Не удалось определить команду по ячейке «${teamCellText}» (лист "${sheetName}"): ${errors.join("; ")}`
+    );
   }
 
   /**
