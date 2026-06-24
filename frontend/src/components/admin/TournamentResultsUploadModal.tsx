@@ -593,6 +593,9 @@ const TournamentResultsUploadModal: React.FC<
                 <option value={TournamentType.DOUBLETTE_MIXT}>
                   Дуплеты микст
                 </option>
+                <option value={TournamentType.DOUBLETTE_ANY}>
+                  Дуплеты смешанные
+                </option>
                 <option value={TournamentType.TET_A_TET_MALE}>
                   Тет-а-тет мужской
                 </option>

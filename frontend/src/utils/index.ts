@@ -120,6 +120,8 @@ export function getTournamentTypeText(type: TournamentType) {
       return "Дуплеты женские";
     case "DOUBLETTE_MIXT":
       return "Дуплеты микст";
+    case "DOUBLETTE_ANY":
+      return "Дуплеты смешанные";
     case "TET_A_TET_MALE":
       return "Тет-а-тет мужской";
     case "TET_A_TET_FEMALE":

@@ -347,7 +347,8 @@ function getPlayersCount(
   if (
     tournamentType === TournamentType.DOUBLETTE_MALE ||
     tournamentType === TournamentType.DOUBLETTE_FEMALE ||
-    tournamentType === TournamentType.DOUBLETTE_MIXT
+    tournamentType === TournamentType.DOUBLETTE_MIXT ||
+    tournamentType === TournamentType.DOUBLETTE_ANY
   ) {
     return totalTeams * 2;
   }

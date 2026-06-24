@@ -50,6 +50,8 @@ function getSlotConfig(type: TournamentType): SlotCfg {
       return { slots: 2, min: 2, max: 2, genders: ["female", "female"] };
     case TournamentType.DOUBLETTE_MIXT:
       return { slots: 2, min: 2, max: 2, genders: ["female", "male"] };
+    case TournamentType.DOUBLETTE_ANY:
+      return { slots: 2, min: 2, max: 2, genders: [undefined, undefined] };
     case TournamentType.TRIPLETTE:
       return { slots: 4, min: 3, max: 4, genders: [undefined, undefined, undefined, undefined], tripletteHint: true };
     default:

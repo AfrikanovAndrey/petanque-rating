@@ -52,6 +52,13 @@ function getSlotConfig(type: TournamentType): SlotCfg {
         max: 2,
         genders: ["female", "male"],
       };
+    case TournamentType.DOUBLETTE_ANY:
+      return {
+        slots: 2,
+        min: 2,
+        max: 2,
+        genders: [undefined, undefined],
+      };
     case TournamentType.TRIPLETTE:
       return {
         slots: 4,

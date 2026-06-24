@@ -543,6 +543,12 @@ export class TournamentController {
           }
         }
         return null;
+      case TournamentType.DOUBLETTE_ANY:
+        if (n !== 2) return "Дуплет смешанный: укажите двух игроков.";
+        if (players.some((p) => !p.gender)) {
+          return "У обоих игроков должен быть указан пол в базе.";
+        }
+        return null;
       default:
         return "Неизвестный тип турнира.";
     }
