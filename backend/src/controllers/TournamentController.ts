@@ -518,6 +518,12 @@ export class TournamentController {
             : "У выбранного игрока не указан пол в базе.";
         }
         return null;
+      case TournamentType.TET_A_TET_ANY:
+        if (n !== 1) return "Тет-а-тет: нужен один игрок.";
+        if (!ge(0)) {
+          return "У выбранного игрока не указан пол в базе.";
+        }
+        return null;
       case TournamentType.DOUBLETTE_MALE:
         if (n !== 2) return "Дуплет: укажите двух игроков.";
         if (players.some((p) => p.gender !== "male")) {

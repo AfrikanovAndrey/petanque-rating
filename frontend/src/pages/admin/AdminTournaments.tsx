@@ -914,6 +914,9 @@ const AdminTournaments: React.FC = () => {
                   <option value={TournamentType.TET_A_TET_FEMALE}>
                     Тет-а-тет женский
                   </option>
+                  <option value={TournamentType.TET_A_TET_ANY}>
+                    Тет-а-тет смешанный
+                  </option>
                 </select>
                 {errorsCreate.type && (
                   <p className="mt-1 text-sm text-red-600">
@@ -1093,6 +1096,9 @@ const AdminTournaments: React.FC = () => {
                   </option>
                   <option value={TournamentType.TET_A_TET_FEMALE}>
                     Тет-а-тет женский
+                  </option>
+                  <option value={TournamentType.TET_A_TET_ANY}>
+                    Тет-а-тет смешанный
                   </option>
                 </select>
                 {errorsEdit.type && (

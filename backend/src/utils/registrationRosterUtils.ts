@@ -155,6 +155,7 @@ export function getExpectedSlotCount(type: TournamentType): number {
       return 2;
     case TournamentType.TET_A_TET_MALE:
     case TournamentType.TET_A_TET_FEMALE:
+    case TournamentType.TET_A_TET_ANY:
       return 1;
     default:
       return 1;

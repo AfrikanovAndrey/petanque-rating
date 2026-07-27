@@ -126,6 +126,8 @@ export function getTournamentTypeText(type: TournamentType) {
       return "Тет-а-тет мужской";
     case "TET_A_TET_FEMALE":
       return "Тет-а-тет женский";
+    case "TET_A_TET_ANY":
+      return "Тет-а-тет смешанный";
   }
 }
 

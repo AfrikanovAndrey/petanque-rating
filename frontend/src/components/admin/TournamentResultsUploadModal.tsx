@@ -602,6 +602,9 @@ const TournamentResultsUploadModal: React.FC<
                 <option value={TournamentType.TET_A_TET_FEMALE}>
                   Тет-а-тет женский
                 </option>
+                <option value={TournamentType.TET_A_TET_ANY}>
+                  Тет-а-тет смешанный
+                </option>
               </select>
               {errors.tournament_type && (
                 <p className="mt-1 text-sm text-red-600">

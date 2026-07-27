@@ -8,10 +8,9 @@ import {
 } from "./enumColumnUtils";
 
 /**
- * Миграция 025: тип турнира DOUBLETTE_ANY (дуплеты смешанные, любой состав)
+ * Миграция 026: тип турнира TET_A_TET_ANY (тет-а-тет смешанный, любой пол)
  *
- * Добавляет значение в ENUM, сохраняя все уже существующие типы
- * (в т.ч. добавленные более поздними миграциями).
+ * Добавляет значение в ENUM, сохраняя все уже существующие типы.
  */
 
 async function getTournamentsTypeColumn(): Promise<string | undefined> {
@@ -26,15 +25,15 @@ async function getTournamentsTypeColumn(): Promise<string | undefined> {
 }
 
 export async function up(): Promise<void> {
-  console.log("  🔍 Проверка типа DOUBLETTE_ANY в tournaments.type...");
+  console.log("  🔍 Проверка типа TET_A_TET_ANY в tournaments.type...");
 
   const columnType = await getTournamentsTypeColumn();
-  if (columnType?.includes("'DOUBLETTE_ANY'")) {
-    console.log("  ✅ Тип DOUBLETTE_ANY уже добавлен");
+  if (columnType?.includes("'TET_A_TET_ANY'")) {
+    console.log("  ✅ Тип TET_A_TET_ANY уже добавлен");
     return;
   }
 
-  console.log("  📝 Добавление типа DOUBLETTE_ANY в tournaments.type...");
+  console.log("  📝 Добавление типа TET_A_TET_ANY в tournaments.type...");
   let values = parseEnumValues(columnType);
   if (values.length === 0) {
     values = [
@@ -42,38 +41,39 @@ export async function up(): Promise<void> {
       "DOUBLETTE_MALE",
       "DOUBLETTE_FEMALE",
       "DOUBLETTE_MIXT",
+      "DOUBLETTE_ANY",
       "TET_A_TET_MALE",
       "TET_A_TET_FEMALE",
     ];
   }
-  values = ensureEnumValue(values, "DOUBLETTE_ANY");
+  values = ensureEnumValue(values, "TET_A_TET_ANY");
 
   await pool.execute(`
     ALTER TABLE tournaments
     MODIFY COLUMN type ${formatEnumSql(values)} NOT NULL
   `);
-  console.log("  ✅ Тип DOUBLETTE_ANY успешно добавлен");
+  console.log("  ✅ Тип TET_A_TET_ANY успешно добавлен");
 }
 
 export async function down(): Promise<void> {
-  console.log("  📝 Откат типа DOUBLETTE_ANY в tournaments.type...");
+  console.log("  📝 Откат типа TET_A_TET_ANY в tournaments.type...");
 
   const [rows] = await pool.execute<RowDataPacket[]>(
-    "SELECT COUNT(*) AS count FROM tournaments WHERE type = 'DOUBLETTE_ANY'",
+    "SELECT COUNT(*) AS count FROM tournaments WHERE type = 'TET_A_TET_ANY'",
   );
   if ((rows[0]?.count as number) > 0) {
     throw new Error(
-      "Невозможно откатить миграцию: есть турниры с типом DOUBLETTE_ANY",
+      "Невозможно откатить миграцию: есть турниры с типом TET_A_TET_ANY",
     );
   }
 
   const columnType = await getTournamentsTypeColumn();
   let values = parseEnumValues(columnType);
-  values = removeEnumValue(values, "DOUBLETTE_ANY");
+  values = removeEnumValue(values, "TET_A_TET_ANY");
 
   await pool.execute(`
     ALTER TABLE tournaments
     MODIFY COLUMN type ${formatEnumSql(values)} NOT NULL
   `);
-  console.log("  ✅ Тип DOUBLETTE_ANY удалён");
+  console.log("  ✅ Тип TET_A_TET_ANY удалён");
 }

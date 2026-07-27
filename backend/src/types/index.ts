@@ -16,6 +16,7 @@ export enum TournamentType {
   DOUBLETTE_ANY = "DOUBLETTE_ANY",
   TET_A_TET_MALE = "TET_A_TET_MALE",
   TET_A_TET_FEMALE = "TET_A_TET_FEMALE",
+  TET_A_TET_ANY = "TET_A_TET_ANY",
 }
 
 export enum TournamentStatus {

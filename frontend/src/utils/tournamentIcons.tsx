@@ -82,6 +82,12 @@ export function getTournamentTypeIcons(
           <UserIcon className={iconClass(options, "female")} />
         </span>
       );
+    case TournamentType.TET_A_TET_ANY:
+      return (
+        <span className={wrapClass(options)} title="Тет-а-тет смешанный">
+          <UserIcon className={iconClass(options, "neutral")} />
+        </span>
+      );
     default:
       return null;
   }
