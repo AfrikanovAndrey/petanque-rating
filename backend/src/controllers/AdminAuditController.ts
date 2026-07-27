@@ -234,6 +234,22 @@ export class AdminAuditController {
           value: "DELETE_TOURNAMENT_REGISTRATION",
           label: "Удаление заявки команды с турнира",
         },
+        {
+          value: "START_TOURNAMENT",
+          label: "Старт турнира (финальная регистрация)",
+        },
+        {
+          value: "BEGIN_TOURNAMENT_PLAY",
+          label: "Переход к проведению турнира",
+        },
+        {
+          value: "TOURNAMENT_GROUP_DRAW",
+          label: "Автоматическая жеребьёвка по группам",
+        },
+        {
+          value: "TOURNAMENT_GROUP_DRAW_MANUAL",
+          label: "Ручная жеребьёвка по группам",
+        },
       ];
 
       return res.json({

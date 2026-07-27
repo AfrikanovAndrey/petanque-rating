@@ -44,8 +44,8 @@ export class TournamentModel {
   }
 
   /**
-   * Список турниров. Поле teams_count: для DRAFT / REGISTRATION / IN_PROGRESS — число
-   * подтверждённых заявок (tournament_registrations.is_confirmed = 1);
+   * Список турниров. Поле teams_count: для DRAFT / REGISTRATION / FINAL_REGISTRATION /
+   * IN_PROGRESS — число подтверждённых заявок (tournament_registrations.is_confirmed = 1);
    * для FINISHED — по tournament_results.
    * Поле pending_registration_teams_count — неподтверждённые заявки (is_confirmed = 0).
    */
@@ -54,7 +54,7 @@ export class TournamentModel {
       `SELECT
         t.*,
         CASE
-          WHEN t.status IN ('DRAFT', 'REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
+          WHEN t.status IN ('DRAFT', 'REGISTRATION', 'FINAL_REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
           ELSE COALESCE(res.cnt, 0)
         END AS teams_count,
         COALESCE(pend.cnt, 0) AS pending_registration_teams_count
@@ -78,7 +78,9 @@ export class TournamentModel {
       ) pend ON pend.tournament_id = t.id
       ORDER BY t.date DESC`,
     );
-    return rows.map((row) => this.mapTournamentRow(row));
+    return rows.map((row) =>
+      this.mapTournamentRow(row as Tournament & RowDataPacket),
+    );
   }
 
   static async getTournamentById(id: number): Promise<Tournament | null> {

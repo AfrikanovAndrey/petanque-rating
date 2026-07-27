@@ -8,8 +8,14 @@ import { PlayerModel } from "../models/PlayerModel";
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
+import { TournamentGroupMatchModel } from "../models/TournamentGroupMatchModel";
+import {
+  buildGroupStageViews,
+  validateMatchScores,
+} from "../services/groupStageService";
 import {
   performGroupDraw,
+  validateManualGroupDraw,
   validatePlaySettings,
   type TournamentPlaySettingsInput,
 } from "../services/tournamentPlaySettings";
@@ -17,6 +23,7 @@ import {
   LicensedPlayerUploadData,
   TiebreakerCriterion,
   TournamentCategoryEnum,
+  TournamentGroupDrawGroup,
   TournamentPlayFormat,
   TournamentStatus,
   TournamentType,
@@ -74,6 +81,16 @@ export const licensedPlayersUploadMiddleware = upload.single(
 export const playersTextUploadMiddleware = textUpload.single("players_file");
 
 export class AdminController {
+  /** Статусы, в которых можно подтверждать/менять/добавлять заявки. */
+  private static isRegistrationEditableStatus(
+    status: TournamentStatus | string,
+  ): boolean {
+    return (
+      status === TournamentStatus.REGISTRATION ||
+      status === TournamentStatus.FINAL_REGISTRATION
+    );
+  }
+
   /** Проверка состава команды по типу турнира (игроки уже загружены из БД). */
   private static validateRegistrationRoster(
     type: TournamentType,
@@ -1057,7 +1074,7 @@ export class AdminController {
   }
 
   /**
-   * Данные страницы регистрации: турнир (в статусе REGISTRATION) + список записанных команд.
+   * Данные страницы регистрации / финальной регистрации + список записанных команд.
    */
   static async getTournamentRegistrationPage(
     req: Request,
@@ -1083,11 +1100,11 @@ export class AdminController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.REGISTRATION) {
+      if (!AdminController.isRegistrationEditableStatus(tournament.status)) {
         res.status(400).json({
           success: false,
           message:
-            "Страница регистрации доступна только для турниров в статусе «Регистрация»",
+            "Страница доступна только для турниров в статусе «Регистрация» или «Финальная регистрация»",
         });
         return;
       }
@@ -1209,11 +1226,35 @@ export class AdminController {
           tournament.type as TournamentType,
         );
 
+      let groups: ReturnType<typeof buildGroupStageViews> = [];
+      if (
+        tournament.play_format === TournamentPlayFormat.GROUPS &&
+        tournament.group_draw &&
+        tournament.group_draw.length > 0
+      ) {
+        let matchCount =
+          await TournamentGroupMatchModel.countByTournament(tournamentId);
+        if (matchCount === 0) {
+          await TournamentGroupMatchModel.regenerateFromDraw(
+            tournamentId,
+            tournament.group_draw,
+          );
+        }
+        const matches =
+          await TournamentGroupMatchModel.listByTournament(tournamentId);
+        groups = buildGroupStageViews(
+          tournament.group_draw,
+          teams,
+          matches,
+        );
+      }
+
       res.json({
         success: true,
         data: {
           tournament,
           teams,
+          groups,
         },
       });
     } catch (error) {
@@ -1221,6 +1262,147 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Ошибка загрузки данных",
+      });
+    }
+  }
+
+  /**
+   * Обновить счёт матча группового этапа.
+   * Тело: { score_a, score_b } или { clear: true }; опционально court.
+   */
+  static async updateTournamentGroupMatch(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const matchId = parseInt(req.params.matchId, 10);
+      if (isNaN(tournamentId) || isNaN(matchId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира или матча",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Счёт можно менять только в статусе «В процессе»",
+        });
+        return;
+      }
+      if (tournament.play_format !== TournamentPlayFormat.GROUPS) {
+        res.status(400).json({
+          success: false,
+          message: "Матчи групп доступны только для группового формата",
+        });
+        return;
+      }
+
+      const match = await TournamentGroupMatchModel.getById(matchId);
+      if (!match || match.tournament_id !== tournamentId) {
+        res.status(404).json({
+          success: false,
+          message: "Матч не найден",
+        });
+        return;
+      }
+
+      const body = req.body as {
+        score_a?: unknown;
+        score_b?: unknown;
+        clear?: unknown;
+        court?: unknown;
+      };
+
+      let scoreA: number | null = match.score_a;
+      let scoreB: number | null = match.score_b;
+
+      if (body.clear === true) {
+        scoreA = null;
+        scoreB = null;
+      } else if (body.score_a !== undefined || body.score_b !== undefined) {
+        const validated = validateMatchScores(body.score_a, body.score_b);
+        if (typeof validated === "string") {
+          res.status(400).json({ success: false, message: validated });
+          return;
+        }
+        scoreA = validated.score_a;
+        scoreB = validated.score_b;
+      } else if (body.court === undefined) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите score_a и score_b, clear или court",
+        });
+        return;
+      }
+
+      let court: number | null | undefined = undefined;
+      if (body.court !== undefined) {
+        if (body.court === null) {
+          court = null;
+        } else {
+          const c =
+            typeof body.court === "number"
+              ? body.court
+              : parseInt(String(body.court), 10);
+          if (!Number.isInteger(c) || c < 1 || c > 99) {
+            res.status(400).json({
+              success: false,
+              message: "Номер дорожки должен быть от 1 до 99",
+            });
+            return;
+          }
+          court = c;
+        }
+      }
+
+      const saved = await TournamentGroupMatchModel.updateScores(
+        matchId,
+        scoreA,
+        scoreB,
+        court,
+      );
+      if (!saved) {
+        res.status(400).json({
+          success: false,
+          message: "Не удалось обновить матч",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const matches =
+        await TournamentGroupMatchModel.listByTournament(tournamentId);
+      const groups = buildGroupStageViews(
+        tournament.group_draw ?? [],
+        teams,
+        matches,
+      );
+
+      res.json({
+        success: true,
+        message: "Матч обновлён",
+        data: { groups },
+      });
+    } catch (error) {
+      console.error("Ошибка обновления матча группы:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
       });
     }
   }
@@ -1264,11 +1446,11 @@ export class AdminController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.REGISTRATION) {
+      if (!AdminController.isRegistrationEditableStatus(tournament.status)) {
         res.status(400).json({
           success: false,
           message:
-            "Подтверждение заявок доступно только для турниров в статусе «Регистрация»",
+            "Подтверждение заявок доступно только в статусах «Регистрация» и «Финальная регистрация»",
         });
         return;
       }
@@ -1377,10 +1559,11 @@ export class AdminController {
       res.status(404).json({ success: false, message: "Турнир не найден" });
       return;
     }
-    if (tournament.status !== TournamentStatus.REGISTRATION) {
+    if (!AdminController.isRegistrationEditableStatus(tournament.status)) {
       res.status(400).json({
         success: false,
-        message: "Изменение состава доступно только в статусе «Регистрация»",
+        message:
+          "Изменение состава доступно только в статусах «Регистрация» и «Финальная регистрация»",
       });
       return;
     }
@@ -1560,10 +1743,11 @@ export class AdminController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.REGISTRATION) {
+      if (!AdminController.isRegistrationEditableStatus(tournament.status)) {
         res.status(400).json({
           success: false,
-          message: "Удаление заявок доступно только в статусе «Регистрация»",
+          message:
+            "Удаление заявок доступно только в статусах «Регистрация» и «Финальная регистрация»",
         });
         return;
       }
@@ -1619,11 +1803,11 @@ export class AdminController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.REGISTRATION) {
+      if (tournament.status !== TournamentStatus.FINAL_REGISTRATION) {
         res.status(400).json({
           success: false,
           message:
-            "Настройки проведения можно сохранить только для турнира в статусе «Регистрация»",
+            "Настройки проведения можно сохранить только в статусе «Финальная регистрация»",
         });
         return;
       }
@@ -1730,11 +1914,11 @@ export class AdminController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.REGISTRATION) {
+      if (tournament.status !== TournamentStatus.FINAL_REGISTRATION) {
         res.status(400).json({
           success: false,
           message:
-            "Жеребьёвка доступна только для турнира в статусе «Регистрация»",
+            "Жеребьёвка доступна только в статусе «Финальная регистрация»",
         });
         return;
       }
@@ -1762,6 +1946,7 @@ export class AdminController {
       const teams =
         await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
           tournamentId,
+          tournament.type as TournamentType,
         );
       const confirmedTeamIds = teams
         .filter((team) => team.is_confirmed)
@@ -1810,7 +1995,154 @@ export class AdminController {
   }
 
   /**
-   * Запустить турнир: перевести в статус IN_PROGRESS после настройки формата.
+   * Сохранить ручную жеребьёвку по группам.
+   * Тело: { group_draw: TournamentGroupDrawGroup[] }
+   */
+  static async saveManualTournamentGroupDraw(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (isNaN(tournamentId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.FINAL_REGISTRATION) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Жеребьёвка доступна только в статусе «Финальная регистрация»",
+        });
+        return;
+      }
+
+      if (tournament.play_format !== TournamentPlayFormat.GROUPS) {
+        res.status(400).json({
+          success: false,
+          message: "Жеребьёвка доступна только для группового формата",
+        });
+        return;
+      }
+
+      if (
+        tournament.group_size == null ||
+        tournament.group_size < 4 ||
+        tournament.group_size > 6
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Сначала сохраните размер группы (4–6)",
+        });
+        return;
+      }
+
+      const rawDraw = (req.body as { group_draw?: unknown }).group_draw;
+      if (!Array.isArray(rawDraw)) {
+        res.status(400).json({
+          success: false,
+          message: "Ожидается массив group_draw",
+        });
+        return;
+      }
+
+      const groupDraw: TournamentGroupDrawGroup[] = [];
+      for (const item of rawDraw) {
+        if (
+          !item ||
+          typeof item !== "object" ||
+          typeof (item as TournamentGroupDrawGroup).group_number !== "number" ||
+          !Array.isArray((item as TournamentGroupDrawGroup).team_ids)
+        ) {
+          res.status(400).json({
+            success: false,
+            message: "Некорректная структура group_draw",
+          });
+          return;
+        }
+        const teamIds = (item as TournamentGroupDrawGroup).team_ids.map((id) =>
+          typeof id === "number" ? id : parseInt(String(id), 10),
+        );
+        if (teamIds.some((id) => !Number.isInteger(id) || id <= 0)) {
+          res.status(400).json({
+            success: false,
+            message: "Некорректный идентификатор команды в жеребьёвке",
+          });
+          return;
+        }
+        groupDraw.push({
+          group_number: (item as TournamentGroupDrawGroup).group_number,
+          team_ids: teamIds,
+        });
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const confirmedTeamIds = teams
+        .filter((team) => team.is_confirmed)
+        .map((team) => team.team_id);
+
+      const validationError = validateManualGroupDraw(
+        groupDraw,
+        confirmedTeamIds,
+        tournament.group_size,
+      );
+      if (validationError) {
+        res.status(400).json({
+          success: false,
+          message: validationError,
+        });
+        return;
+      }
+
+      const saved = await TournamentModel.saveTournamentGroupDraw(
+        tournamentId,
+        groupDraw,
+      );
+      if (!saved) {
+        res.status(400).json({
+          success: false,
+          message: "Не удалось сохранить результат жеребьёвки",
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: "Ручная жеребьёвка сохранена",
+        data: {
+          group_draw: groupDraw,
+          teams,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка сохранения ручной жеребьёвки:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /**
+   * Начать турнир: из «Регистрация» в «Финальная регистрация»
+   * (подтверждение явки до выбора формата). Подтверждения заявок сбрасываются.
    */
   static async startTournament(req: Request, res: Response): Promise<void> {
     try {
@@ -1836,6 +2168,87 @@ export class AdminController {
         res.status(400).json({
           success: false,
           message: "Турнир можно начать только из статуса «Регистрация»",
+        });
+        return;
+      }
+
+      const success = await TournamentModel.updateTournament(
+        tournamentId,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        TournamentStatus.FINAL_REGISTRATION,
+      );
+
+      if (!success) {
+        res.status(400).json({
+          success: false,
+          message: "Не удалось начать турнир",
+        });
+        return;
+      }
+
+      await TournamentRegistrationModel.unconfirmAllRegistrations(tournamentId);
+
+      res.json({
+        success: true,
+        message: "Турнир переведён в статус «Финальная регистрация»",
+      });
+    } catch (error) {
+      console.error("Ошибка запуска турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /**
+   * Перейти от финальной регистрации к проведению (IN_PROGRESS)
+   * после выбора формата и (для групп) жеребьёвки.
+   */
+  static async beginTournamentPlay(req: Request, res: Response): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (isNaN(tournamentId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.FINAL_REGISTRATION) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Переход к проведению доступен только из статуса «Финальная регистрация»",
+        });
+        return;
+      }
+
+      const confirmedTeams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+          { confirmedOnly: true },
+        );
+
+      if (confirmedTeams.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: "Подтвердите хотя бы одну команду перед началом проведения",
         });
         return;
       }
@@ -1871,6 +2284,17 @@ export class AdminController {
           });
           return;
         }
+        const confirmedIds = new Set(confirmedTeams.map((t) => t.team_id));
+        const drawnIds = tournament.group_draw.flatMap((g) => g.team_ids);
+        const missing = drawnIds.filter((id) => !confirmedIds.has(id));
+        if (missing.length > 0) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Жеребьёвка устарела: есть команды без подтверждения или удалённые заявки. Проведите жеребьёвку заново.",
+          });
+          return;
+        }
       }
 
       const success = await TournamentModel.updateTournament(
@@ -1886,9 +2310,19 @@ export class AdminController {
       if (!success) {
         res.status(400).json({
           success: false,
-          message: "Не удалось начать турнир",
+          message: "Не удалось перейти к проведению турнира",
         });
         return;
+      }
+
+      if (
+        tournament.play_format === TournamentPlayFormat.GROUPS &&
+        tournament.group_draw
+      ) {
+        await TournamentGroupMatchModel.regenerateFromDraw(
+          tournamentId,
+          tournament.group_draw,
+        );
       }
 
       res.json({
@@ -1896,7 +2330,7 @@ export class AdminController {
         message: "Турнир переведён в статус «В процессе»",
       });
     } catch (error) {
-      console.error("Ошибка запуска турнира:", error);
+      console.error("Ошибка перехода к проведению турнира:", error);
       res.status(500).json({
         success: false,
         message: "Внутренняя ошибка сервера",
@@ -1988,6 +2422,13 @@ export class AdminController {
       );
 
       if (success) {
+        if (
+          status !== undefined &&
+          existingTournament.status === TournamentStatus.IN_PROGRESS &&
+          status !== TournamentStatus.IN_PROGRESS
+        ) {
+          await TournamentGroupMatchModel.deleteByTournament(tournamentId);
+        }
         res.json({
           success: true,
           message: "Турнир успешно обновлен",

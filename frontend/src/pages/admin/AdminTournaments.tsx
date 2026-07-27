@@ -499,11 +499,16 @@ const AdminTournaments: React.FC = () => {
                 {displayedTournaments.map((tournament: Tournament) => {
                   const isRegistration =
                     tournament.status === TournamentStatus.REGISTRATION;
+                  const isFinalRegistration =
+                    tournament.status === TournamentStatus.FINAL_REGISTRATION;
                   const isInProgress =
                     tournament.status === TournamentStatus.IN_PROGRESS;
                   const isDraft = tournament.status === TournamentStatus.DRAFT;
                   const opensSnapshotView =
-                    isRegistration || isInProgress || isDraft;
+                    isRegistration ||
+                    isFinalRegistration ||
+                    isInProgress ||
+                    isDraft;
                   return (
                   <tr
                     key={tournament.id}
@@ -520,7 +525,9 @@ const AdminTournaments: React.FC = () => {
                                 ? `/admin/tournaments/${tournament.id}/draft`
                                 : isRegistration
                                   ? `/admin/tournaments/${tournament.id}/registration`
-                                  : `/admin/tournaments/${tournament.id}/in-progress`
+                                  : isFinalRegistration
+                                    ? `/admin/tournaments/${tournament.id}/final-registration`
+                                    : `/admin/tournaments/${tournament.id}/in-progress`
                             )
                         : undefined
                     }
@@ -569,14 +576,17 @@ const AdminTournaments: React.FC = () => {
                               : tournament.status === TournamentStatus.REGISTRATION
                                 ? "bg-amber-100 text-amber-900"
                                 : tournament.status ===
-                                    TournamentStatus.IN_PROGRESS
-                                  ? "bg-sky-100 text-sky-900"
-                                  : "bg-gray-100 text-gray-800"
+                                    TournamentStatus.FINAL_REGISTRATION
+                                  ? "bg-emerald-100 text-emerald-900"
+                                  : tournament.status ===
+                                      TournamentStatus.IN_PROGRESS
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "bg-gray-100 text-gray-800"
                           }`}
                         >
                           {getTournamentStatusText(tournament.status)}
                         </span>
-                        {isRegistration &&
+                        {(isRegistration || isFinalRegistration) &&
                           (tournament.pending_registration_teams_count ?? 0) >
                             0 && (
                           <span
@@ -1133,6 +1143,11 @@ const AdminTournaments: React.FC = () => {
                   </option>
                   <option value={TournamentStatus.REGISTRATION}>
                     {getTournamentStatusText(TournamentStatus.REGISTRATION)}
+                  </option>
+                  <option value={TournamentStatus.FINAL_REGISTRATION}>
+                    {getTournamentStatusText(
+                      TournamentStatus.FINAL_REGISTRATION
+                    )}
                   </option>
                   <option value={TournamentStatus.IN_PROGRESS}>
                     {getTournamentStatusText(TournamentStatus.IN_PROGRESS)}

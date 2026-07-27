@@ -195,6 +195,19 @@ function App() {
             />
 
             <Route
+              path="/admin/tournaments/:tournamentId/final-registration"
+              element={
+                <ProtectedRoute>
+                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENT_STAFF}>
+                    <AdminLayout>
+                      <AdminTournamentRegistration />
+                    </AdminLayout>
+                  </AdminRoleRoute>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/admin/tournaments/:tournamentId/in-progress"
               element={
                 <ProtectedRoute>

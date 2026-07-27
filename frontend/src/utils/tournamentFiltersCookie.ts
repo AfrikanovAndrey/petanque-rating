@@ -34,6 +34,7 @@ export const EMPTY_TOURNAMENT_LIST_FILTERS: TournamentListFilters = {
 const PUBLIC_FILTER_STATUSES: TournamentStatus[] = [
   TournamentStatus.FINISHED,
   TournamentStatus.REGISTRATION,
+  TournamentStatus.FINAL_REGISTRATION,
   TournamentStatus.IN_PROGRESS,
 ];
 

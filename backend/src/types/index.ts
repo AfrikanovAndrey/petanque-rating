@@ -21,6 +21,8 @@ export enum TournamentStatus {
   DRAFT = "DRAFT",
   FINISHED = "FINISHED",
   REGISTRATION = "REGISTRATION",
+  /** После «Начать турнир»: подтверждение явки до выбора формата */
+  FINAL_REGISTRATION = "FINAL_REGISTRATION",
   IN_PROGRESS = "IN_PROGRESS",
 }
 
@@ -60,7 +62,7 @@ export interface Tournament {
   results_validated_at?: Date | string | null;
   created_at: Date;
   updated_at: Date;
-  /** См. TournamentModel.getAllTournaments: DRAFT/REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */
+  /** См. TournamentModel.getAllTournaments: DRAFT/REGISTRATION/FINAL_REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */
   teams_count?: number;
   /** Неподтверждённые заявки на регистрацию (getAllTournaments) */
   pending_registration_teams_count?: number;

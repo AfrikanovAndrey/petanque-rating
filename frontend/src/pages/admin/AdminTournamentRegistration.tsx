@@ -50,6 +50,9 @@ const AdminTournamentRegistration: React.FC = () => {
   const tournamentId = parseInt(tournamentIdParam || "", 10);
   const location = useLocation();
   const isDraftPage = location.pathname.endsWith("/draft");
+  const isFinalRegistrationPage = location.pathname.endsWith(
+    "/final-registration"
+  );
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [teamForEdit, setTeamForEdit] = useState<TournamentRegisteredTeam | null>(
@@ -65,7 +68,9 @@ const AdminTournamentRegistration: React.FC = () => {
 
   const pageQueryKey = isDraftPage
     ? (["tournamentDraft", tournamentId] as const)
-    : (["tournamentRegistration", tournamentId] as const);
+    : isFinalRegistrationPage
+      ? (["tournamentFinalRegistration", tournamentId] as const)
+      : (["tournamentRegistration", tournamentId] as const);
 
   const { data, isLoading, error } = useQuery(
     pageQueryKey,
@@ -181,6 +186,35 @@ const AdminTournamentRegistration: React.FC = () => {
 
   useEffect(() => {
     if (!data?.tournament) return;
+    const status = data.tournament.status;
+    if (
+      status === TournamentStatus.FINAL_REGISTRATION &&
+      !isFinalRegistrationPage &&
+      !isDraftPage
+    ) {
+      navigate(`/admin/tournaments/${tournamentId}/final-registration`, {
+        replace: true,
+      });
+      return;
+    }
+    if (
+      status === TournamentStatus.REGISTRATION &&
+      isFinalRegistrationPage
+    ) {
+      navigate(`/admin/tournaments/${tournamentId}/registration`, {
+        replace: true,
+      });
+    }
+  }, [
+    data?.tournament,
+    isFinalRegistrationPage,
+    isDraftPage,
+    navigate,
+    tournamentId,
+  ]);
+
+  useEffect(() => {
+    if (!data?.tournament) return;
     const t = data.tournament;
     reset({
       name: t.name,
@@ -190,10 +224,12 @@ const AdminTournamentRegistration: React.FC = () => {
       status: (t.status ??
         (isDraftPage
           ? TournamentStatus.DRAFT
-          : TournamentStatus.REGISTRATION)) as TournamentStatus,
+          : isFinalRegistrationPage
+            ? TournamentStatus.FINAL_REGISTRATION
+            : TournamentStatus.REGISTRATION)) as TournamentStatus,
       regulations: t.regulations ?? "",
     });
-  }, [data, reset, isDraftPage]);
+  }, [data, reset, isDraftPage, isFinalRegistrationPage]);
 
   const updateMutation = useMutation(
     async (form: TournamentParamsForm) => {
@@ -214,6 +250,10 @@ const AdminTournamentRegistration: React.FC = () => {
             "tournamentRegistration",
             tournamentId,
           ]);
+          void queryClient.invalidateQueries([
+            "tournamentFinalRegistration",
+            tournamentId,
+          ]);
           void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
           if (isDraftPage && form.status === TournamentStatus.REGISTRATION) {
             navigate(`/admin/tournaments/${tournamentId}/registration`);
@@ -231,6 +271,15 @@ const AdminTournamentRegistration: React.FC = () => {
     }
   );
 
+  const invalidateRegistrationQueries = () => {
+    void queryClient.invalidateQueries(["tournamentRegistration", tournamentId]);
+    void queryClient.invalidateQueries([
+      "tournamentFinalRegistration",
+      tournamentId,
+    ]);
+    void queryClient.invalidateQueries("tournaments");
+  };
+
   const confirmRegistrationMutation = useMutation(
     async (teamId: number) => {
       return adminApi.confirmTournamentRegistration(tournamentId, teamId);
@@ -239,10 +288,7 @@ const AdminTournamentRegistration: React.FC = () => {
       onSuccess: (res) => {
         if (res.data.success) {
           toast.success(res.data.message || "Заявка подтверждена");
-          void queryClient.invalidateQueries([
-            "tournamentRegistration",
-            tournamentId,
-          ]);
+          invalidateRegistrationQueries();
         } else {
           toast.error(res.data.message || "Ошибка подтверждения заявки");
         }
@@ -261,12 +307,29 @@ const AdminTournamentRegistration: React.FC = () => {
       onSuccess: (res) => {
         if (res.data.success) {
           toast.success(res.data.message || "Заявка удалена");
-          void queryClient.invalidateQueries([
-            "tournamentRegistration",
-            tournamentId,
-          ]);
+          invalidateRegistrationQueries();
         } else {
           toast.error(res.data.message || "Ошибка удаления заявки");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const startFinalRegistrationMutation = useMutation(
+    () => adminApi.startTournament(tournamentId),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success(
+            res.data.message || "Турнир в статусе «Финальная регистрация»"
+          );
+          invalidateRegistrationQueries();
+          navigate(`/admin/tournaments/${tournamentId}/final-registration`);
+        } else {
+          toast.error(res.data.message || "Не удалось начать турнир");
         }
       },
       onError: (e) => {
@@ -397,7 +460,13 @@ const AdminTournamentRegistration: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900">
               {tournament.name}
               </h1>
-              <p className="mt-1 text-gray-600 break-words">{isDraftPage ? "Черновик турнира" : "Регистрация на турнир"}</p>
+              <p className="mt-1 text-gray-600 break-words">
+                {isDraftPage
+                  ? "Черновик турнира"
+                  : isFinalRegistrationPage
+                    ? "Финальная регистрация"
+                    : "Регистрация на турнир"}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -414,14 +483,43 @@ const AdminTournamentRegistration: React.FC = () => {
               </button>
             )}
             {!isDraftPage &&
+              !isFinalRegistrationPage &&
               tournament.status === TournamentStatus.REGISTRATION && (
                 <button
                   type="button"
                   className="btn-primary shrink-0"
-                  onClick={() => setStartWizardOpen(true)}
+                  disabled={startFinalRegistrationMutation.isLoading}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Перейти к финальной регистрации? Подтверждения заявок будут сброшены — нужно будет подтвердить явку команд."
+                      )
+                    ) {
+                      return;
+                    }
+                    startFinalRegistrationMutation.mutate();
+                  }}
                 >
-                  Начать турнир
+                  {startFinalRegistrationMutation.isLoading
+                    ? "Сохранение…"
+                    : "Начать турнир"}
                 </button>
+              )}
+            {isFinalRegistrationPage &&
+              tournament.status === TournamentStatus.FINAL_REGISTRATION && (
+                  <button
+                    type="button"
+                    className="btn-primary shrink-0"
+                    disabled={confirmedTeamsCount === 0}
+                    title={
+                      confirmedTeamsCount === 0
+                        ? "Подтвердите хотя бы одну команду"
+                        : undefined
+                    }
+                    onClick={() => setStartWizardOpen(true)}
+                  >
+                    Начать проведение
+                  </button>
               )}
           </div>
         </div>
@@ -601,14 +699,20 @@ const AdminTournamentRegistration: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                Зарегистрированные команды
+                {isFinalRegistrationPage
+                  ? "Команды на финальной регистрации"
+                  : "Зарегистрированные команды"}
               </h2>
               <p className="mt-1 text-sm text-gray-500">
                 Всего: {teams.length} • Подтверждено: {confirmedTeamsCount}
+                {isFinalRegistrationPage
+                  ? " — подтвердите явку команды отдельной кнопкой"
+                  : ""}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {tournament.status === TournamentStatus.REGISTRATION && (
+              {(tournament.status === TournamentStatus.REGISTRATION ||
+                tournament.status === TournamentStatus.FINAL_REGISTRATION) && (
                 <button
                   type="button"
                   onClick={() => setRegisterModalOpen(true)}
@@ -716,7 +820,14 @@ const AdminTournamentRegistration: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {sortedTeams.map((team, index) => (
-                  <tr key={team.team_id}>
+                  <tr
+                    key={team.team_id}
+                    className={
+                      team.is_confirmed
+                        ? "bg-green-50 hover:bg-green-100/80"
+                        : "bg-white hover:bg-gray-50"
+                    }
+                  >
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {index + 1}
                     </td>
@@ -733,13 +844,17 @@ const AdminTournamentRegistration: React.FC = () => {
                       {team.is_confirmed ? (
                         <div className="flex flex-col">
                           <span className="inline-flex w-fit rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                            Подтверждена
+                            {isFinalRegistrationPage
+                              ? "Явка подтверждена"
+                              : "Подтверждена"}
                           </span>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1">
                           <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            Ожидает подтверждения
+                            {isFinalRegistrationPage
+                              ? "Ожидает подтверждения явки"
+                              : "Ожидает подтверждения"}
                           </span>
                           {!!team.has_pending_new_players && (
                             <span className="text-xs text-amber-900">
@@ -779,7 +894,9 @@ const AdminTournamentRegistration: React.FC = () => {
                           >
                             {confirmRegistrationMutation.isLoading
                               ? "Подтверждение…"
-                              : "Подтвердить"}
+                              : isFinalRegistrationPage
+                                ? "Подтвердить явку"
+                                : "Подтвердить"}
                           </button>
                         )}
                         <button
@@ -832,7 +949,10 @@ const AdminTournamentRegistration: React.FC = () => {
           tournamentId={tournamentId}
           tournament={tournament}
           context="admin"
-          invalidateQueryKeys={[["tournamentRegistration", tournamentId]]}
+          invalidateQueryKeys={[
+            ["tournamentRegistration", tournamentId],
+            ["tournamentFinalRegistration", tournamentId],
+          ]}
           onClose={() => setRegisterModalOpen(false)}
         />
       )}
@@ -848,6 +968,10 @@ const AdminTournamentRegistration: React.FC = () => {
           onSuccess={() => {
             void queryClient.invalidateQueries([
               "tournamentRegistration",
+              tournamentId,
+            ]);
+            void queryClient.invalidateQueries([
+              "tournamentFinalRegistration",
               tournamentId,
             ]);
             void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);

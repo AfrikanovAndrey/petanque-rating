@@ -31,6 +31,8 @@ export enum TournamentStatus {
   DRAFT = "DRAFT",
   FINISHED = "FINISHED",
   REGISTRATION = "REGISTRATION",
+  /** После старта турнира: подтверждение явки до выбора формата */
+  FINAL_REGISTRATION = "FINAL_REGISTRATION",
   IN_PROGRESS = "IN_PROGRESS",
 }
 
@@ -71,7 +73,7 @@ export interface Tournament {
   results_validated_at?: string | null;
   created_at: string;
   updated_at: string;
-  /** Для FINISHED — команды с результатами; для DRAFT / REGISTRATION / IN_PROGRESS — только подтверждённые заявки */
+  /** Для FINISHED — команды с результатами; для DRAFT / REGISTRATION / FINAL_REGISTRATION / IN_PROGRESS — только подтверждённые заявки */
   teams_count?: number;
   /** Неподтверждённые заявки (список турниров в админке) */
   pending_registration_teams_count?: number;
@@ -118,6 +120,33 @@ export interface TournamentRegisteredTeam {
 export interface TournamentRegistrationPageData {
   tournament: Tournament;
   teams: TournamentRegisteredTeam[];
+  /** Групповой этап (только IN_PROGRESS + GROUPS) */
+  groups?: TournamentGroupStageView[];
+}
+
+export interface TournamentGroupMatchView {
+  id: number;
+  round_number: number;
+  team_a_id: number;
+  team_b_id: number;
+  score_a: number | null;
+  score_b: number | null;
+  court: number | null;
+}
+
+export interface TournamentGroupTeamStanding {
+  team_id: number;
+  players: string[];
+  wins: number;
+  point_diff: number;
+  place: number;
+  played: number;
+}
+
+export interface TournamentGroupStageView {
+  group_number: number;
+  teams: TournamentGroupTeamStanding[];
+  matches: TournamentGroupMatchView[];
 }
 
 /** Ответ GET /rating/players/search (автодополнение) */

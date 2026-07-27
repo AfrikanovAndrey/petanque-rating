@@ -169,6 +169,20 @@ router.get(
   AdminController.getTournamentInProgressPage,
 );
 
+// PUT /api/admin/tournaments/:tournamentId/group-matches/:matchId — счёт матча группы
+router.put(
+  "/tournaments/:tournamentId/group-matches/:matchId",
+  requireTournamentStaff,
+  auditLog({
+    action: "UPDATE_TOURNAMENT_GROUP_MATCH",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Обновление матча #${req.params.matchId} турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.updateTournamentGroupMatch,
+);
+
 // POST /api/admin/tournaments/:tournamentId/complete-from-excel — завершить турнир «в процессе» загрузкой Excel
 router.post(
   "/tournaments/:tournamentId/complete-from-excel",
@@ -311,7 +325,7 @@ router.put(
   AdminController.updateTournamentPlaySettings,
 );
 
-// POST /api/admin/tournaments/:tournamentId/group-draw — жеребьёвка по группам
+// POST /api/admin/tournaments/:tournamentId/group-draw — автоматическая жеребьёвка по группам
 router.post(
   "/tournaments/:tournamentId/group-draw",
   requireTournamentStaff,
@@ -325,7 +339,21 @@ router.post(
   AdminController.performTournamentGroupDraw,
 );
 
-// POST /api/admin/tournaments/:tournamentId/start — начать турнир (IN_PROGRESS)
+// PUT /api/admin/tournaments/:tournamentId/group-draw — ручная жеребьёвка по группам
+router.put(
+  "/tournaments/:tournamentId/group-draw",
+  requireTournamentStaff,
+  auditLog({
+    action: "TOURNAMENT_GROUP_DRAW_MANUAL",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Ручная жеребьёвка по группам для турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.saveManualTournamentGroupDraw,
+);
+
+// POST /api/admin/tournaments/:tournamentId/start — в финальную регистрацию (до выбора формата)
 router.post(
   "/tournaments/:tournamentId/start",
   requireTournamentStaff,
@@ -336,6 +364,20 @@ router.post(
     getDescription: (req) => `Старт турнира ID ${req.params.tournamentId}`,
   }),
   AdminController.startTournament,
+);
+
+// POST /api/admin/tournaments/:tournamentId/begin-play — формат выбран, переход к IN_PROGRESS
+router.post(
+  "/tournaments/:tournamentId/begin-play",
+  requireTournamentStaff,
+  auditLog({
+    action: "BEGIN_TOURNAMENT_PLAY",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Переход к проведению турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.beginTournamentPlay,
 );
 
 // PUT /api/admin/tournaments/:tournamentId - обновить турнир (ADMIN и MANAGER)

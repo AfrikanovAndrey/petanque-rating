@@ -17,15 +17,18 @@ import {
   TeamQualifyingResults,
   TournamentParser,
 } from "../controllers/TournamentParser";
+import { TournamentGroupMatchModel } from "../models/TournamentGroupMatchModel";
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
+import { buildGroupStageViews } from "../services/groupStageService";
 import {
   Cup,
   CupPosition,
   TeamResults,
   TournamentCategoryEnum,
+  TournamentPlayFormat,
   TournamentStatus,
   TournamentType,
 } from "../types";
@@ -444,11 +447,14 @@ export class TournamentController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+      if (
+        tournament.status !== TournamentStatus.IN_PROGRESS &&
+        tournament.status !== TournamentStatus.FINAL_REGISTRATION
+      ) {
         res.status(400).json({
           success: false,
           message:
-            "Страница доступна только для турниров в статусе «В процессе»",
+            "Страница доступна только для турниров в статусе «Финальная регистрация» или «В процессе»",
         });
         return;
       }
@@ -460,11 +466,30 @@ export class TournamentController {
           { confirmedOnly: true },
         );
 
+      let groups: ReturnType<typeof buildGroupStageViews> = [];
+      if (
+        tournament.status === TournamentStatus.IN_PROGRESS &&
+        tournament.play_format === TournamentPlayFormat.GROUPS &&
+        tournament.group_draw &&
+        tournament.group_draw.length > 0
+      ) {
+        const matches =
+          await TournamentGroupMatchModel.listByTournament(tournamentId);
+        if (matches.length > 0) {
+          groups = buildGroupStageViews(
+            tournament.group_draw,
+            teams,
+            matches,
+          );
+        }
+      }
+
       res.json({
         success: true,
         data: {
           tournament,
           teams,
+          groups,
         },
       });
     } catch (error) {
@@ -552,7 +577,10 @@ export class TournamentController {
       res.status(404).json({ success: false, message: "Турнир не найден" });
       return;
     }
-    if (tournament.status !== TournamentStatus.REGISTRATION) {
+    if (
+      tournament.status !== TournamentStatus.REGISTRATION &&
+      tournament.status !== TournamentStatus.FINAL_REGISTRATION
+    ) {
       res.status(400).json({
         success: false,
         message: "Регистрация на этот турнир закрыта",

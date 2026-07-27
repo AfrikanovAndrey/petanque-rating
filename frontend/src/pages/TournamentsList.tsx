@@ -226,10 +226,12 @@ const TournamentsList: React.FC = () => {
               const details = tournamentDetails[tournament.id];
               const isRegistration =
                 tournament.status === TournamentStatus.REGISTRATION;
+              const isFinalRegistration =
+                tournament.status === TournamentStatus.FINAL_REGISTRATION;
               const isInProgress =
                 tournament.status === TournamentStatus.IN_PROGRESS;
               const navigatesToPublicSnapshot =
-                isRegistration || isInProgress;
+                isRegistration || isFinalRegistration || isInProgress;
 
               const rowSummary = (
                 <div className="flex items-start sm:items-center justify-between">
@@ -253,9 +255,13 @@ const TournamentsList: React.FC = () => {
                           className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             tournament.status === TournamentStatus.REGISTRATION
                               ? "bg-amber-100 text-amber-900"
-                              : tournament.status === TournamentStatus.IN_PROGRESS
-                                ? "bg-sky-100 text-sky-900"
-                                : "bg-gray-100 text-gray-700"
+                              : tournament.status ===
+                                  TournamentStatus.FINAL_REGISTRATION
+                                ? "bg-emerald-100 text-emerald-900"
+                                : tournament.status ===
+                                    TournamentStatus.IN_PROGRESS
+                                  ? "bg-sky-100 text-sky-900"
+                                  : "bg-gray-100 text-gray-700"
                           }`}
                         >
                           {getTournamentStatusText(tournament.status)}

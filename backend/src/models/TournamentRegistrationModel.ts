@@ -343,6 +343,44 @@ export class TournamentRegistrationModel {
     return result.affectedRows > 0 ? "confirmed" : "already_confirmed";
   }
 
+  /** Сбросить подтверждения всех заявок (перед финальной регистрацией). */
+  static async unconfirmAllRegistrations(
+    tournamentId: number,
+    connection?: PoolConnection,
+  ): Promise<number> {
+    const exec = connection ?? pool;
+    const hasUpdatedAt = await this.hasColumn("updated_at");
+    const setClause = hasUpdatedAt
+      ? "is_confirmed = 0, updated_at = NOW()"
+      : "is_confirmed = 0";
+    const [result] = await exec.execute<ResultSetHeader>(
+      `UPDATE tournament_registrations
+       SET ${setClause}
+       WHERE tournament_id = ? AND is_confirmed = 1`,
+      [tournamentId],
+    );
+    return result.affectedRows;
+  }
+
+  /** При смене состава сбросить подтверждение заявки. */
+  static async unconfirmRegistration(
+    tournamentId: number,
+    teamId: number,
+    connection?: PoolConnection,
+  ): Promise<void> {
+    const exec = connection ?? pool;
+    const hasUpdatedAt = await this.hasColumn("updated_at");
+    const setClause = hasUpdatedAt
+      ? "is_confirmed = 0, updated_at = NOW()"
+      : "is_confirmed = 0";
+    await exec.execute(
+      `UPDATE tournament_registrations
+       SET ${setClause}
+       WHERE tournament_id = ? AND team_id = ?`,
+      [tournamentId, teamId],
+    );
+  }
+
   static async replaceRegisteredTeam(
     tournamentId: number,
     currentTeamId: number,
@@ -358,6 +396,7 @@ export class TournamentRegistrationModel {
     if (hasRosterJson) {
       setClause += ", registration_roster_json = NULL";
     }
+    setClause += ", is_confirmed = 0";
     params.push(tournamentId, currentTeamId);
 
     const [result] = await exec.execute<ResultSetHeader>(

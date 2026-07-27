@@ -88,6 +88,8 @@ export function getTournamentStatusText(
       return "Черновик";
     case TournamentStatus.REGISTRATION:
       return "Регистрация";
+    case TournamentStatus.FINAL_REGISTRATION:
+      return "Финальная регистрация";
     case TournamentStatus.IN_PROGRESS:
       return "В процессе";
     case TournamentStatus.FINISHED:

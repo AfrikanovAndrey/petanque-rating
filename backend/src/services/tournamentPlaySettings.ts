@@ -113,7 +113,28 @@ function shuffleTeamIds(teamIds: number[]): number[] {
 }
 
 /**
- * Случайная жеребьёвка команд по группам с ограничением размера группы.
+ * Равномерные размеры групп при ограничении maxGroupSize.
+ * Пример: 6 команд, max 4 → [3, 3], а не [4, 2].
+ */
+export function getEvenGroupSizes(
+  teamCount: number,
+  maxGroupSize: number,
+): number[] {
+  if (teamCount <= 0 || maxGroupSize <= 0) {
+    return [];
+  }
+  const numGroups = Math.max(1, Math.ceil(teamCount / maxGroupSize));
+  const base = Math.floor(teamCount / numGroups);
+  const remainder = teamCount % numGroups;
+  return Array.from(
+    { length: numGroups },
+    (_, index) => base + (index < remainder ? 1 : 0),
+  );
+}
+
+/**
+ * Случайная жеребьёвка команд по группам: размеры групп выравниваются
+ * (разница не больше 1), при этом не превышая maxGroupSize.
  */
 export function performGroupDraw(
   teamIds: number[],
@@ -124,31 +145,77 @@ export function performGroupDraw(
   }
 
   const shuffled = shuffleTeamIds(teamIds);
-  const numGroups = Math.max(1, Math.ceil(shuffled.length / groupSize));
-  const groups: TournamentGroupDrawGroup[] = Array.from(
-    { length: numGroups },
-    (_, index) => ({
-      group_number: index + 1,
-      team_ids: [],
-    }),
-  );
+  const sizes = getEvenGroupSizes(shuffled.length, groupSize);
+  const groups: TournamentGroupDrawGroup[] = sizes.map((size, index) => ({
+    group_number: index + 1,
+    team_ids: [],
+  }));
 
-  let groupIndex = 0;
-  for (const teamId of shuffled) {
-    while (
-      groups[groupIndex].team_ids.length >= groupSize &&
-      groupIndex < numGroups - 1
-    ) {
-      groupIndex++;
+  let offset = 0;
+  for (let i = 0; i < sizes.length; i++) {
+    groups[i].team_ids = shuffled.slice(offset, offset + sizes[i]);
+    offset += sizes[i];
+  }
+
+  return groups;
+}
+
+/**
+ * Проверка ручной жеребьёвки: все подтверждённые команды ровно один раз,
+ * размеры групп — равномерные и не больше groupSize.
+ */
+export function validateManualGroupDraw(
+  groupDraw: TournamentGroupDrawGroup[],
+  confirmedTeamIds: number[],
+  groupSize: number,
+): string | null {
+  if (!Array.isArray(groupDraw) || groupDraw.length === 0) {
+    return "Укажите распределение команд по группам";
+  }
+
+  const confirmedSet = new Set(confirmedTeamIds);
+  if (confirmedSet.size === 0) {
+    return "Нет подтверждённых заявок для жеребьёвки";
+  }
+
+  const expectedSizes = getEvenGroupSizes(confirmedTeamIds.length, groupSize);
+  if (groupDraw.length !== expectedSizes.length) {
+    return `Ожидается ${expectedSizes.length} групп(ы) при размере группы до ${groupSize}`;
+  }
+
+  const seen = new Set<number>();
+  for (let i = 0; i < groupDraw.length; i++) {
+    const group = groupDraw[i];
+    if (!group || group.group_number !== i + 1) {
+      return "Номера групп должны идти подряд, начиная с 1";
     }
-    groups[groupIndex].team_ids.push(teamId);
-    if (
-      groups[groupIndex].team_ids.length >= groupSize &&
-      groupIndex < numGroups - 1
-    ) {
-      groupIndex++;
+    if (!Array.isArray(group.team_ids) || group.team_ids.length === 0) {
+      return `Группа ${i + 1} пуста`;
+    }
+    if (group.team_ids.length !== expectedSizes[i]) {
+      return `В группе ${i + 1} должно быть ${expectedSizes[i]} команд(ы) (равномерное распределение)`;
+    }
+    if (group.team_ids.length > groupSize) {
+      return `В группе ${i + 1} больше ${groupSize} команд`;
+    }
+    for (const teamId of group.team_ids) {
+      if (!Number.isInteger(teamId) || teamId <= 0) {
+        return "Некорректный идентификатор команды в жеребьёвке";
+      }
+      if (!confirmedSet.has(teamId)) {
+        return `Команда #${teamId} не входит в подтверждённые заявки`;
+      }
+      if (seen.has(teamId)) {
+        return "Одна и та же команда указана в нескольких группах";
+      }
+      seen.add(teamId);
     }
   }
 
-  return groups.filter((group) => group.team_ids.length > 0);
+  if (seen.size !== confirmedSet.size) {
+    const missing = confirmedTeamIds.filter((id) => !seen.has(id));
+    return `Не все подтверждённые команды распределены (осталось: ${missing.length})`;
+  }
+
+  return null;
 }

@@ -1,5 +1,6 @@
 import {
   performGroupDraw,
+  validateManualGroupDraw,
   validatePlaySettings,
 } from "../tournamentPlaySettings";
 import {
@@ -78,5 +79,62 @@ describe("performGroupDraw", () => {
       expect(group.team_ids.length).toBeLessThanOrEqual(4);
       expect(group.team_ids.length).toBeGreaterThan(0);
     }
+  });
+
+  it("выравнивает размеры групп (6 команд, max 4 → 3+3)", () => {
+    const groups = performGroupDraw([1, 2, 3, 4, 5, 6], 4);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.team_ids.length).sort()).toEqual([3, 3]);
+  });
+});
+
+describe("validateManualGroupDraw", () => {
+  it("принимает полное равномерное распределение без дублей", () => {
+    expect(
+      validateManualGroupDraw(
+        [
+          { group_number: 1, team_ids: [1, 2, 3] },
+          { group_number: 2, team_ids: [4, 5, 6] },
+        ],
+        [1, 2, 3, 4, 5, 6],
+        4,
+      ),
+    ).toBeNull();
+  });
+
+  it("отклоняет неравномерное 4+2 при max 4 и 6 командах", () => {
+    expect(
+      validateManualGroupDraw(
+        [
+          { group_number: 1, team_ids: [1, 2, 3, 4] },
+          { group_number: 2, team_ids: [5, 6] },
+        ],
+        [1, 2, 3, 4, 5, 6],
+        4,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("отклоняет незавершённое распределение", () => {
+    expect(
+      validateManualGroupDraw(
+        [{ group_number: 1, team_ids: [1, 2, 3] }],
+        [1, 2, 3, 4, 5, 6],
+        4,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("отклоняет дубли команд", () => {
+    expect(
+      validateManualGroupDraw(
+        [
+          { group_number: 1, team_ids: [1, 2, 3, 4] },
+          { group_number: 2, team_ids: [5, 6, 1, 8] },
+        ],
+        [1, 2, 3, 4, 5, 6, 7, 8],
+        4,
+      ),
+    ).not.toBeNull();
   });
 });

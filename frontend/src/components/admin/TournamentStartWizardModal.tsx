@@ -20,6 +20,7 @@ import {
 } from "../../utils/tournamentPlaySettings";
 
 type WizardStep = 1 | 2 | 3;
+type DrawMode = "auto" | "manual";
 
 type Props = {
   open: boolean;
@@ -30,6 +31,30 @@ type Props = {
   confirmedTeamsCount: number;
   onSuccess: () => void;
 };
+
+/** Пустые слоты групп с равномерным числом мест. 0 = не выбрано. */
+function buildEmptyManualSlots(
+  teamCount: number,
+  maxGroupSize: number
+): number[][] {
+  if (teamCount <= 0 || maxGroupSize <= 0) {
+    return [];
+  }
+  const numGroups = Math.max(1, Math.ceil(teamCount / maxGroupSize));
+  const base = Math.floor(teamCount / numGroups);
+  const remainder = teamCount % numGroups;
+  return Array.from({ length: numGroups }, (_, index) => {
+    const slotCount = base + (index < remainder ? 1 : 0);
+    return Array.from({ length: slotCount }, () => 0);
+  });
+}
+
+function manualSlotsToGroupDraw(slots: number[][]): TournamentGroupDrawGroup[] {
+  return slots.map((teamIds, index) => ({
+    group_number: index + 1,
+    team_ids: teamIds.filter((id) => id > 0),
+  }));
+}
 
 const TournamentStartWizardModal: React.FC<Props> = ({
   open,
@@ -59,6 +84,8 @@ const TournamentStartWizardModal: React.FC<Props> = ({
   const [groupDraw, setGroupDraw] = useState<TournamentGroupDrawGroup[] | null>(
     tournament.group_draw ?? null
   );
+  const [drawMode, setDrawMode] = useState<DrawMode>("auto");
+  const [manualSlots, setManualSlots] = useState<number[][]>([]);
 
   useEffect(() => {
     if (!open) {
@@ -71,6 +98,8 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     setTiebreakerOrder(tournament.tiebreaker_order ?? []);
     setPendingTiebreaker("");
     setGroupDraw(tournament.group_draw ?? null);
+    setDrawMode("auto");
+    setManualSlots([]);
   }, [open, tournament]);
 
   const availableTiebreakers = useMemo(
@@ -90,16 +119,40 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     }
   }, [availableTiebreakers, pendingTiebreaker]);
 
+  const confirmedTeams = useMemo(
+    () => teams.filter((team) => team.is_confirmed),
+    [teams]
+  );
+
   const teamNameById = useMemo(
     () =>
       new Map(
-        teams.map((team) => [
-          team.team_id,
-          team.players.join(", "),
-        ])
+        teams.map((team) => [team.team_id, team.players.join(", ")])
       ),
     [teams]
   );
+
+  const assignedTeamIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const group of manualSlots) {
+      for (const teamId of group) {
+        if (teamId > 0) {
+          ids.add(teamId);
+        }
+      }
+    }
+    return ids;
+  }, [manualSlots]);
+
+  const isManualDrawComplete = useMemo(() => {
+    if (manualSlots.length === 0 || confirmedTeams.length === 0) {
+      return false;
+    }
+    const allFilled = manualSlots.every((group) =>
+      group.every((teamId) => teamId > 0)
+    );
+    return allFilled && assignedTeamIds.size === confirmedTeams.length;
+  }, [manualSlots, confirmedTeams.length, assignedTeamIds.size]);
 
   const totalSteps = playFormat === TournamentPlayFormat.GROUPS ? 3 : 2;
 
@@ -153,11 +206,33 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     }
   );
 
-  const startMutation = useMutation(
+  const saveManualDrawMutation = useMutation(
+    async (draw: TournamentGroupDrawGroup[]) => {
+      const response = await adminApi.saveManualTournamentGroupDraw(
+        tournamentId,
+        draw
+      );
+      if (!response.data.success || !response.data.data) {
+        throw new Error(
+          response.data.message || "Не удалось сохранить жеребьёвку"
+        );
+      }
+      return response.data.data.group_draw;
+    },
+    {
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
+  const beginPlayMutation = useMutation(
     async () => {
-      const response = await adminApi.startTournament(tournamentId);
+      const response = await adminApi.beginTournamentPlay(tournamentId);
       if (!response.data.success) {
-        throw new Error(response.data.message || "Не удалось начать турнир");
+        throw new Error(
+          response.data.message || "Не удалось начать проведение"
+        );
       }
     },
     {
@@ -185,6 +260,54 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     setTiebreakerOrder((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const initManualSlots = () => {
+    setManualSlots(
+      buildEmptyManualSlots(confirmedTeams.length, groupSize)
+    );
+    setGroupDraw(null);
+  };
+
+  const handleDrawModeChange = (mode: DrawMode) => {
+    setDrawMode(mode);
+    if (mode === "manual") {
+      initManualSlots();
+    } else {
+      setManualSlots([]);
+      setGroupDraw(null);
+    }
+  };
+
+  const setManualSlot = (
+    groupIndex: number,
+    slotIndex: number,
+    teamId: number
+  ) => {
+    setManualSlots((prev) =>
+      prev.map((group, gIdx) => {
+        if (gIdx !== groupIndex) {
+          return group.map((id) => (teamId > 0 && id === teamId ? 0 : id));
+        }
+        return group.map((id, sIdx) => {
+          if (sIdx === slotIndex) {
+            return teamId;
+          }
+          if (teamId > 0 && id === teamId) {
+            return 0;
+          }
+          return id;
+        });
+      })
+    );
+  };
+
+  const optionsForSlot = (groupIndex: number, slotIndex: number) => {
+    const current = manualSlots[groupIndex]?.[slotIndex] ?? 0;
+    return confirmedTeams.filter(
+      (team) =>
+        team.team_id === current || !assignedTeamIds.has(team.team_id)
+    );
+  };
+
   const handleNextFromStep1 = () => {
     if (!playFormat) {
       toast.error("Выберите формат турнира");
@@ -198,9 +321,11 @@ const TournamentStartWizardModal: React.FC<Props> = ({
       await saveSettingsMutation.mutateAsync();
       if (playFormat === TournamentPlayFormat.GROUPS) {
         setGroupDraw(null);
+        setDrawMode("auto");
+        setManualSlots([]);
         setStep(3);
       } else {
-        await startMutation.mutateAsync();
+        await beginPlayMutation.mutateAsync();
       }
     } catch {
       // toast already shown
@@ -208,12 +333,20 @@ const TournamentStartWizardModal: React.FC<Props> = ({
   };
 
   const handleStartWithGroups = async () => {
-    if (!groupDraw || groupDraw.length === 0) {
-      toast.error("Сначала проведите жеребьёвку");
-      return;
-    }
     try {
-      await startMutation.mutateAsync();
+      if (drawMode === "manual") {
+        if (!isManualDrawComplete) {
+          toast.error("Распределите все подтверждённые команды по группам");
+          return;
+        }
+        const draw = manualSlotsToGroupDraw(manualSlots);
+        const saved = await saveManualDrawMutation.mutateAsync(draw);
+        setGroupDraw(saved);
+      } else if (!groupDraw || groupDraw.length === 0) {
+        toast.error("Сначала проведите жеребьёвку");
+        return;
+      }
+      await beginPlayMutation.mutateAsync();
     } catch {
       // toast already shown
     }
@@ -222,7 +355,13 @@ const TournamentStartWizardModal: React.FC<Props> = ({
   const isBusy =
     saveSettingsMutation.isLoading ||
     drawMutation.isLoading ||
-    startMutation.isLoading;
+    saveManualDrawMutation.isLoading ||
+    beginPlayMutation.isLoading;
+
+  const canStartWithGroups =
+    drawMode === "manual"
+      ? isManualDrawComplete
+      : Boolean(groupDraw && groupDraw.length > 0);
 
   if (!open) {
     return null;
@@ -239,7 +378,7 @@ const TournamentStartWizardModal: React.FC<Props> = ({
       }}
     >
       <div
-        className="relative w-full max-w-2xl rounded-lg bg-white shadow-xl"
+        className="relative w-full max-w-3xl rounded-lg bg-white shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="tournament-start-wizard-title"
@@ -260,10 +399,10 @@ const TournamentStartWizardModal: React.FC<Props> = ({
             id="tournament-start-wizard-title"
             className="text-lg font-semibold text-gray-900 pr-8"
           >
-            Начать турнир
+            Начать проведение
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Шаг {step} из {totalSteps}
+            Выберите формат турнира. Шаг {step} из {totalSteps}
           </p>
           <div className="mt-3 flex gap-2">
             {Array.from({ length: totalSteps }, (_, index) => {
@@ -470,48 +609,151 @@ const TournamentStartWizardModal: React.FC<Props> = ({
           {step === 3 && playFormat === TournamentPlayFormat.GROUPS && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
-                Проведите жеребьёвку подтверждённых команд по группам (размер группы:{" "}
-                {groupSize}).
+                Распределите подтверждённые команды по группам (размер группы:{" "}
+                {groupSize}). Подтверждённых заявок: {confirmedTeamsCount}.
               </p>
+
               {confirmedTeamsCount === 0 ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   Нет подтверждённых заявок. Подтвердите заявки перед жеребьёвкой.
                 </div>
               ) : (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={drawMutation.isLoading}
-                  onClick={() => drawMutation.mutate()}
-                >
-                  {drawMutation.isLoading
-                    ? "Жеребьёвка…"
-                    : groupDraw
-                      ? "Повторить жеребьёвку"
-                      : "Провести жеребьёвку"}
-                </button>
-              )}
-
-              {groupDraw && groupDraw.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {groupDraw.map((group) => (
-                    <div
-                      key={group.group_number}
-                      className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={`rounded-md border px-4 py-2 text-sm font-medium ${
+                        drawMode === "auto"
+                          ? "border-primary-500 bg-primary-50 text-primary-900"
+                          : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                      disabled={isBusy}
+                      onClick={() => handleDrawModeChange("auto")}
                     >
-                      <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                        Группа {getGroupLetter(group.group_number)}
-                      </h3>
-                      <ol className="space-y-1 text-sm text-gray-700 list-decimal list-inside">
-                        {group.team_ids.map((teamId) => (
-                          <li key={teamId}>
-                            {teamNameById.get(teamId) ?? `Команда #${teamId}`}
-                          </li>
-                        ))}
-                      </ol>
+                      Автоматическая жеребьёвка
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-md border px-4 py-2 text-sm font-medium ${
+                        drawMode === "manual"
+                          ? "border-primary-500 bg-primary-50 text-primary-900"
+                          : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                      disabled={isBusy}
+                      onClick={() => handleDrawModeChange("manual")}
+                    >
+                      Ручная жеребьёвка
+                    </button>
+                  </div>
+
+                  {drawMode === "auto" && (
+                    <div className="space-y-4">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={drawMutation.isLoading}
+                        onClick={() => drawMutation.mutate()}
+                      >
+                        {drawMutation.isLoading
+                          ? "Жеребьёвка…"
+                          : groupDraw
+                            ? "Повторить жеребьёвку"
+                            : "Провести жеребьёвку"}
+                      </button>
+
+                      {groupDraw && groupDraw.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {groupDraw.map((group) => (
+                            <div
+                              key={group.group_number}
+                              className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                            >
+                              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                                Группа {getGroupLetter(group.group_number)}
+                              </h3>
+                              <ol className="space-y-1 text-sm text-gray-700 list-decimal list-inside">
+                                {group.team_ids.map((teamId) => (
+                                  <li key={teamId}>
+                                    {teamNameById.get(teamId) ??
+                                      `Команда #${teamId}`}
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  )}
+
+                  {drawMode === "manual" && (
+                    <div className="space-y-4">
+                      <p className="text-xs text-gray-500">
+                        Выберите команду для каждого места. Уже назначенные
+                        команды автоматически скрываются из остальных списков.
+                        Назначено: {assignedTeamIds.size} из{" "}
+                        {confirmedTeams.length}.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {manualSlots.map((group, groupIndex) => (
+                          <div
+                            key={groupIndex}
+                            className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2"
+                          >
+                            <h3 className="text-sm font-semibold text-gray-900">
+                              Группа {getGroupLetter(groupIndex + 1)}
+                            </h3>
+                            {group.map((teamId, slotIndex) => (
+                              <div key={slotIndex}>
+                                <label
+                                  className="sr-only"
+                                  htmlFor={`group-${groupIndex}-slot-${slotIndex}`}
+                                >
+                                  Место {slotIndex + 1} группы{" "}
+                                  {getGroupLetter(groupIndex + 1)}
+                                </label>
+                                <select
+                                  id={`group-${groupIndex}-slot-${slotIndex}`}
+                                  className="input-field text-sm"
+                                  value={teamId || ""}
+                                  disabled={isBusy}
+                                  onChange={(e) =>
+                                    setManualSlot(
+                                      groupIndex,
+                                      slotIndex,
+                                      e.target.value
+                                        ? Number(e.target.value)
+                                        : 0
+                                    )
+                                  }
+                                >
+                                  <option value="">
+                                    Место {slotIndex + 1} — выбрать команду…
+                                  </option>
+                                  {optionsForSlot(groupIndex, slotIndex).map(
+                                    (team) => (
+                                      <option
+                                        key={team.team_id}
+                                        value={team.team_id}
+                                      >
+                                        {team.players.join(", ")}
+                                      </option>
+                                    )
+                                  )}
+                                </select>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      {isManualDrawComplete && (
+                        <p className="text-sm text-green-700">
+                          Все команды распределены.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -551,11 +793,11 @@ const TournamentStartWizardModal: React.FC<Props> = ({
                 disabled={isBusy}
                 onClick={() => void handleNextFromStep2()}
               >
-                {saveSettingsMutation.isLoading || startMutation.isLoading
+                {saveSettingsMutation.isLoading || beginPlayMutation.isLoading
                   ? "Сохранение…"
                   : playFormat === TournamentPlayFormat.GROUPS
                     ? "Далее"
-                    : "Начать турнир"}
+                    : "Начать проведение"}
               </button>
             )}
             {step === 3 && (
@@ -563,14 +805,13 @@ const TournamentStartWizardModal: React.FC<Props> = ({
                 type="button"
                 className="btn-primary"
                 disabled={
-                  isBusy ||
-                  confirmedTeamsCount === 0 ||
-                  !groupDraw ||
-                  groupDraw.length === 0
+                  isBusy || confirmedTeamsCount === 0 || !canStartWithGroups
                 }
                 onClick={() => void handleStartWithGroups()}
               >
-                {startMutation.isLoading ? "Запуск…" : "Начать турнир"}
+                {saveManualDrawMutation.isLoading || beginPlayMutation.isLoading
+                  ? "Запуск…"
+                  : "Начать проведение"}
               </button>
             )}
           </div>

@@ -1,24 +1,32 @@
-import { ArrowLeftIcon, PlayCircleIcon } from "@heroicons/react/24/outline";
-import React, { useMemo } from "react";
+import {
+  ArrowLeftIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PlayCircleIcon,
+} from "@heroicons/react/24/outline";
+import React, { useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { Link, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../components/RegulationsMarkdown";
+import TournamentGroupStageResults from "../components/admin/TournamentGroupStageResults";
 import { getPublicTournamentInProgress, ratingApi } from "../services/api";
-import { TournamentType } from "../types";
 import {
   formatDate,
   formatDateTime,
   getTornamentCategoryText,
+  getTournamentStatusText,
   getTournamentTypeIcons,
   getTournamentTypeText,
   handleApiError,
 } from "../utils";
+import { TournamentStatus, TournamentType } from "../types";
 
 const TournamentInProgressPublic: React.FC = () => {
   const { tournamentId: tournamentIdParam } = useParams<{
     tournamentId: string;
   }>();
   const tournamentId = parseInt(tournamentIdParam || "", 10);
+  const [registrationListOpen, setRegistrationListOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery(
     ["publicTournamentInProgress", tournamentId],
@@ -119,6 +127,10 @@ const TournamentInProgressPublic: React.FC = () => {
     return ratingValues.reduce((sum, value) => sum + value, 0);
   };
 
+  const teamsByRating = [...teams].sort(
+    (a, b) => getTeamTotalRating(b.players) - getTeamTotalRating(a.players)
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -133,8 +145,16 @@ const TournamentInProgressPublic: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             {tournament.name}
           </h1>            
-          <PlayCircleIcon className="h-9 w-9 shrink-0 text-sky-600" />
-          <p className="mt-1 text-gray-600">Турнир в процессе</p>            
+          <PlayCircleIcon
+            className={`h-9 w-9 shrink-0 ${
+              tournament.status === TournamentStatus.FINAL_REGISTRATION
+                ? "text-emerald-600"
+                : "text-sky-600"
+            }`}
+          />
+          <p className="mt-1 text-gray-600">
+            {getTournamentStatusText(tournament.status)}
+          </p>            
         </div>
       </div>
 
@@ -187,60 +207,80 @@ const TournamentInProgressPublic: React.FC = () => {
         </dl>
       </div>
 
+      {data.groups && data.groups.length > 0 && (
+        <TournamentGroupStageResults
+          groups={data.groups}
+          readOnly
+        />
+      )}
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="border-b border-gray-200 px-4 sm:px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Список заявок
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Публичный список — только подтверждённые заявки. Всего:{" "}
-            {teams.length}
-          </p>
-        </div>
-        {teams.length === 0 ? (
-          <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
-            Пока нет подтверждённых команд.
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 sm:px-6 py-4 text-left hover:bg-gray-50"
+          aria-expanded={registrationListOpen}
+          onClick={() => setRegistrationListOpen((open) => !open)}
+        >
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Список регистрации
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Публичный список — только подтверждённые заявки. Всего:{" "}
+              {teams.length}
+            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    №
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Состав команды
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Рейтинг команды
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Обновлено
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {teams.map((team, index) => (
-                  <tr key={team.team_id}>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                      {team.players.map(formatPlayerWithRating).join(", ")}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                      {getTeamTotalRating(team.players)}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                      {formatDateTime(team.updated_at)}
-                    </td>
+          {registrationListOpen ? (
+            <ChevronUpIcon className="h-5 w-5 shrink-0 text-gray-500" />
+          ) : (
+            <ChevronDownIcon className="h-5 w-5 shrink-0 text-gray-500" />
+          )}
+        </button>
+        {registrationListOpen &&
+          (teams.length === 0 ? (
+            <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
+              Пока нет подтверждённых команд.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      №
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Состав команды
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Рейтинг команды
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Обновлено
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {teamsByRating.map((team, index) => (
+                    <tr key={team.team_id}>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
+                        {index + 1}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
+                        {team.players.map(formatPlayerWithRating).join(", ")}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {getTeamTotalRating(team.players)}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                        {formatDateTime(team.updated_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
       </div>
     </div>
   );

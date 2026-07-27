@@ -9,6 +9,7 @@ import {
   TournamentPlayFormat,
   TournamentRegisteredTeam,
   TournamentRegistrationPageData,
+  TournamentGroupStageView,
   TournamentWithResults,
   TiebreakerCriterion,
   Player,
@@ -279,6 +280,21 @@ export const adminApi = {
     AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
   > => api.get(`/admin/tournaments/${tournamentId}/in-progress`),
 
+  updateTournamentGroupMatch: (
+    tournamentId: number,
+    matchId: number,
+    data:
+      | { score_a: number; score_b: number; court?: number | null }
+      | { clear: true; court?: number | null }
+      | { court: number | null }
+  ): Promise<
+    AxiosResponse<ApiResponse<{ groups: TournamentGroupStageView[] }>>
+  > =>
+    api.put(
+      `/admin/tournaments/${tournamentId}/group-matches/${matchId}`,
+      data
+    ),
+
   /** Завершить турнир «в процессе»: записать результаты из Excel в этот же турнир */
   completeInProgressTournamentFromExcel: (
     tournamentId: number,
@@ -403,10 +419,28 @@ export const adminApi = {
     >
   > => api.post(`/admin/tournaments/${tournamentId}/group-draw`),
 
+  saveManualTournamentGroupDraw: (
+    tournamentId: number,
+    group_draw: TournamentGroupDrawGroup[]
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        group_draw: TournamentGroupDrawGroup[];
+        teams: TournamentRegisteredTeam[];
+      }>
+    >
+  > => api.put(`/admin/tournaments/${tournamentId}/group-draw`, { group_draw }),
+
   startTournament: (
     tournamentId: number
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.post(`/admin/tournaments/${tournamentId}/start`),
+
+  /** От финальной регистрации к проведению (IN_PROGRESS) */
+  beginTournamentPlay: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse>> =>
+    api.post(`/admin/tournaments/${tournamentId}/begin-play`),
 
   // Удалить турнир
   deleteTournament: (

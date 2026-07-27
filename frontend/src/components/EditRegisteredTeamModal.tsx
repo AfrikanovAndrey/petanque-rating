@@ -165,6 +165,10 @@ export const EditRegisteredTeamModal: React.FC<Props> = ({
         return;
       }
       await queryClient.invalidateQueries(["tournamentRegistration", tournamentId]);
+      await queryClient.invalidateQueries([
+        "tournamentFinalRegistration",
+        tournamentId,
+      ]);
       onClose();
     } catch (err: unknown) {
       const msg =
