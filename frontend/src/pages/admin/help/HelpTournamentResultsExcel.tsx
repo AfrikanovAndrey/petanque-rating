@@ -55,8 +55,8 @@ const HelpTournamentResultsExcel: React.FC = () => {
               <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">
                 Кубок
               </code>{" "}
-              — A / B / C или А / Б / С (латиница или кириллица). Можно оставить
-              пустым, если команда не дошла до кубков.
+              — A / B / C / D или А / Б / С / Д (латиница или кириллица). Можно
+              оставить пустым, если команда не дошла до кубков.
             </li>
             <li>
               <code className="text-sm bg-gray-100 px-1.5 py-0.5 rounded">

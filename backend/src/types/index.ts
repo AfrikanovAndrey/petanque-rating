@@ -44,6 +44,33 @@ export interface TournamentGroupDrawGroup {
   team_ids: number[];
 }
 
+/** Сид команды в швейцарской системе */
+export type SwissSeedEntry = {
+  team_id: number;
+  seed: number;
+  rating: number;
+  random_tie: number;
+};
+
+export type CupStageConfig = {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  ab_playoff: boolean;
+  /** Сохранённые составы при старте (для AB → A/B и отображения) */
+  pools?: Partial<
+    Record<"AB" | "A" | "B" | "C" | "D", Array<{
+      team_id: number;
+      group_number: number;
+      place: number;
+      wins: number;
+      point_diff: number;
+      points_for: number;
+    }>>
+  >;
+};
+
 export interface Tournament {
   id: number;
   name: string;
@@ -57,7 +84,11 @@ export interface Tournament {
   group_size?: number | null;
   swiss_rounds?: number | null;
   tiebreaker_order?: TiebreakerCriterion[] | null;
+  /** Сиды швейцарки после старта проведения */
+  swiss_seed?: SwissSeedEntry[] | null;
   group_draw?: TournamentGroupDrawGroup[] | null;
+  /** Конфиг финальных кубков (после старта финала) */
+  cup_stage_config?: CupStageConfig | null;
   /** Признание президиумом / админом: только тогда результаты входят в публичный рейтинг */
   results_validated_at?: Date | string | null;
   created_at: Date;
@@ -244,7 +275,7 @@ export interface PlayersTeam {
   players: number[];
 }
 
-export type Cup = "A" | "B" | "C";
+export type Cup = "A" | "B" | "C" | "D";
 
 export interface CupTeamResult {
   team: string;

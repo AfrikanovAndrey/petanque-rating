@@ -10,6 +10,8 @@ import {
   TournamentRegisteredTeam,
   TournamentRegistrationPageData,
   TournamentGroupStageView,
+  TournamentCupStageView,
+  TournamentSwissStageView,
   TournamentWithResults,
   TiebreakerCriterion,
   Player,
@@ -292,6 +294,64 @@ export const adminApi = {
   > =>
     api.put(
       `/admin/tournaments/${tournamentId}/group-matches/${matchId}`,
+      data
+    ),
+
+  updateTournamentSwissMatch: (
+    tournamentId: number,
+    matchId: number,
+    data:
+      | { score_a: number; score_b: number; court?: number | null }
+      | { clear: true; court?: number | null }
+      | { court: number | null }
+  ): Promise<
+    AxiosResponse<ApiResponse<{ swiss: TournamentSwissStageView }>>
+  > =>
+    api.put(
+      `/admin/tournaments/${tournamentId}/swiss-matches/${matchId}`,
+      data
+    ),
+
+  startCupStage: (
+    tournamentId: number,
+    data: {
+      a: number;
+      b?: number;
+      c?: number;
+      d?: number;
+      ab_playoff?: boolean;
+    }
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        cups: TournamentCupStageView[];
+        tournament: Tournament;
+      }>
+    >
+  > => api.post(`/admin/tournaments/${tournamentId}/cup-stage/start`, data),
+
+  resetCupStage: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse<{ cups: TournamentCupStageView[] }>>> =>
+    api.delete(`/admin/tournaments/${tournamentId}/cup-stage`),
+
+  updateTournamentCupMatch: (
+    tournamentId: number,
+    matchId: number,
+    data:
+      | { score_a: number; score_b: number; court?: number | null }
+      | { clear: true; court?: number | null }
+      | { court: number | null }
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        cups: TournamentCupStageView[];
+        tournament?: Tournament;
+      }>
+    >
+  > =>
+    api.put(
+      `/admin/tournaments/${tournamentId}/cup-matches/${matchId}`,
       data
     ),
 

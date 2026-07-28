@@ -288,10 +288,10 @@ const MatchScoreInputs: React.FC<{
         title={teamAName}
       >
         {teamAIndex != null && (
-        <span className="inline-flex h-5 w-8 shrink-0 items-center justify-center text-xs font-semibold text-gray-500">
-          ({teamAIndex})
-        </span>
-      )}
+          <span className="inline-flex h-5 w-8 shrink-0 items-center justify-center text-xs font-semibold text-gray-500">
+            ({teamAIndex})
+          </span>
+        )}
         {teamAName}
       </span>
       <input
@@ -358,12 +358,11 @@ const MatchScoreInputs: React.FC<{
       >
         {teamBName}
         {teamBIndex != null && (
-        <span className="inline-flex h-5 w-8 shrink-0 items-center justify-center text-xs font-semibold text-gray-500">
-          ({teamBIndex})
-        </span>
-      )}
+          <span className="inline-flex h-5 w-8 shrink-0 items-center justify-center text-xs font-semibold text-gray-500">
+            ({teamBIndex})
+          </span>
+        )}
       </span>
-      
       <span className="shrink-0 text-sm font-medium text-gray-600">дорожка</span>
       <input
         type="number"
@@ -431,43 +430,47 @@ const GroupResultsPanel: React.FC<{
   return (
     <div className="space-y-5">
       <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="min-w-full border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm">
           <thead>
             <tr className="bg-gray-50">
-              <th className="border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600 w-8">
+              <th className="w-8 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600">
                 №
               </th>
-              <th className="border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600 min-w-[140px]">
+              <th className="w-52 border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600">
                 Команда
               </th>
               {orderedTeams.map((_, i) => (
                 <th
                   key={i}
-                  className="border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600 w-14"
+                  className="w-14 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600"
                 >
                   {i + 1}
                 </th>
               ))}
-              <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
+              <th className="w-12 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600">
                 победы
               </th>
-              <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
+              <th className="w-10 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600">
                 доп
               </th>
-              <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
+              <th className="w-10 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600">
                 место
               </th>
             </tr>
           </thead>
           <tbody>
             {orderedTeams.map((rowTeam, rowIndex) => {
+              const name = teamLabel(rowTeam.players);
               return (
                 <tr key={rowTeam.team_id} className="bg-white">
-                  <td className="border border-gray-200 px-2 py-1 text-gray-500 text-center">
+                  <td className="border border-gray-200 px-1 py-1 text-center text-gray-500">
                     {rowIndex + 1}
                   </td>
-                  <td className="border border-gray-200 px-2 py-1 font-medium text-gray-900">
-                    {teamLabel(rowTeam.players)}
+                  <td
+                    className="truncate border border-gray-200 px-2 py-1 font-medium text-gray-900"
+                    title={name}
+                  >
+                    {name}
                   </td>
                   {orderedTeams.map((colTeam, colIndex) => {
                     if (rowIndex === colIndex) {
@@ -511,13 +514,13 @@ const GroupResultsPanel: React.FC<{
                       </td>
                     );
                   })}
-                  <td className="border border-gray-200 px-2 py-1 text-center font-semibold">
+                  <td className="border border-gray-200 px-1 py-1 text-center font-semibold">
                     {rowTeam.wins}
                   </td>
-                  <td className="border border-gray-200 px-2 py-1 text-center">
+                  <td className="border border-gray-200 px-1 py-1 text-center">
                     {formatDiff(rowTeam.point_diff)}
                   </td>
-                  <td className="border border-gray-200 px-2 py-1 text-center font-semibold">
+                  <td className="border border-gray-200 px-1 py-1 text-center font-semibold">
                     {allMatchesPlayed && rowTeam.place > 0
                       ? rowTeam.place
                       : "—"}
@@ -601,6 +604,11 @@ export const TournamentGroupStageResults: React.FC<Props> = ({
     <div className="card p-6 space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-gray-900">Групповой этап</h2>
+        {readOnly && tournamentId != null && (
+          <p className="mt-1 text-sm text-gray-500">
+            Финал уже начат — результаты групп только для просмотра
+          </p>
+        )}
       </div>
 
       <div

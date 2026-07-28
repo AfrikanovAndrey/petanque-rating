@@ -9,6 +9,8 @@ import { useQuery } from "react-query";
 import { Link, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../components/RegulationsMarkdown";
 import TournamentGroupStageResults from "../components/admin/TournamentGroupStageResults";
+import TournamentCupStageResults from "../components/admin/TournamentCupStageResults";
+import TournamentSwissStageResults from "../components/admin/TournamentSwissStageResults";
 import { getPublicTournamentInProgress, ratingApi } from "../services/api";
 import {
   formatDate,
@@ -212,6 +214,14 @@ const TournamentInProgressPublic: React.FC = () => {
           groups={data.groups}
           readOnly
         />
+      )}
+
+      {data.swiss && (
+        <TournamentSwissStageResults swiss={data.swiss} readOnly />
+      )}
+
+      {data.cups && data.cups.length > 0 && (
+        <TournamentCupStageResults cups={data.cups} readOnly />
       )}
 
       <div className="bg-white rounded-lg shadow overflow-hidden">

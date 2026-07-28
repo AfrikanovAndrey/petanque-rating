@@ -54,6 +54,35 @@ export interface TournamentGroupDrawGroup {
   team_ids: number[];
 }
 
+export type CupStageConfig = {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  ab_playoff: boolean;
+};
+
+export type CupBracketCode = "AB" | "A" | "B" | "C" | "D";
+
+export interface TournamentCupMatchView {
+  id: number;
+  round_number: number;
+  match_index: number;
+  team_a_id: number | null;
+  team_b_id: number | null;
+  team_a_players: string[];
+  team_b_players: string[];
+  score_a: number | null;
+  score_b: number | null;
+  court: number | null;
+  is_third_place: boolean;
+}
+
+export interface TournamentCupStageView {
+  cup: CupBracketCode;
+  matches: TournamentCupMatchView[];
+}
+
 // Турнир
 export interface Tournament {
   id: number;
@@ -69,6 +98,7 @@ export interface Tournament {
   swiss_rounds?: number | null;
   tiebreaker_order?: TiebreakerCriterion[] | null;
   group_draw?: TournamentGroupDrawGroup[] | null;
+  cup_stage_config?: CupStageConfig | null;
   /** Признание президиумом: учёт результатов в рейтинге */
   results_validated_at?: string | null;
   created_at: string;
@@ -122,6 +152,10 @@ export interface TournamentRegistrationPageData {
   teams: TournamentRegisteredTeam[];
   /** Групповой этап (только IN_PROGRESS + GROUPS) */
   groups?: TournamentGroupStageView[];
+  /** Швейцарская система (только IN_PROGRESS + SWISS) */
+  swiss?: TournamentSwissStageView | null;
+  /** Финальные кубки / стык AB */
+  cups?: TournamentCupStageView[];
 }
 
 export interface TournamentGroupMatchView {
@@ -147,6 +181,37 @@ export interface TournamentGroupStageView {
   group_number: number;
   teams: TournamentGroupTeamStanding[];
   matches: TournamentGroupMatchView[];
+}
+
+export interface TournamentSwissMatchView {
+  id: number;
+  round_number: number;
+  team_a_id: number;
+  team_b_id: number | null;
+  score_a: number | null;
+  score_b: number | null;
+  is_bye: boolean;
+  court: number | null;
+}
+
+export interface TournamentSwissStanding {
+  team_id: number;
+  players: string[];
+  seed: number;
+  rating: number;
+  random_tie: number;
+  wins: number;
+  point_diff: number;
+  points_for: number;
+  played: number;
+  place: number;
+}
+
+export interface TournamentSwissStageView {
+  swiss_rounds: number;
+  completed_rounds: number;
+  standings: TournamentSwissStanding[];
+  matches: TournamentSwissMatchView[];
 }
 
 /** Ответ GET /rating/players/search (автодополнение) */
@@ -175,7 +240,7 @@ export enum CupPosition {
 
 export function getCupPositionText(
   cupPosition: CupPosition | string,
-  cup?: "A" | "B" | "C" | null
+  cup?: "A" | "B" | "C" | "D" | null
 ) {
   // Для обратной совместимости со старыми данными
   if (typeof cupPosition === "string") {

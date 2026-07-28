@@ -183,6 +183,62 @@ router.put(
   AdminController.updateTournamentGroupMatch,
 );
 
+// PUT /api/admin/tournaments/:tournamentId/swiss-matches/:matchId — счёт матча швейцарки
+router.put(
+  "/tournaments/:tournamentId/swiss-matches/:matchId",
+  requireTournamentStaff,
+  auditLog({
+    action: "UPDATE_TOURNAMENT_SWISS_MATCH",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Обновление матча швейцарки #${req.params.matchId} турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.updateTournamentSwissMatch,
+);
+
+// POST /api/admin/tournaments/:tournamentId/cup-stage/start
+router.post(
+  "/tournaments/:tournamentId/cup-stage/start",
+  requireTournamentStaff,
+  auditLog({
+    action: "START_CUP_STAGE",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Старт финала турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.startCupStage,
+);
+
+// DELETE /api/admin/tournaments/:tournamentId/cup-stage
+router.delete(
+  "/tournaments/:tournamentId/cup-stage",
+  requireTournamentStaff,
+  auditLog({
+    action: "RESET_CUP_STAGE",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Сброс финала турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.resetCupStage,
+);
+
+// PUT /api/admin/tournaments/:tournamentId/cup-matches/:matchId
+router.put(
+  "/tournaments/:tournamentId/cup-matches/:matchId",
+  requireTournamentStaff,
+  auditLog({
+    action: "UPDATE_TOURNAMENT_CUP_MATCH",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Обновление матча кубка #${req.params.matchId} турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.updateTournamentCupMatch,
+);
+
 // POST /api/admin/tournaments/:tournamentId/complete-from-excel — завершить турнир «в процессе» загрузкой Excel
 router.post(
   "/tournaments/:tournamentId/complete-from-excel",

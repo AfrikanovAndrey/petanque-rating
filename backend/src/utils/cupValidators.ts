@@ -4,13 +4,13 @@ import { Cup, CupPosition } from "../types";
  * Проверяет и преобразует строковое значение кубка в тип Cup.
  * Поддерживает латиницу (A, B, C) и кириллицу (А, Б, С) в любом регистре.
  * @param value - строковое значение для проверки
- * @returns Cup ("A" | "B" | "C") или null, если значение не валидно
+ * @returns Cup ("A" | "B" | "C" | "D") или null, если значение не валидно
  */
 export function parseCupValue(value: string): Cup | null {
   const normalized = value.trim().toUpperCase();
 
   // Проверка латиницы
-  if (normalized === "A" || normalized === "B" || normalized === "C") {
+  if (normalized === "A" || normalized === "B" || normalized === "C" || normalized === "D") {
     return normalized as Cup;
   }
 
@@ -23,6 +23,8 @@ export function parseCupValue(value: string): Cup | null {
       return "B";
     case "С": // Кириллица С
       return "C";
+    case "Д": // Кириллица Д
+      return "D";
     default:
       return null;
   }

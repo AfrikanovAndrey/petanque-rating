@@ -18,11 +18,14 @@ import {
   TournamentParser,
 } from "../controllers/TournamentParser";
 import { TournamentGroupMatchModel } from "../models/TournamentGroupMatchModel";
+import { TournamentCupMatchModel } from "../models/TournamentCupMatchModel";
+import { TournamentSwissMatchModel } from "../models/TournamentSwissMatchModel";
 import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
 import { buildGroupStageViews } from "../services/groupStageService";
+import { buildSwissStageView } from "../services/swissStageService";
 import {
   Cup,
   CupPosition,
@@ -484,12 +487,81 @@ export class TournamentController {
         }
       }
 
+      let swiss: ReturnType<typeof buildSwissStageView> | null = null;
+      if (
+        tournament.status === TournamentStatus.IN_PROGRESS &&
+        tournament.play_format === TournamentPlayFormat.SWISS &&
+        tournament.swiss_seed?.length &&
+        tournament.swiss_rounds
+      ) {
+        const swissMatches =
+          await TournamentSwissMatchModel.listByTournament(tournamentId);
+        swiss = buildSwissStageView(
+          tournament.swiss_seed,
+          teams,
+          swissMatches.map((m) => ({
+            id: m.id,
+            round_number: m.round_number,
+            team_a_id: m.team_a_id,
+            team_b_id: m.team_b_id,
+            score_a: m.score_a,
+            score_b: m.score_b,
+            is_bye: m.is_bye,
+            court: m.court,
+          })),
+          tournament.swiss_rounds,
+        );
+      }
+
+      let cups: Array<{
+        cup: string;
+        matches: Array<Record<string, unknown>>;
+      }> = [];
+      if (tournament.status === TournamentStatus.IN_PROGRESS) {
+        const cupMatches =
+          await TournamentCupMatchModel.listByTournament(tournamentId);
+        if (cupMatches.length > 0) {
+          const teamById = new Map(teams.map((t) => [t.team_id, t]));
+          const order = ["AB", "A", "B", "C", "D"] as const;
+          cups = order
+            .map((cup) => {
+              const list = cupMatches.filter((m) => m.cup === cup);
+              if (!list.length) {
+                return null;
+              }
+              return {
+                cup,
+                matches: list.map((m) => ({
+                  id: m.id,
+                  round_number: m.round_number,
+                  match_index: m.match_index,
+                  team_a_id: m.team_a_id,
+                  team_b_id: m.team_b_id,
+                  team_a_players: m.team_a_id
+                    ? teamById.get(m.team_a_id)?.players ?? []
+                    : [],
+                  team_b_players: m.team_b_id
+                    ? teamById.get(m.team_b_id)?.players ?? []
+                    : [],
+                  score_a: m.score_a,
+                  score_b: m.score_b,
+                  court: m.court,
+                  is_third_place: m.is_third_place,
+                })),
+              };
+            })
+            .filter((x): x is NonNullable<typeof x> => x != null);
+        }
+      }
+
       res.json({
         success: true,
         data: {
           tournament,
           teams,
           groups,
+          swiss,
+          cups,
         },
       });
     } catch (error) {

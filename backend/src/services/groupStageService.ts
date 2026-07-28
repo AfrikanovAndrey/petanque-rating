@@ -12,6 +12,7 @@ export type GroupStandingRow = {
   team_id: number;
   wins: number;
   point_diff: number;
+  points_for: number;
   place: number;
   played: number;
 };
@@ -39,6 +40,7 @@ export type GroupStageTeamView = {
   players: string[];
   wins: number;
   point_diff: number;
+  points_for: number;
   place: number;
   played: number;
 };
@@ -81,6 +83,7 @@ export function buildGroupStageViews(
         players: team?.players ?? [],
         wins: standing?.wins ?? 0,
         point_diff: standing?.point_diff ?? 0,
+        points_for: standing?.points_for ?? 0,
         place: standing?.place ?? 0,
         played: standing?.played ?? 0,
       };
@@ -199,6 +202,7 @@ export function computeGroupStandings(
       team_id: teamId,
       wins: s.wins,
       point_diff: s.point_diff,
+      points_for: s.points_for,
       played: s.played,
       place: index + 1,
     };

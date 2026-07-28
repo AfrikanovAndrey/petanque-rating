@@ -12,6 +12,9 @@ import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
 import TournamentGroupStageResults from "../../components/admin/TournamentGroupStageResults";
+import TournamentCupStageResults from "../../components/admin/TournamentCupStageResults";
+import TournamentSwissStageResults from "../../components/admin/TournamentSwissStageResults";
+import CupStageStartModal from "../../components/admin/CupStageStartModal";
 import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
 import { adminApi, ratingApi } from "../../services/api";
 import {
@@ -42,6 +45,7 @@ const AdminTournamentInProgress: React.FC = () => {
   const navigate = useNavigate();
   const [completionModalOpen, setCompletionModalOpen] = useState(false);
   const [registrationListOpen, setRegistrationListOpen] = useState(false);
+  const [cupStageModalOpen, setCupStageModalOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery(
     ["tournamentInProgress", tournamentId],
@@ -337,8 +341,94 @@ const AdminTournamentInProgress: React.FC = () => {
         <TournamentGroupStageResults
           tournamentId={tournamentId}
           groups={data.groups}
+          readOnly={Boolean(data.cups && data.cups.length > 0)}
         />
       )}
+
+      {data.swiss && (
+        <TournamentSwissStageResults
+          tournamentId={tournamentId}
+          swiss={data.swiss}
+          readOnly={Boolean(data.cups && data.cups.length > 0)}
+        />
+      )}
+
+      {tournament.play_format === TournamentPlayFormat.GROUPS &&
+        data.groups &&
+        data.groups.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {!(data.cups && data.cups.length > 0) ? (
+              <button
+                type="button"
+                className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                disabled={
+                  !data.groups.every(
+                    (g) =>
+                      g.matches.length > 0 &&
+                      g.matches.every(
+                        (m) => m.score_a != null && m.score_b != null
+                      )
+                  )
+                }
+                onClick={() => setCupStageModalOpen(true)}
+              >
+                Начать финальную часть
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Сбросить финальную часть? Все счета кубков будут удалены."
+                    )
+                  ) {
+                    return;
+                  }
+                  void adminApi.resetCupStage(tournamentId).then((res) => {
+                    if (res.data.success) {
+                      toast.success("Финал сброшен");
+                      void queryClient.invalidateQueries([
+                        "tournamentInProgress",
+                        tournamentId,
+                      ]);
+                    } else {
+                      toast.error(res.data.message || "Не удалось сбросить");
+                    }
+                  });
+                }}
+              >
+                Сбросить финал
+              </button>
+            )}
+          </div>
+        )}
+
+      {data.cups && data.cups.length > 0 && (
+        <TournamentCupStageResults
+          tournamentId={tournamentId}
+          cups={data.cups}
+        />
+      )}
+
+      <CupStageStartModal
+        open={cupStageModalOpen}
+        onClose={() => setCupStageModalOpen(false)}
+        tournamentId={tournamentId}
+        availableTeams={
+          data.groups?.reduce(
+            (sum, g) => sum + g.teams.filter((t) => t.place > 0).length,
+            0
+          ) ?? 0
+        }
+        onSuccess={() => {
+          void queryClient.invalidateQueries([
+            "tournamentInProgress",
+            tournamentId,
+          ]);
+        }}
+      />
 
       <div className="card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">

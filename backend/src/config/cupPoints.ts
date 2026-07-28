@@ -211,9 +211,8 @@ export function getPoints(
   } else if (!position) {
     // Игрок вышел в плей-офф, проверяем наличие позиции
     throw new Error(`Рассчет очков: Не задана позиция в кубке ${cup}`);
-  } else if (cup === "C") {
-    // ПРАВИЛО 3: Кубок С (утешительный турнир) при количестве участников более 85
-    // Игроки получают квалификационные очки + бонус за позицию
+  } else if (cup === "C" || cup === "D") {
+    // ПРАВИЛО 3: Кубок С/D (утешительный) при количестве участников более 85
     const playersCount = getPlayersCount(totalTeams, tournamentType);
     points =
       playersCount >= 85

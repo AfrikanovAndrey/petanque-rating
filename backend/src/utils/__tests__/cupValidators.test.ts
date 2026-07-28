@@ -26,6 +26,13 @@ describe("parseCupValue", () => {
     test("должна вернуть 'C' для латинской 'c' в нижнем регистре", () => {
       expect(parseCupValue("c")).toBe("C");
     });
+    test("должна вернуть 'D' для латинской 'D'", () => {
+      expect(parseCupValue("D")).toBe("D");
+    });
+
+    test("должна вернуть 'D' для кириллической 'Д'", () => {
+      expect(parseCupValue("Д")).toBe("D");
+    });
   });
 
   describe("Кириллические буквы", () => {
@@ -65,8 +72,8 @@ describe("parseCupValue", () => {
   });
 
   describe("Некорректные значения", () => {
-    test("должна вернуть null для латинской 'D'", () => {
-      expect(parseCupValue("D")).toBeNull();
+    test("должна вернуть null для латинской 'E'", () => {
+      expect(parseCupValue("E")).toBeNull();
     });
 
     test("должна вернуть null для кириллической 'Г'", () => {

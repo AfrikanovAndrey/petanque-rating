@@ -9,10 +9,35 @@ import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
 import { TournamentGroupMatchModel } from "../models/TournamentGroupMatchModel";
+import { TournamentCupMatchModel } from "../models/TournamentCupMatchModel";
+import { TournamentSwissMatchModel } from "../models/TournamentSwissMatchModel";
 import {
   buildGroupStageViews,
   validateMatchScores,
 } from "../services/groupStageService";
+import {
+  buildSwissStageView,
+  isRoundComplete,
+  nextCourtStart,
+  pairNextRoundByScoreGroups,
+  pairRound1HalfMethod,
+  seedTeamsByRating,
+  type SwissMatchScores,
+  type SwissMatchView,
+  type SwissSeedEntry,
+} from "../services/swissStageService";
+import { computeTeamRatingsForSwiss } from "../services/swissTeamRating";
+import {
+  allocateCups,
+  buildAbResultQualified,
+  buildAllCupFixtures,
+  generateBracketFixtures,
+  parseCupStageConfig,
+  rankTeamsFromGroups,
+  validateCupStageConfig,
+  type CupBracketCode,
+  type QualifiedTeam,
+} from "../services/cupStageService";
 import {
   performGroupDraw,
   validateManualGroupDraw,
@@ -20,6 +45,7 @@ import {
   type TournamentPlaySettingsInput,
 } from "../services/tournamentPlaySettings";
 import {
+  CupStageConfig,
   LicensedPlayerUploadData,
   TiebreakerCriterion,
   TournamentCategoryEnum,
@@ -29,6 +55,8 @@ import {
   TournamentType,
 } from "../types";
 import { TournamentController } from "./TournamentController";
+import type { TournamentCupMatchRow } from "../models/TournamentCupMatchModel";
+import type { RegisteredTeamRow } from "../models/TournamentRegistrationModel";
 
 // Настройка multer для загрузки файлов
 const storage = multer.memoryStorage();
@@ -1249,12 +1277,58 @@ export class AdminController {
         );
       }
 
+      let swiss: ReturnType<typeof buildSwissStageView> | null = null;
+      if (tournament.play_format === TournamentPlayFormat.SWISS) {
+        const swissCount =
+          await TournamentSwissMatchModel.countByTournament(tournamentId);
+        if (swissCount === 0) {
+          const confirmed = teams.filter((t) => t.is_confirmed);
+          if (confirmed.length > 0) {
+            await AdminController.ensureSwissRound1(
+              tournamentId,
+              confirmed,
+              tournament.type as TournamentType,
+            );
+            const refreshed =
+              await TournamentModel.getTournamentById(tournamentId);
+            if (refreshed?.swiss_seed) {
+              tournament.swiss_seed = refreshed.swiss_seed;
+            }
+          }
+        }
+        swiss = await AdminController.buildSwissViewForTournament(
+          tournamentId,
+          tournament.swiss_seed ?? null,
+          tournament.swiss_rounds ?? 0,
+          teams,
+        );
+      }
+
+      let cups: ReturnType<typeof AdminController.buildCupStageViews> = [];
+      const cupCount =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (cupCount > 0) {
+        let cupMatches =
+          await TournamentCupMatchModel.listByTournament(tournamentId);
+        const cupsToSync = [
+          ...new Set(cupMatches.map((m) => m.cup)),
+        ] as CupBracketCode[];
+        for (const cup of cupsToSync) {
+          await AdminController.syncThirdPlaceFromSemis(tournamentId, cup);
+        }
+        cupMatches =
+          await TournamentCupMatchModel.listByTournament(tournamentId);
+        cups = AdminController.buildCupStageViews(cupMatches, teams);
+      }
+
       res.json({
         success: true,
         data: {
           tournament,
           teams,
           groups,
+          swiss,
+          cups,
         },
       });
     } catch (error) {
@@ -1304,6 +1378,17 @@ export class AdminController {
         res.status(400).json({
           success: false,
           message: "Матчи групп доступны только для группового формата",
+        });
+        return;
+      }
+
+      const cupCount =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (cupCount > 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "После начала финала групповой этап нельзя изменять. Сбросьте финал, чтобы править группы.",
         });
         return;
       }
@@ -1400,6 +1485,865 @@ export class AdminController {
       });
     } catch (error) {
       console.error("Ошибка обновления матча группы:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /** Сиды + тур 1 швейцарки (пересоздаёт матчи). */
+  private static async ensureSwissRound1(
+    tournamentId: number,
+    teams: Array<{ team_id: number; player_ids: number[] }>,
+    tournamentType: TournamentType,
+  ): Promise<SwissSeedEntry[]> {
+    const ratings = await computeTeamRatingsForSwiss(
+      teams.map((t) => ({
+        team_id: t.team_id,
+        player_ids: t.player_ids,
+      })),
+      tournamentType,
+    );
+    const seeds = seedTeamsByRating(
+      teams.map((t) => ({
+        team_id: t.team_id,
+        rating: ratings.get(t.team_id) ?? 0,
+      })),
+    );
+    await TournamentModel.saveSwissSeed(tournamentId, seeds);
+    await TournamentSwissMatchModel.deleteByTournament(tournamentId);
+    const fixtures = pairRound1HalfMethod(seeds);
+    await TournamentSwissMatchModel.insertFixtures(tournamentId, fixtures);
+    return seeds;
+  }
+
+  private static swissRowsToViews(
+    rows: Awaited<ReturnType<typeof TournamentSwissMatchModel.listByTournament>>,
+  ): SwissMatchView[] {
+    return rows.map((m) => ({
+      id: m.id,
+      round_number: m.round_number,
+      team_a_id: m.team_a_id,
+      team_b_id: m.team_b_id,
+      score_a: m.score_a,
+      score_b: m.score_b,
+      is_bye: m.is_bye,
+      court: m.court,
+    }));
+  }
+
+  private static swissRowsToScores(
+    rows: Awaited<ReturnType<typeof TournamentSwissMatchModel.listByTournament>>,
+  ): SwissMatchScores[] {
+    return rows.map((m) => ({
+      team_a_id: m.team_a_id,
+      team_b_id: m.team_b_id,
+      score_a: m.score_a,
+      score_b: m.score_b,
+      is_bye: m.is_bye,
+      round_number: m.round_number,
+    }));
+  }
+
+  private static async buildSwissViewForTournament(
+    tournamentId: number,
+    swissSeed: SwissSeedEntry[] | null,
+    swissRounds: number,
+    teams: RegisteredTeamRow[],
+  ) {
+    if (!swissSeed?.length || swissRounds < 1) {
+      return null;
+    }
+    const rows = await TournamentSwissMatchModel.listByTournament(tournamentId);
+    return buildSwissStageView(
+      swissSeed,
+      teams,
+      AdminController.swissRowsToViews(rows),
+      swissRounds,
+    );
+  }
+
+  /**
+   * Обновить счёт матча швейцарки.
+   * После последнего результата тура автоматически формирует пары следующего.
+   */
+  static async updateTournamentSwissMatch(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const matchId = parseInt(req.params.matchId, 10);
+      if (isNaN(tournamentId) || isNaN(matchId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира или матча",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Счёт можно менять только в статусе «В процессе»",
+        });
+        return;
+      }
+      if (tournament.play_format !== TournamentPlayFormat.SWISS) {
+        res.status(400).json({
+          success: false,
+          message: "Матчи швейцарки доступны только для формата SWISS",
+        });
+        return;
+      }
+      if (!tournament.swiss_seed?.length || !tournament.swiss_rounds) {
+        res.status(400).json({
+          success: false,
+          message: "Сиды швейцарки не сформированы",
+        });
+        return;
+      }
+
+      const cupCount =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (cupCount > 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "После начала финала швейцарку нельзя изменять. Сбросьте финал.",
+        });
+        return;
+      }
+
+      const match = await TournamentSwissMatchModel.getById(matchId);
+      if (!match || match.tournament_id !== tournamentId) {
+        res.status(404).json({
+          success: false,
+          message: "Матч не найден",
+        });
+        return;
+      }
+      if (match.is_bye) {
+        res.status(400).json({
+          success: false,
+          message: "Bye нельзя редактировать",
+        });
+        return;
+      }
+
+      const body = req.body as {
+        score_a?: unknown;
+        score_b?: unknown;
+        clear?: unknown;
+        court?: unknown;
+      };
+
+      let scoreA: number | null = match.score_a;
+      let scoreB: number | null = match.score_b;
+      const scoreChanging =
+        body.clear === true ||
+        body.score_a !== undefined ||
+        body.score_b !== undefined;
+
+      if (scoreChanging) {
+        const allMatches =
+          await TournamentSwissMatchModel.listByTournament(tournamentId);
+        const laterExists = allMatches.some(
+          (m) => m.round_number > match.round_number,
+        );
+        if (laterExists) {
+          // Каскад: удалить последующие туры при правке счёта
+          await TournamentSwissMatchModel.deleteRoundsFrom(
+            tournamentId,
+            match.round_number + 1,
+          );
+        }
+      }
+
+      if (body.clear === true) {
+        scoreA = null;
+        scoreB = null;
+      } else if (body.score_a !== undefined || body.score_b !== undefined) {
+        const validated = validateMatchScores(body.score_a, body.score_b);
+        if (typeof validated === "string") {
+          res.status(400).json({ success: false, message: validated });
+          return;
+        }
+        scoreA = validated.score_a;
+        scoreB = validated.score_b;
+      } else if (body.court === undefined) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите score_a и score_b, clear или court",
+        });
+        return;
+      }
+
+      let court: number | null | undefined = undefined;
+      if (body.court !== undefined) {
+        if (body.court === null) {
+          court = null;
+        } else {
+          const c =
+            typeof body.court === "number"
+              ? body.court
+              : parseInt(String(body.court), 10);
+          if (!Number.isInteger(c) || c < 1 || c > 99) {
+            res.status(400).json({
+              success: false,
+              message: "Номер дорожки должен быть от 1 до 99",
+            });
+            return;
+          }
+          court = c;
+        }
+      }
+
+      const saved = await TournamentSwissMatchModel.updateScores(
+        matchId,
+        scoreA,
+        scoreB,
+        court,
+      );
+      if (!saved) {
+        res.status(400).json({
+          success: false,
+          message: "Не удалось обновить матч",
+        });
+        return;
+      }
+
+      let rows = await TournamentSwissMatchModel.listByTournament(tournamentId);
+      const scoreRows = AdminController.swissRowsToScores(rows);
+      const swissRounds = tournament.swiss_rounds;
+      const currentRound = match.round_number;
+
+      if (
+        scoreChanging &&
+        scoreA != null &&
+        scoreB != null &&
+        isRoundComplete(scoreRows, currentRound) &&
+        currentRound < swissRounds
+      ) {
+        const nextRound = currentRound + 1;
+        const nextExists = rows.some((m) => m.round_number === nextRound);
+        if (!nextExists) {
+          try {
+            const fixtures = pairNextRoundByScoreGroups(
+              tournament.swiss_seed,
+              scoreRows,
+              nextRound,
+              nextCourtStart(rows),
+            );
+            await TournamentSwissMatchModel.insertFixtures(
+              tournamentId,
+              fixtures,
+            );
+            rows =
+              await TournamentSwissMatchModel.listByTournament(tournamentId);
+          } catch (pairError) {
+            console.error("Ошибка паринга следующего тура швейцарки:", pairError);
+            res.status(400).json({
+              success: false,
+              message:
+                pairError instanceof Error
+                  ? pairError.message
+                  : "Не удалось сформировать пары следующего тура",
+            });
+            return;
+          }
+        }
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const swiss = buildSwissStageView(
+        tournament.swiss_seed,
+        teams,
+        AdminController.swissRowsToViews(rows),
+        swissRounds,
+      );
+
+      res.json({
+        success: true,
+        message: "Матч обновлён",
+        data: { swiss },
+      });
+    } catch (error) {
+      console.error("Ошибка обновления матча швейцарки:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  private static buildCupStageViews(
+    matches: TournamentCupMatchRow[],
+    teams: RegisteredTeamRow[],
+  ) {
+    const teamById = new Map(teams.map((t) => [t.team_id, t]));
+    const byCup = new Map<CupBracketCode, TournamentCupMatchRow[]>();
+    for (const m of matches) {
+      if (!byCup.has(m.cup)) {
+        byCup.set(m.cup, []);
+      }
+      byCup.get(m.cup)!.push(m);
+    }
+    const order: CupBracketCode[] = ["AB", "A", "B", "C", "D"];
+    return order
+      .filter((cup) => byCup.has(cup))
+      .map((cup) => ({
+        cup,
+        matches: (byCup.get(cup) ?? []).map((m) => ({
+          id: m.id,
+          round_number: m.round_number,
+          match_index: m.match_index,
+          team_a_id: m.team_a_id,
+          team_b_id: m.team_b_id,
+          team_a_players: m.team_a_id
+            ? teamById.get(m.team_a_id)?.players ?? []
+            : [],
+          team_b_players: m.team_b_id
+            ? teamById.get(m.team_b_id)?.players ?? []
+            : [],
+          score_a: m.score_a,
+          score_b: m.score_b,
+          court: m.court,
+          is_third_place: m.is_third_place,
+        })),
+      }));
+  }
+
+  private static collectQualifiedFromGroups(
+    groups: ReturnType<typeof buildGroupStageViews>,
+  ): QualifiedTeam[] {
+    const qualified: QualifiedTeam[] = [];
+    for (const g of groups) {
+      for (const t of g.teams) {
+        if (t.place <= 0) {
+          continue;
+        }
+        qualified.push({
+          team_id: t.team_id,
+          group_number: g.group_number,
+          place: t.place,
+          wins: t.wins,
+          point_diff: t.point_diff,
+          points_for: t.points_for,
+        });
+      }
+    }
+    return qualified;
+  }
+
+  private static async advanceCupWinner(
+    match: TournamentCupMatchRow,
+    winnerId: number | null,
+    loserId: number | null,
+  ): Promise<void> {
+    if (
+      winnerId != null &&
+      match.next_match_round != null &&
+      match.next_match_index != null &&
+      match.next_slot
+    ) {
+      const next = await TournamentCupMatchModel.findSlot(
+        match.tournament_id,
+        match.cup,
+        match.next_match_round,
+        match.next_match_index,
+        false,
+      );
+      if (next) {
+        await TournamentCupMatchModel.setTeamSlot(
+          next.id,
+          match.next_slot,
+          winnerId,
+        );
+      }
+    }
+
+    if (loserId == null || match.is_third_place) {
+      return;
+    }
+
+    let loserRound = match.loser_next_match_round;
+    let loserIndex = match.loser_next_match_index;
+    let loserSlot = match.loser_next_slot;
+
+    // Fallback: полуфинал без loser_next_* (старые сетки на 4 команды)
+    if (
+      loserRound == null &&
+      match.next_match_round != null &&
+      match.next_match_index != null
+    ) {
+      const next = await TournamentCupMatchModel.findSlot(
+        match.tournament_id,
+        match.cup,
+        match.next_match_round,
+        match.next_match_index,
+        false,
+      );
+      if (next && next.next_match_round == null) {
+        const third = await TournamentCupMatchModel.findSlot(
+          match.tournament_id,
+          match.cup,
+          match.next_match_round,
+          0,
+          true,
+        );
+        if (third) {
+          loserRound = match.next_match_round;
+          loserIndex = 0;
+          loserSlot = match.match_index % 2 === 0 ? "a" : "b";
+        }
+      }
+    }
+
+    if (loserRound != null && loserIndex != null && loserSlot) {
+      const third = await TournamentCupMatchModel.findSlot(
+        match.tournament_id,
+        match.cup,
+        loserRound,
+        loserIndex,
+        true,
+      );
+      if (third) {
+        await TournamentCupMatchModel.setTeamSlot(
+          third.id,
+          loserSlot,
+          loserId,
+        );
+      }
+    }
+  }
+
+  /** Заполнить слоты матча за 3-е из уже сыгранных полуфиналов. */
+  private static async syncThirdPlaceFromSemis(
+    tournamentId: number,
+    cup: CupBracketCode,
+  ): Promise<void> {
+    const all = await TournamentCupMatchModel.listByTournament(tournamentId);
+    const cupMatches = all.filter((m) => m.cup === cup);
+    const third = cupMatches.find((m) => m.is_third_place);
+    if (!third || third.score_a != null || third.score_b != null) {
+      return;
+    }
+
+    const final = cupMatches.find(
+      (m) =>
+        !m.is_third_place &&
+        m.round_number === third.round_number &&
+        m.match_index === 0,
+    );
+    if (!final) {
+      return;
+    }
+
+    const semis = cupMatches.filter(
+      (m) =>
+        !m.is_third_place &&
+        m.next_match_round === final.round_number &&
+        m.next_match_index === final.match_index,
+    );
+
+    let teamA: number | null = null;
+    let teamB: number | null = null;
+    for (const semi of semis) {
+      if (
+        semi.score_a == null ||
+        semi.score_b == null ||
+        semi.team_a_id == null ||
+        semi.team_b_id == null
+      ) {
+        continue;
+      }
+      const loserId =
+        semi.score_a > semi.score_b ? semi.team_b_id : semi.team_a_id;
+      const slot: "a" | "b" =
+        semi.loser_next_slot ?? (semi.match_index % 2 === 0 ? "a" : "b");
+      if (slot === "a") {
+        teamA = loserId;
+      } else {
+        teamB = loserId;
+      }
+    }
+
+    await TournamentCupMatchModel.setTeamSlot(third.id, "a", teamA);
+    await TournamentCupMatchModel.setTeamSlot(third.id, "b", teamB);
+  }
+
+  private static async maybeGenerateAbCups(
+    tournamentId: number,
+    config: CupStageConfig,
+  ): Promise<void> {
+    if (!config.ab_playoff || !config.pools?.AB) {
+      return;
+    }
+    const all = await TournamentCupMatchModel.listByTournament(tournamentId);
+    const abMatches = all.filter((m) => m.cup === "AB");
+    if (abMatches.length === 0) {
+      return;
+    }
+    if (
+      abMatches.some(
+        (m) =>
+          m.score_a == null ||
+          m.score_b == null ||
+          m.team_a_id == null ||
+          m.team_b_id == null,
+      )
+    ) {
+      return;
+    }
+    if (all.some((m) => m.cup === "A" || m.cup === "B")) {
+      return;
+    }
+
+    const { winners, losers } = buildAbResultQualified(
+      abMatches.map((m) => ({
+        match_index: m.match_index,
+        team_a_id: m.team_a_id!,
+        team_b_id: m.team_b_id!,
+        score_a: m.score_a!,
+        score_b: m.score_b!,
+      })),
+      config.pools.AB,
+    );
+
+    let court = Math.max(0, ...all.map((m) => m.court ?? 0)) + 1;
+    const aFixtures = generateBracketFixtures("A", winners, court);
+    court += aFixtures.length;
+    const bFixtures = generateBracketFixtures("B", losers, court);
+    await TournamentCupMatchModel.insertFixtures(tournamentId, [
+      ...aFixtures,
+      ...bFixtures,
+    ]);
+
+    await TournamentModel.saveCupStageConfig(tournamentId, {
+      ...config,
+      pools: {
+        ...config.pools,
+        A: winners,
+        B: losers,
+      },
+    });
+  }
+
+  /** Старт финальной части: кубки A–D и опциональный стык AB. */
+  static async startCupStage(req: Request, res: Response): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (isNaN(tournamentId)) {
+        res.status(400).json({ success: false, message: "Неверный ID турнира" });
+        return;
+      }
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({ success: false, message: "Турнир не найден" });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Финал доступен только в статусе «В процессе»",
+        });
+        return;
+      }
+      if (
+        tournament.play_format !== TournamentPlayFormat.GROUPS ||
+        !tournament.group_draw?.length
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Финал после групп доступен только для формата GROUPS",
+        });
+        return;
+      }
+
+      const existing =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (existing > 0) {
+        res.status(400).json({
+          success: false,
+          message: "Финал уже начат. Сначала сбросьте кубковую сетку.",
+        });
+        return;
+      }
+
+      const raw = req.body as Record<string, unknown>;
+      const config = parseCupStageConfig({
+        a: raw.a ?? 8,
+        b: raw.b ?? 0,
+        c: raw.c ?? 0,
+        d: raw.d ?? 0,
+        ab_playoff: raw.ab_playoff ?? false,
+      });
+      if (!config) {
+        res.status(400).json({
+          success: false,
+          message: "Некорректный конфиг кубков",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const groupMatches =
+        await TournamentGroupMatchModel.listByTournament(tournamentId);
+      const groups = buildGroupStageViews(
+        tournament.group_draw,
+        teams,
+        groupMatches,
+      );
+
+      const allPlayed = groups.every(
+        (g) =>
+          g.matches.length > 0 &&
+          g.matches.every((m) => m.score_a != null && m.score_b != null),
+      );
+      if (!allPlayed) {
+        res.status(400).json({
+          success: false,
+          message: "Сначала введите результаты всех матчей группового этапа",
+        });
+        return;
+      }
+
+      const qualified = AdminController.collectQualifiedFromGroups(groups);
+      const ranked = rankTeamsFromGroups(qualified);
+      const err = validateCupStageConfig(config, ranked.length);
+      if (err) {
+        res.status(400).json({ success: false, message: err });
+        return;
+      }
+
+      const allocation = allocateCups(ranked, config);
+      const fixtures = buildAllCupFixtures(allocation, config);
+      await TournamentCupMatchModel.insertFixtures(tournamentId, fixtures);
+
+      const pools: NonNullable<CupStageConfig["pools"]> = {};
+      if (allocation.ab.length) pools.AB = allocation.ab;
+      if (allocation.A.length) pools.A = allocation.A;
+      if (allocation.B.length) pools.B = allocation.B;
+      if (allocation.C.length) pools.C = allocation.C;
+      if (allocation.D.length) pools.D = allocation.D;
+      const savedConfig: CupStageConfig = { ...config, pools };
+      await TournamentModel.saveCupStageConfig(tournamentId, savedConfig);
+
+      const cupMatches =
+        await TournamentCupMatchModel.listByTournament(tournamentId);
+      const cups = AdminController.buildCupStageViews(cupMatches, teams);
+
+      res.json({
+        success: true,
+        message: "Финал начат",
+        data: {
+          tournament: { ...tournament, cup_stage_config: savedConfig },
+          cups,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка старта финала:", error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : "Внутренняя ошибка",
+      });
+    }
+  }
+
+  /** Сброс финальной части. */
+  static async resetCupStage(req: Request, res: Response): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (isNaN(tournamentId)) {
+        res.status(400).json({ success: false, message: "Неверный ID турнира" });
+        return;
+      }
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({ success: false, message: "Турнир не найден" });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Сброс доступен только в статусе «В процессе»",
+        });
+        return;
+      }
+      await TournamentCupMatchModel.deleteByTournament(tournamentId);
+      await TournamentModel.saveCupStageConfig(tournamentId, null);
+      res.json({ success: true, message: "Финал сброшен", data: { cups: [] } });
+    } catch (error) {
+      console.error("Ошибка сброса финала:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /** Обновить счёт / дорожку матча кубка. */
+  static async updateTournamentCupMatch(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const matchId = parseInt(req.params.matchId, 10);
+      if (isNaN(tournamentId) || isNaN(matchId)) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира или матча",
+        });
+        return;
+      }
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament || tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Счёт можно менять только в статусе «В процессе»",
+        });
+        return;
+      }
+      const match = await TournamentCupMatchModel.getById(matchId);
+      if (!match || match.tournament_id !== tournamentId) {
+        res.status(404).json({ success: false, message: "Матч не найден" });
+        return;
+      }
+
+      const body = req.body as {
+        score_a?: unknown;
+        score_b?: unknown;
+        clear?: unknown;
+        court?: unknown;
+      };
+
+      let scoreA: number | null = match.score_a;
+      let scoreB: number | null = match.score_b;
+      const hadScore = match.score_a != null && match.score_b != null;
+
+      if (body.clear === true) {
+        scoreA = null;
+        scoreB = null;
+      } else if (body.score_a !== undefined || body.score_b !== undefined) {
+        const validated = validateMatchScores(body.score_a, body.score_b);
+        if (typeof validated === "string") {
+          res.status(400).json({ success: false, message: validated });
+          return;
+        }
+        scoreA = validated.score_a;
+        scoreB = validated.score_b;
+      } else if (body.court === undefined) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите score_a и score_b, clear или court",
+        });
+        return;
+      }
+
+      let court: number | null | undefined = undefined;
+      if (body.court !== undefined) {
+        if (body.court === null) {
+          court = null;
+        } else {
+          const c =
+            typeof body.court === "number"
+              ? body.court
+              : parseInt(String(body.court), 10);
+          if (!Number.isInteger(c) || c < 1 || c > 99) {
+            res.status(400).json({
+              success: false,
+              message: "Номер дорожки должен быть от 1 до 99",
+            });
+            return;
+          }
+          court = c;
+        }
+      }
+
+      await TournamentCupMatchModel.updateScores(
+        matchId,
+        scoreA,
+        scoreB,
+        court,
+      );
+
+      if (body.clear === true && hadScore) {
+        if (
+          match.next_match_round != null &&
+          match.next_match_index != null &&
+          match.next_slot
+        ) {
+          const next = await TournamentCupMatchModel.findSlot(
+            tournamentId,
+            match.cup,
+            match.next_match_round,
+            match.next_match_index,
+            false,
+          );
+          if (next) {
+            await TournamentCupMatchModel.setTeamSlot(
+              next.id,
+              match.next_slot,
+              null,
+            );
+          }
+        }
+        await AdminController.syncThirdPlaceFromSemis(tournamentId, match.cup);
+      } else if (
+        scoreA != null &&
+        scoreB != null &&
+        match.team_a_id != null &&
+        match.team_b_id != null
+      ) {
+        const winnerId = scoreA > scoreB ? match.team_a_id : match.team_b_id;
+        const loserId = scoreA > scoreB ? match.team_b_id : match.team_a_id;
+        await AdminController.advanceCupWinner(match, winnerId, loserId);
+        await AdminController.syncThirdPlaceFromSemis(tournamentId, match.cup);
+      }
+
+      const freshConfig =
+        (await TournamentModel.getTournamentById(tournamentId))
+          ?.cup_stage_config ?? tournament.cup_stage_config;
+      if (match.cup === "AB" && freshConfig) {
+        await AdminController.maybeGenerateAbCups(tournamentId, freshConfig);
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const cupMatches =
+        await TournamentCupMatchModel.listByTournament(tournamentId);
+      const cups = AdminController.buildCupStageViews(cupMatches, teams);
+      const updated = await TournamentModel.getTournamentById(tournamentId);
+
+      res.json({
+        success: true,
+        message: "Матч обновлён",
+        data: { cups, tournament: updated },
+      });
+    } catch (error) {
+      console.error("Ошибка обновления матча кубка:", error);
       res.status(500).json({
         success: false,
         message: "Внутренняя ошибка сервера",
@@ -2297,6 +3241,25 @@ export class AdminController {
         }
       }
 
+      // Сначала фикстуры — статус меняем только после успешной подготовки
+      if (
+        tournament.play_format === TournamentPlayFormat.GROUPS &&
+        tournament.group_draw
+      ) {
+        await TournamentGroupMatchModel.regenerateFromDraw(
+          tournamentId,
+          tournament.group_draw,
+        );
+      }
+
+      if (tournament.play_format === TournamentPlayFormat.SWISS) {
+        await AdminController.ensureSwissRound1(
+          tournamentId,
+          confirmedTeams,
+          tournament.type as TournamentType,
+        );
+      }
+
       const success = await TournamentModel.updateTournament(
         tournamentId,
         undefined,
@@ -2313,16 +3276,6 @@ export class AdminController {
           message: "Не удалось перейти к проведению турнира",
         });
         return;
-      }
-
-      if (
-        tournament.play_format === TournamentPlayFormat.GROUPS &&
-        tournament.group_draw
-      ) {
-        await TournamentGroupMatchModel.regenerateFromDraw(
-          tournamentId,
-          tournament.group_draw,
-        );
       }
 
       res.json({
@@ -2428,6 +3381,10 @@ export class AdminController {
           status !== TournamentStatus.IN_PROGRESS
         ) {
           await TournamentGroupMatchModel.deleteByTournament(tournamentId);
+          await TournamentCupMatchModel.deleteByTournament(tournamentId);
+          await TournamentSwissMatchModel.deleteByTournament(tournamentId);
+          await TournamentModel.saveCupStageConfig(tournamentId, null);
+          await TournamentModel.saveSwissSeed(tournamentId, null);
         }
         res.json({
           success: true,
