@@ -15,6 +15,8 @@ import TournamentRegistrationPublic from "./pages/TournamentRegistrationPublic";
 import TournamentInProgressPublic from "./pages/TournamentInProgressPublic";
 import RatingRules from "./pages/RatingRules";
 import Licenses from "./pages/Licenses";
+import Clubs from "./pages/Clubs";
+import ClubDetail from "./pages/ClubDetail";
 import PersonalDataPolicy from "./pages/PersonalDataPolicy";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -23,6 +25,7 @@ import AdminTournamentRegistration from "./pages/admin/AdminTournamentRegistrati
 import AdminTournamentInProgress from "./pages/admin/AdminTournamentInProgress";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPlayers from "./pages/admin/AdminPlayers";
+import AdminClubs from "./pages/admin/AdminClubs";
 import AdminLicensedPlayers from "./pages/admin/AdminLicensedPlayers";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
@@ -39,10 +42,18 @@ import AdminRoleRoute from "./components/admin/AdminRoleRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { UserRole } from "./types";
 
-const ROLES_ALL_STAFF = [
+const ROLES_PLAYERS_SECTION = [
   UserRole.ADMIN,
   UserRole.MANAGER,
   UserRole.LICENSE_MANAGER,
+  UserRole.CLUB_OWNER,
+];
+const ROLES_HELP = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.LICENSE_MANAGER,
+  UserRole.CLUB_OWNER,
+  UserRole.PRESIDIUM_MEMBER,
 ];
 const ROLES_LICENSE_SECTION = [UserRole.ADMIN, UserRole.LICENSE_MANAGER];
 const ROLES_TOURNAMENT_STAFF = [UserRole.ADMIN, UserRole.MANAGER];
@@ -50,6 +61,11 @@ const ROLES_TOURNAMENTS_PAGE = [
   UserRole.ADMIN,
   UserRole.MANAGER,
   UserRole.PRESIDIUM_MEMBER,
+];
+const ROLES_CLUBS = [
+  UserRole.ADMIN,
+  UserRole.PRESIDIUM_MEMBER,
+  UserRole.CLUB_OWNER,
 ];
 
 // Create a client
@@ -123,6 +139,24 @@ function App() {
               element={
                 <Layout>
                   <Licenses />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/clubs/:clubId"
+              element={
+                <Layout>
+                  <ClubDetail />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/clubs"
+              element={
+                <Layout>
+                  <Clubs />
                 </Layout>
               }
             />
@@ -224,9 +258,22 @@ function App() {
               path="/admin/players"
               element={
                 <ProtectedRoute>
-                  <AdminRoleRoute allowedRoles={ROLES_ALL_STAFF}>
+                  <AdminRoleRoute allowedRoles={ROLES_PLAYERS_SECTION}>
                     <AdminLayout>
                       <AdminPlayers />
+                    </AdminLayout>
+                  </AdminRoleRoute>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/clubs"
+              element={
+                <ProtectedRoute>
+                  <AdminRoleRoute allowedRoles={ROLES_CLUBS}>
+                    <AdminLayout>
+                      <AdminClubs />
                     </AdminLayout>
                   </AdminRoleRoute>
                 </ProtectedRoute>
@@ -289,7 +336,7 @@ function App() {
               path="/admin/help"
               element={
                 <ProtectedRoute>
-                  <AdminRoleRoute allowedRoles={ROLES_ALL_STAFF}>
+                  <AdminRoleRoute allowedRoles={ROLES_HELP}>
                     <AdminLayout>
                       <AdminHelpLayout />
                     </AdminLayout>

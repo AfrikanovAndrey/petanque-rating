@@ -109,6 +109,8 @@ mysql/data/*
 !mysql/data/.gitkeep
 uploads/*
 !uploads/.gitkeep
+!uploads/clubs/
+!uploads/clubs/.gitkeep
 !backups/.gitkeep
 
 # IDE
@@ -121,3 +123,5 @@ Thumbs.db
 
 # Playwright
 .playwright-mcp
+
+uploads/*

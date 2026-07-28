@@ -16,9 +16,16 @@ import {
   requireTournamentViewer,
   requirePresidiumOrAdmin,
   requirePlayersSectionAccess,
+  requirePlayersDeleteAccess,
   requireLicensedPlayersEditor,
+  requireClubEditor,
+  requireClubAdmin,
 } from "../middleware/auth";
 import { auditLog, auditLogDelete } from "../middleware/audit";
+import {
+  ClubController,
+  clubLogoUploadMiddleware,
+} from "../controllers/ClubController";
 
 const router = Router();
 
@@ -392,10 +399,10 @@ router.put(
   AdminController.updatePlayer,
 );
 
-// DELETE /api/admin/players/:playerId - удалить игрока (ADMIN и MANAGER, если игрок не участвовал в турнирах)
+// DELETE /api/admin/players/:playerId - удалить игрока (без CLUB_OWNER)
 router.delete(
   "/players/:playerId",
-  requirePlayersSectionAccess,
+  requirePlayersDeleteAccess,
   auditLogDelete({
     action: "DELETE_PLAYER",
     entityType: "player",
@@ -602,6 +609,74 @@ router.delete(
   "/audit-logs/cleanup",
   requireAdmin,
   AdminAuditController.cleanup,
+);
+
+// === КЛУБЫ ===
+// GET /api/admin/clubs
+router.get("/clubs", requireClubEditor, ClubController.listAdmin);
+
+// GET /api/admin/clubs/owner-candidates (до /:id)
+router.get(
+  "/clubs/owner-candidates",
+  requireClubAdmin,
+  ClubController.listOwnerCandidates,
+);
+
+// GET /api/admin/clubs/:id
+router.get("/clubs/:id", requireClubEditor, ClubController.getAdmin);
+
+// POST /api/admin/clubs
+router.post(
+  "/clubs",
+  requireClubAdmin,
+  auditLog({
+    action: "CREATE_CLUB",
+    entityType: "club",
+    getEntityName: (req) => req.body?.name || null,
+    getDescription: (req) => `Создание клуба «${req.body?.name || ""}»`,
+  }),
+  ClubController.create,
+);
+
+// PUT /api/admin/clubs/:id
+router.put(
+  "/clubs/:id",
+  requireClubEditor,
+  auditLog({
+    action: "UPDATE_CLUB",
+    entityType: "club",
+    getEntityId: (req) => parseInt(req.params.id, 10),
+    getDescription: (req) => `Обновление клуба ID ${req.params.id}`,
+  }),
+  ClubController.update,
+);
+
+// POST /api/admin/clubs/:id/logo
+router.post(
+  "/clubs/:id/logo",
+  requireClubEditor,
+  clubLogoUploadMiddleware,
+  auditLog({
+    action: "UPDATE_CLUB_LOGO",
+    entityType: "club",
+    getEntityId: (req) => parseInt(req.params.id, 10),
+    getDescription: (req) => `Загрузка логотипа клуба ID ${req.params.id}`,
+  }),
+  ClubController.uploadLogo,
+);
+
+// DELETE /api/admin/clubs/:id
+router.delete(
+  "/clubs/:id",
+  requireClubAdmin,
+  auditLogDelete({
+    action: "DELETE_CLUB",
+    entityType: "club",
+    getEntityId: (req) => parseInt(req.params.id, 10),
+    getDescription: (req, entityName) =>
+      `Удаление клуба ${entityName || "ID " + req.params.id}`,
+  }),
+  ClubController.remove,
 );
 
 export default router;

@@ -175,6 +175,8 @@ const AdminUsers: React.FC = () => {
         return "bg-amber-100 text-amber-900";
       case UserRole.PRESIDIUM_MEMBER:
         return "bg-indigo-100 text-indigo-900";
+      case UserRole.CLUB_OWNER:
+        return "bg-teal-100 text-teal-900";
       default:
         return "bg-green-100 text-green-800";
     }
@@ -405,6 +407,15 @@ const AdminUsers: React.FC = () => {
                       className="mr-2"
                     />
                     <span>{getUserRoleLabel(UserRole.PRESIDIUM_MEMBER)}</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.roles.includes(UserRole.CLUB_OWNER)}
+                      onChange={() => toggleRole(UserRole.CLUB_OWNER)}
+                      className="mr-2"
+                    />
+                    <span>{getUserRoleLabel(UserRole.CLUB_OWNER)}</span>
                   </label>
                   <label className="flex items-center">
                     <input

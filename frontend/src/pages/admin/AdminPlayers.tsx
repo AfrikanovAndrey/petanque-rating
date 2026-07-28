@@ -13,12 +13,13 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { adminApi } from "../../services/api";
-import { Player, PlayerRating, getCupPositionText } from "../../types";
+import { Player, PlayerRating, getCupPositionText, UserRole } from "../../types";
 import {
   formatDateTime,
   handleApiError,
   formatDate,
   formatNumber,
+  hasAnyUserRole,
 } from "../../utils";
 import { getTournamentTypeIcons } from "../../utils/tournamentIcons";
 
@@ -59,6 +60,20 @@ const AdminPlayers: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
+
+  const cachedUser = (() => {
+    try {
+      const raw = localStorage.getItem("current_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const canDeletePlayers = hasAnyUserRole(cachedUser, [
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.LICENSE_MANAGER,
+  ]);
 
   const {
     register,
@@ -473,17 +488,19 @@ const AdminPlayers: React.FC = () => {
                             >
                               <PencilIcon className="h-4 w-4" />
                             </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(player);
-                              }}
-                              disabled={deleteMutation.isLoading}
-                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                              title="Удалить"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
+                            {canDeletePlayers && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(player);
+                                }}
+                                disabled={deleteMutation.isLoading}
+                                className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                                title="Удалить"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

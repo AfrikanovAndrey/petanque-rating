@@ -98,6 +98,49 @@ export enum UserRole {
   LICENSE_MANAGER = "LICENSE_MANAGER",
   /** Признание результатов турниров для рейтинга */
   PRESIDIUM_MEMBER = "PRESIDIUM_MEMBER",
+  /** Владелец клуба: свой клуб + раздел игроков (без удаления) */
+  CLUB_OWNER = "CLUB_OWNER",
+}
+
+export interface Club {
+  id: number;
+  name: string;
+  logo_path: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+export interface ClubOwnerSummary {
+  user_id: number;
+  name: string;
+  username: string;
+}
+
+export interface ClubMemberSummary {
+  player_id: number;
+  player_name: string;
+  city?: string | null;
+  license_number?: string | null;
+  /** Дата добавления в состав клуба */
+  created_at: Date | string;
+}
+
+export interface ClubWithDetails extends Club {
+  owners: ClubOwnerSummary[];
+  members: ClubMemberSummary[];
+  logo_url?: string | null;
+}
+
+export interface CreateClubRequest {
+  name: string;
+  owner_user_ids?: number[];
+  member_player_ids?: number[];
+}
+
+export interface UpdateClubRequest {
+  name?: string;
+  owner_user_ids?: number[];
+  member_player_ids?: number[];
 }
 
 export interface User {

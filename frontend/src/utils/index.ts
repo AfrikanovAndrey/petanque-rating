@@ -185,6 +185,7 @@ export function getAdminHomePath(roleOrRoles: UserRole | UserRole[]): string {
   if (roles.includes(UserRole.MANAGER)) return "/admin/tournaments";
   if (roles.includes(UserRole.LICENSE_MANAGER)) return "/admin/players";
   if (roles.includes(UserRole.PRESIDIUM_MEMBER)) return "/admin/tournaments";
+  if (roles.includes(UserRole.CLUB_OWNER)) return "/admin/clubs";
   return "/admin/tournaments";
 }
 
@@ -198,6 +199,8 @@ export function getUserRoleLabel(role: UserRole): string {
       return "Менеджер лицензий";
     case UserRole.PRESIDIUM_MEMBER:
       return "Член президиума";
+    case UserRole.CLUB_OWNER:
+      return "Владелец клуба";
     default:
       return String(role);
   }

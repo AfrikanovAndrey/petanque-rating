@@ -110,11 +110,32 @@ export const requirePresidiumOrAdmin = requireRole([
   UserRole.PRESIDIUM_MEMBER,
 ]);
 
-/** Игроки рейтинга (справочник): ADMIN, MANAGER и менеджер лицензий */
+/** Игроки рейтинга (справочник): ADMIN, MANAGER, менеджер лицензий и владелец клуба */
 export const requirePlayersSectionAccess = requireRole([
   UserRole.ADMIN,
   UserRole.MANAGER,
   UserRole.LICENSE_MANAGER,
+  UserRole.CLUB_OWNER,
+]);
+
+/** Удаление игроков: без владельца клуба */
+export const requirePlayersDeleteAccess = requireRole([
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.LICENSE_MANAGER,
+]);
+
+/** Клубы: просмотр/редактирование (админ, президиум, владелец своего) */
+export const requireClubEditor = requireRole([
+  UserRole.ADMIN,
+  UserRole.PRESIDIUM_MEMBER,
+  UserRole.CLUB_OWNER,
+]);
+
+/** Клубы: создание / удаление / назначение владельцев */
+export const requireClubAdmin = requireRole([
+  UserRole.ADMIN,
+  UserRole.PRESIDIUM_MEMBER,
 ]);
 
 /** Раздел лицензионных игроков (API чтения и записи): только ADMIN и LICENSE_MANAGER */
