@@ -1043,6 +1043,14 @@ const AdminTournamentRegistration: React.FC = () => {
             ]);
             void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
             void queryClient.invalidateQueries("tournaments");
+            void queryClient.removeQueries([
+              "tournamentInProgress",
+              tournamentId,
+            ]);
+            void queryClient.removeQueries([
+              "publicTournamentInProgress",
+              tournamentId,
+            ]);
             navigate(`/admin/tournaments/${tournamentId}/in-progress`);
           }}
         />

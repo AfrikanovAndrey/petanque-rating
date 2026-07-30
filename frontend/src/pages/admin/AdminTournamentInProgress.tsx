@@ -84,6 +84,14 @@ const AdminTournamentInProgress: React.FC = () => {
       onSuccess: (res) => {
         if (res.data.success) {
           toast.success("Турнир возвращён в статус «Финальная регистрация»");
+          void queryClient.removeQueries([
+            "tournamentInProgress",
+            tournamentId,
+          ]);
+          void queryClient.removeQueries([
+            "publicTournamentInProgress",
+            tournamentId,
+          ]);
           void queryClient.invalidateQueries("tournaments");
           navigate(`/admin/tournaments/${tournamentId}/final-registration`);
         } else {

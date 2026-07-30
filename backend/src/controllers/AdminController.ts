@@ -3407,6 +3407,16 @@ export class AdminController {
         return;
       }
 
+      // При смене формата убираем чужие фикстуры (на случай неполного сброса статуса)
+      if (settingsInput.play_format === TournamentPlayFormat.GROUPS) {
+        await TournamentSwissMatchModel.deleteByTournament(tournamentId);
+        await TournamentModel.saveSwissSeed(tournamentId, null);
+      } else {
+        await TournamentGroupMatchModel.deleteByTournament(tournamentId);
+      }
+      await TournamentCupMatchModel.deleteByTournament(tournamentId);
+      await TournamentModel.saveCupStageConfig(tournamentId, null);
+
       const updated = await TournamentModel.getTournamentById(tournamentId);
       res.json({
         success: true,
