@@ -1065,6 +1065,7 @@ export class TournamentController {
     options?: {
       existingTournamentId?: number;
       replaceFinishedResults?: boolean;
+      organizerUserId?: number | null;
     }
   ): Promise<{
     tournamentId: number;
@@ -1318,7 +1319,10 @@ export class TournamentController {
             tournamentCategory,
             tournamentDate,
             isManualInput,
-            connection
+            connection,
+            null,
+            undefined,
+            options?.organizerUserId ?? null,
           );
         }
 
@@ -1547,6 +1551,7 @@ export class TournamentController {
     options?: {
       existingTournamentId?: number;
       replaceFinishedResults?: boolean;
+      organizerUserId?: number | null;
     }
   ): Promise<{
     tournamentId: number;

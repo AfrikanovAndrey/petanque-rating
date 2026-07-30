@@ -14,6 +14,7 @@ import {
   authenticateAdmin,
   requireAdmin,
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   requireTournamentViewer,
   requirePresidiumOrAdmin,
   requirePlayersSectionAccess,
@@ -153,6 +154,7 @@ router.post(
 router.get(
   "/tournaments/:tournamentId/draft",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   AdminController.getTournamentDraftPage,
 );
 
@@ -160,6 +162,7 @@ router.get(
 router.get(
   "/tournaments/:tournamentId/registration",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   AdminController.getTournamentRegistrationPage,
 );
 
@@ -167,6 +170,7 @@ router.get(
 router.get(
   "/tournaments/:tournamentId/in-progress",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   AdminController.getTournamentInProgressPage,
 );
 
@@ -181,6 +185,7 @@ router.get(
 router.put(
   "/tournaments/:tournamentId/group-matches/:matchId",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "UPDATE_TOURNAMENT_GROUP_MATCH",
     entityType: "tournament",
@@ -195,6 +200,7 @@ router.put(
 router.put(
   "/tournaments/:tournamentId/swiss-matches/:matchId",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "UPDATE_TOURNAMENT_SWISS_MATCH",
     entityType: "tournament",
@@ -210,6 +216,7 @@ router.put(
 router.delete(
   "/tournaments/:tournamentId/swiss/rounds/:roundNumber",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "ROLLBACK_TOURNAMENT_SWISS_ROUND",
     entityType: "tournament",
@@ -225,6 +232,7 @@ router.delete(
 router.post(
   "/tournaments/:tournamentId/swiss/rounds/:roundNumber/advance",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "ADVANCE_TOURNAMENT_SWISS_ROUND",
     entityType: "tournament",
@@ -239,6 +247,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/cup-stage/start",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "START_CUP_STAGE",
     entityType: "tournament",
@@ -253,6 +262,7 @@ router.post(
 router.delete(
   "/tournaments/:tournamentId/cup-stage",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "RESET_CUP_STAGE",
     entityType: "tournament",
@@ -267,6 +277,7 @@ router.delete(
 router.put(
   "/tournaments/:tournamentId/cup-matches/:matchId",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "UPDATE_TOURNAMENT_CUP_MATCH",
     entityType: "tournament",
@@ -281,6 +292,7 @@ router.put(
 router.post(
   "/tournaments/:tournamentId/complete-from-excel",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   uploadMiddleware,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
@@ -296,6 +308,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/complete-from-google-sheets",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
     entityType: "tournament",
@@ -310,6 +323,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/replace-results-from-excel",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   uploadMiddleware,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
@@ -325,6 +339,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/replace-results-from-google-sheets",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "UPLOAD_TOURNAMENT",
     entityType: "tournament",
@@ -339,6 +354,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/registration",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "REGISTER_TOURNAMENT_TEAM",
     entityType: "tournament",
@@ -353,6 +369,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/registration/import-csv",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   registrationCsvUploadMiddleware,
   auditLog({
     action: "IMPORT_TOURNAMENT_REGISTRATIONS_CSV",
@@ -368,6 +385,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/registration/:teamId/confirm",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "CONFIRM_TOURNAMENT_REGISTRATION",
     entityType: "tournament",
@@ -382,6 +400,7 @@ router.post(
 router.put(
   "/tournaments/:tournamentId/registration/:teamId",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   AdminController.updateTournamentRegistrationTeam,
 );
 
@@ -389,6 +408,7 @@ router.put(
 router.delete(
   "/tournaments/:tournamentId/registration/:teamId",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "DELETE_TOURNAMENT_REGISTRATION",
     entityType: "tournament",
@@ -424,6 +444,7 @@ router.post(
 router.put(
   "/tournaments/:tournamentId/play-settings",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "UPDATE_TOURNAMENT_PLAY_SETTINGS",
     entityType: "tournament",
@@ -438,6 +459,7 @@ router.put(
 router.post(
   "/tournaments/:tournamentId/group-draw",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "TOURNAMENT_GROUP_DRAW",
     entityType: "tournament",
@@ -452,6 +474,7 @@ router.post(
 router.put(
   "/tournaments/:tournamentId/group-draw",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "TOURNAMENT_GROUP_DRAW_MANUAL",
     entityType: "tournament",
@@ -466,6 +489,7 @@ router.put(
 router.post(
   "/tournaments/:tournamentId/start",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "START_TOURNAMENT",
     entityType: "tournament",
@@ -479,6 +503,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/begin-play",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "BEGIN_TOURNAMENT_PLAY",
     entityType: "tournament",
@@ -493,6 +518,7 @@ router.post(
 router.put(
   "/tournaments/:tournamentId",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   auditLog({
     action: "UPDATE_TOURNAMENT",
     entityType: "tournament",
@@ -503,10 +529,25 @@ router.put(
   AdminController.updateTournament,
 );
 
+// PUT /api/admin/tournaments/:tournamentId/organizer — сменить организатора (только ADMIN)
+router.put(
+  "/tournaments/:tournamentId/organizer",
+  requireAdmin,
+  auditLog({
+    action: "SET_TOURNAMENT_ORGANIZER",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Смена организатора турнира ID ${req.params.tournamentId} → user ${req.body?.organizer_user_id}`,
+  }),
+  AdminController.setTournamentOrganizer,
+);
+
 // DELETE /api/admin/tournaments/:tournamentId - удалить турнир (только ADMIN)
 router.delete(
   "/tournaments/:tournamentId",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   requireAdmin,
   auditLogDelete({
     action: "DELETE_TOURNAMENT",
@@ -715,6 +756,7 @@ router.post(
 router.post(
   "/tournaments/:tournamentId/recalculate-points",
   requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
   async (req, res) => {
     try {
       const tournamentId = parseInt(req.params.tournamentId);

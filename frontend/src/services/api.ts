@@ -520,6 +520,15 @@ export const adminApi = {
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/tournaments/${tournamentId}`, data),
 
+  /** Сменить организатора турнира (только ADMIN). */
+  setTournamentOrganizer: (
+    tournamentId: number,
+    organizerUserId: number
+  ): Promise<AxiosResponse<ApiResponse<Tournament>>> =>
+    api.put(`/admin/tournaments/${tournamentId}/organizer`, {
+      organizer_user_id: organizerUserId,
+    }),
+
   updateTournamentPlaySettings: (
     tournamentId: number,
     data: {

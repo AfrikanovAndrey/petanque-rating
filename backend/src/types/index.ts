@@ -101,6 +101,14 @@ export interface Tournament {
   cup_stage_config?: CupStageConfig | null;
   /** Признание президиумом / админом: только тогда результаты входят в публичный рейтинг */
   results_validated_at?: Date | string | null;
+  /** Пользователь, создавший турнир (организатор) */
+  organizer_user_id?: number | null;
+  /** Краткое представление организатора (из JOIN) */
+  organizer?: {
+    id: number;
+    name: string;
+    username: string;
+  } | null;
   created_at: Date;
   updated_at: Date;
   /** См. TournamentModel.getAllTournaments: DRAFT/REGISTRATION/FINAL_REGISTRATION/IN_PROGRESS — подтверждённые заявки, иначе результаты */

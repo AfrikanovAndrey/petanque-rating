@@ -1,4 +1,4 @@
-import { CheckIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, PencilIcon, PrinterIcon } from "@heroicons/react/24/outline";
 import React, { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useMutation, useQueryClient } from "react-query";
@@ -14,6 +14,10 @@ type Props = {
   tournamentId?: number;
   cups: TournamentCupStageView[];
   readOnly?: boolean;
+  /** Кнопки печати (только админка) */
+  showPrint?: boolean;
+  /** Название турнира для шапки печати */
+  tournamentName?: string;
 };
 
 const MATCH_H = 56;
@@ -77,6 +81,328 @@ function roundTitle(round: number, total: number, isAb: boolean): string {
   if (fromEnd === 2) return "1/4";
   if (fromEnd === 3) return "1/8";
   return `Раунд ${round}`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function openPrintWindow(documentTitle: string, bodyHtml: string): void {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("title", documentTitle);
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "1400px";
+  iframe.style.height = "900px";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  document.body.appendChild(iframe);
+
+  const frameWindow = iframe.contentWindow;
+  const frameDocument = frameWindow?.document;
+  if (!frameWindow || !frameDocument) {
+    iframe.remove();
+    toast.error("Не удалось открыть диалог печати");
+    return;
+  }
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) {
+      return;
+    }
+    cleaned = true;
+    iframe.remove();
+  };
+
+  frameDocument.open();
+  frameDocument.write(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(documentTitle)}</title>
+  <style>
+    @page { size: landscape; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; color: #111; margin: 16px; }
+    h1 { font-size: 16px; margin: 0 0 2px; }
+    .meta { color: #555; margin: 0 0 12px; font-size: 11px; }
+    .bracket { display: flex; align-items: flex-start; width: max-content; }
+    .col { display: flex; flex-direction: column; padding-left: 40px; }
+    .col-title { height: 14px; margin-bottom: 8px; text-align: center; font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
+    .col-body { position: relative; }
+    .mc { position: absolute; left: 0; width: ${MATCH_W}px; height: ${MATCH_H}px; }
+    .mc-stack { position: relative; width: ${MATCH_W}px; height: ${MATCH_H}px; margin-bottom: 12px; }
+    .court { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 36px;
+      text-align: center; font-size: 8px; color: #4b5563; line-height: 1.15; }
+    .court strong { display: inline-block; margin-top: 2px; min-width: 28px; padding: 2px 0;
+      border: 1.5px solid #f59e0b; background: #fffbeb; font-size: 11px; font-weight: 700; color: #78350f; }
+    .box { display: flex; width: 100%; height: 100%; overflow: hidden; border: 1px solid #000; background: #fff; border-radius: 2px; }
+    .names { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .row { flex: 1; display: flex; align-items: center; padding: 0 6px; min-height: 0; }
+    .row + .row { border-top: 1px solid rgba(0,0,0,0.15); }
+    .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 10px; font-weight: 500; line-height: 1.2; }
+    .name.tbd { font-style: italic; color: #9ca3af; font-weight: 400; }
+    .scores { width: 28px; display: flex; flex-direction: column; border-left: 1px solid #000; }
+    .sc { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+    .sc + .sc { border-top: 1px solid rgba(0,0,0,0.15); }
+    .conn { position: relative; flex-shrink: 0; width: ${CONNECTOR_W}px; }
+    .conn .h { position: absolute; left: 0; height: 2px; background: #000; }
+    .conn .v { position: absolute; left: 50%; width: 2px; background: #000; }
+    .place-label { position: absolute; left: 0; width: 100%; top: -14px; text-align: center;
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
+    .place-card { position: absolute; left: 0; width: ${MATCH_W}px; height: ${MATCH_H}px;
+      display: flex; align-items: center; }
+    .place-box { width: 100%; height: 28px; display: flex; align-items: center; padding: 0 6px;
+      border: 1px solid #000; background: #fff; border-radius: 2px; overflow: hidden; }
+    .stack-col { display: flex; flex-direction: column; gap: 12px; width: ${MATCH_W}px; }
+    @media print {
+      body { margin: 8px; }
+      .bracket { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+${bodyHtml}
+</body>
+</html>`);
+  frameDocument.close();
+
+  const triggerPrint = () => {
+    try {
+      frameWindow.focus();
+      frameWindow.print();
+    } finally {
+      window.setTimeout(cleanup, 1000);
+    }
+  };
+
+  frameWindow.addEventListener("afterprint", cleanup);
+  window.setTimeout(triggerPrint, 150);
+}
+
+function printMatchCardHtml(
+  match: TournamentCupMatchView,
+  absoluteTop: number | null
+): string {
+  const aName = teamLabel(match.team_a_players);
+  const bName = teamLabel(match.team_b_players);
+  const isTbdA = !match.team_a_id;
+  const isTbdB = !match.team_b_id;
+  const scoreA = match.score_a != null ? String(match.score_a) : "—";
+  const scoreB = match.score_b != null ? String(match.score_b) : "—";
+  const court = match.court != null ? String(match.court) : "—";
+  const wrapClass = absoluteTop == null ? "mc-stack" : "mc";
+  const style =
+    absoluteTop == null ? "" : ` style="top:${absoluteTop}px"`;
+  return `<div class="${wrapClass}"${style}>
+    <div class="court">дорожка<br><strong>${escapeHtml(court)}</strong></div>
+    <div class="box">
+      <div class="names">
+        <div class="row"><span class="name${isTbdA ? " tbd" : ""}">${escapeHtml(aName)}</span></div>
+        <div class="row"><span class="name${isTbdB ? " tbd" : ""}">${escapeHtml(bName)}</span></div>
+      </div>
+      <div class="scores">
+        <div class="sc">${scoreA}</div>
+        <div class="sc">${scoreB}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function printPlaceCardHtml(
+  players: string[] | null,
+  absoluteTop: number | null,
+  label?: string
+): string {
+  const isTbd = !players?.length;
+  const name = isTbd ? "Будет определен" : teamLabel(players!);
+  const style =
+    absoluteTop == null ? "" : ` style="top:${absoluteTop}px"`;
+  const labelHtml = label
+    ? `<div class="place-label">${escapeHtml(label)}</div>`
+    : "";
+  if (absoluteTop == null) {
+    return `<div class="mc-stack" style="height:auto;margin-bottom:12px">
+      ${label ? `<div style="text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:4px">${escapeHtml(label)}</div>` : ""}
+      <div class="place-box"><span class="name${isTbd ? " tbd" : ""}">${escapeHtml(name)}</span></div>
+    </div>`;
+  }
+  return `<div class="place-card"${style}>
+    ${labelHtml}
+    <div class="place-box"><span class="name${isTbd ? " tbd" : ""}">${escapeHtml(name)}</span></div>
+  </div>`;
+}
+
+function printConnectorsHtml(
+  roundIdx: number,
+  pairCount: number,
+  columnHeight: number
+): string {
+  const lines: string[] = [];
+  for (let i = 0; i < pairCount; i++) {
+    const y1 = matchCenterY(roundIdx, i * 2);
+    const y2 = matchCenterY(roundIdx, i * 2 + 1);
+    const mid = (y1 + y2) / 2;
+    const top = Math.min(y1, y2);
+    const height = Math.abs(y2 - y1);
+    lines.push(
+      `<div class="h" style="top:${y1 - 1}px;width:50%"></div>`,
+      `<div class="h" style="top:${y2 - 1}px;width:50%"></div>`,
+      `<div class="v" style="top:${top}px;height:${height}px"></div>`,
+      `<div class="h" style="top:${mid - 1}px;left:50%;width:50%"></div>`
+    );
+  }
+  return `<div class="conn" style="height:${columnHeight}px;margin-top:22px">${lines.join("")}</div>`;
+}
+
+function buildCupBracketPrintHtml(options: {
+  tournamentName?: string;
+  cupView: TournamentCupStageView;
+}): string {
+  const { tournamentName, cupView } = options;
+  const isAb = cupView.cup === "AB";
+  const title = cupTabLabel(cupView.cup);
+  const third = cupView.matches.find((m) => m.is_third_place);
+  const mainMatches = cupView.matches.filter((m) => !m.is_third_place);
+  const byRound = new Map<number, TournamentCupMatchView[]>();
+  for (const m of mainMatches) {
+    if (!byRound.has(m.round_number)) {
+      byRound.set(m.round_number, []);
+    }
+    byRound.get(m.round_number)!.push(m);
+  }
+  const rounds = [...byRound.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([round, matches]) => ({
+      round,
+      matches: matches.sort((a, b) => a.match_index - b.match_index),
+    }));
+
+  const firstCount = rounds[0]?.matches.length ?? 0;
+  const lastRoundIdx = Math.max(0, rounds.length - 1);
+  const finalMatch = rounds[lastRoundIdx]?.matches[0] ?? null;
+  const useAbsolute = !isAb && firstCount > 1;
+  const showPlaces = !isAb && finalMatch != null;
+  const championPlayers = finalMatch ? matchWinnerPlayers(finalMatch) : null;
+  const thirdPlayers = third ? matchWinnerPlayers(third) : null;
+
+  const baseHeight = bracketColumnHeight(Math.max(firstCount, 1));
+  const finalTop = useAbsolute ? matchTop(lastRoundIdx, 0) : 0;
+  const thirdTop = finalTop + MATCH_H + ROUND_GAP * 2;
+  const columnHeight =
+    third && useAbsolute
+      ? Math.max(baseHeight, thirdTop + MATCH_H)
+      : baseHeight;
+
+  let bracketInner = "";
+
+  if (useAbsolute) {
+    for (let roundIdx = 0; roundIdx < rounds.length; roundIdx++) {
+      const { round, matches } = rounds[roundIdx];
+      const pairCount = Math.max(1, Math.floor(matches.length / 2));
+      const cards = matches
+        .map((m, mi) => printMatchCardHtml(m, matchTop(roundIdx, mi)))
+        .join("");
+
+      let thirdBlock = "";
+      if (roundIdx === lastRoundIdx && third) {
+        thirdBlock = `<div class="mc" style="top:${thirdTop}px">
+          <div class="place-label">За 3-е место</div>
+          <div class="court">дорожка<br><strong>${escapeHtml(
+            third.court != null ? String(third.court) : "—"
+          )}</strong></div>
+          <div class="box">
+            <div class="names">
+              <div class="row"><span class="name${!third.team_a_id ? " tbd" : ""}">${escapeHtml(teamLabel(third.team_a_players))}</span></div>
+              <div class="row"><span class="name${!third.team_b_id ? " tbd" : ""}">${escapeHtml(teamLabel(third.team_b_players))}</span></div>
+            </div>
+            <div class="scores">
+              <div class="sc">${third.score_a != null ? third.score_a : "—"}</div>
+              <div class="sc">${third.score_b != null ? third.score_b : "—"}</div>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      bracketInner += `<div class="col">
+        <div class="col-title">${escapeHtml(roundTitle(round, rounds.length, isAb))}</div>
+        <div class="col-body" style="height:${columnHeight}px;width:${MATCH_W}px">${cards}${thirdBlock}</div>
+      </div>`;
+
+      if (roundIdx < rounds.length - 1) {
+        bracketInner += printConnectorsHtml(roundIdx, pairCount, columnHeight);
+      }
+    }
+
+    if (showPlaces) {
+      const placeLines = [
+        `<div class="h" style="top:${finalTop + MATCH_H / 2 - 1}px;width:100%"></div>`,
+      ];
+      if (third) {
+        placeLines.push(
+          `<div class="h" style="top:${thirdTop + MATCH_H / 2 - 1}px;width:100%"></div>`
+        );
+      }
+      bracketInner += `<div class="conn" style="height:${columnHeight}px;margin-top:22px">${placeLines.join("")}</div>`;
+      bracketInner += `<div class="col" style="padding-left:0">
+        <div class="col-title"></div>
+        <div class="col-body" style="height:${columnHeight}px;width:${MATCH_W}px">
+          ${printPlaceCardHtml(championPlayers, finalTop)}
+          ${third ? printPlaceCardHtml(thirdPlayers, thirdTop) : ""}
+        </div>
+      </div>`;
+    }
+  } else {
+    // Стык AB или короткая сетка — колонки без абсолютного позиционирования
+    for (let roundIdx = 0; roundIdx < rounds.length; roundIdx++) {
+      const { round, matches } = rounds[roundIdx];
+      const cards = matches.map((m) => printMatchCardHtml(m, null)).join("");
+      let thirdBlock = "";
+      if (roundIdx === lastRoundIdx && third) {
+        thirdBlock = `<div style="margin-top:8px">
+          <div style="text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:4px">За 3-е место</div>
+          ${printMatchCardHtml(third, null)}
+        </div>`;
+      }
+      bracketInner += `<div class="col">
+        <div class="col-title">${escapeHtml(roundTitle(round, rounds.length, isAb))}</div>
+        <div class="stack-col">${cards}${thirdBlock}</div>
+      </div>`;
+      if (roundIdx < rounds.length - 1) {
+        bracketInner += `<div style="width:${CONNECTOR_W}px;flex-shrink:0"></div>`;
+      }
+    }
+    if (showPlaces) {
+      bracketInner += `<div style="width:${CONNECTOR_W}px;flex-shrink:0"></div>`;
+      bracketInner += `<div class="col" style="padding-left:0">
+        <div class="col-title"></div>
+        <div class="stack-col">
+          ${printPlaceCardHtml(championPlayers, null)}
+          ${third ? printPlaceCardHtml(thirdPlayers, null) : ""}
+        </div>
+      </div>`;
+    }
+  }
+
+  return `
+    <h1>${escapeHtml(title)}</h1>
+    ${
+      tournamentName
+        ? `<p class="meta">${escapeHtml(tournamentName)}</p>`
+        : ""
+    }
+    <div class="bracket">${bracketInner}</div>
+  `;
 }
 
 /** Высота колонки раунда 1 при n матчах. */
@@ -672,6 +998,8 @@ export const TournamentCupStageResults: React.FC<Props> = ({
   tournamentId,
   cups,
   readOnly = false,
+  showPrint = false,
+  tournamentName,
 }) => {
   const sorted = useMemo(() => {
     const order: CupBracketCode[] = ["AB", "A", "B", "C", "D"];
@@ -687,13 +1015,39 @@ export const TournamentCupStageResults: React.FC<Props> = ({
       : sorted[0]?.cup ?? null;
   const active = sorted.find((c) => c.cup === selected);
 
+  const printActiveCup = () => {
+    if (!active) {
+      return;
+    }
+    const title = cupTabLabel(active.cup);
+    openPrintWindow(
+      tournamentName ? `${tournamentName} — ${title}` : title,
+      buildCupBracketPrintHtml({
+        tournamentName,
+        cupView: active,
+      })
+    );
+  };
+
   if (!sorted.length) {
     return null;
   }
 
   return (
     <div className="card space-y-4 p-6">
-      <h2 className="text-lg font-semibold text-gray-900">Финал</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold text-gray-900">Финал</h2>
+        {showPrint && active && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={printActiveCup}
+          >
+            <PrinterIcon className="h-4 w-4" aria-hidden />
+            Печать
+          </button>
+        )}
+      </div>
       <div
         className="flex flex-wrap gap-1 border-b border-gray-200"
         role="tablist"

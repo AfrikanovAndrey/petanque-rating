@@ -162,6 +162,29 @@ export function hasAnyUserRole(
   return allowedRoles.some((role) => roles.includes(role));
 }
 
+/**
+ * Может ли пользователь управлять данными турнира (заявки, сетки, счета…).
+ * ADMIN — всегда; MANAGER — только свой турнир (или без организатора — legacy).
+ */
+export function canManageTournamentData(
+  user: { id?: number; role?: UserRole; roles?: UserRole[] } | null | undefined,
+  tournament: { organizer_user_id?: number | null } | null | undefined
+): boolean {
+  if (!user || !tournament) {
+    return false;
+  }
+  if (hasAnyUserRole(user, [UserRole.ADMIN])) {
+    return true;
+  }
+  if (!hasAnyUserRole(user, [UserRole.MANAGER])) {
+    return false;
+  }
+  if (tournament.organizer_user_id == null) {
+    return true;
+  }
+  return user.id != null && tournament.organizer_user_id === user.id;
+}
+
 /** Стартовая страница админки после входа в зависимости от роли(ей) */
 export function getAdminHomePath(roleOrRoles: UserRole | UserRole[]): string {
   const roles = Array.isArray(roleOrRoles) ? roleOrRoles : [roleOrRoles];

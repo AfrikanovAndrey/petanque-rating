@@ -111,6 +111,14 @@ export interface Tournament {
   cup_stage_config?: CupStageConfig | null;
   /** Признание президиумом: учёт результатов в рейтинге */
   results_validated_at?: string | null;
+  /** Пользователь, создавший турнир (организатор) */
+  organizer_user_id?: number | null;
+  /** Краткое представление организатора */
+  organizer?: {
+    id: number;
+    name: string;
+    username: string;
+  } | null;
   created_at: string;
   updated_at: string;
   /** Для FINISHED — команды с результатами; для DRAFT / REGISTRATION / FINAL_REGISTRATION / IN_PROGRESS — только подтверждённые заявки */

@@ -541,6 +541,8 @@ const AdminTournamentInProgress: React.FC = () => {
         <TournamentCupStageResults
           tournamentId={tournamentId}
           cups={data.cups}
+          showPrint
+          tournamentName={tournament.name}
         />
       )}
 

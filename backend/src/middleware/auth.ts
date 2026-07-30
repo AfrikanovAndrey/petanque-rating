@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { TournamentModel } from "../models/TournamentModel";
 import { UserRole } from "../types";
 
 export interface AuthRequest extends Request {
@@ -96,6 +97,77 @@ export const requireTournamentStaff = requireRole([
   UserRole.ADMIN,
   UserRole.MANAGER,
 ]);
+
+/**
+ * Управление данными турнира: ADMIN или MANAGER-организатор этого турнира.
+ * Турниры без organizer_user_id (legacy) доступны любому MANAGER.
+ * Ожидает :tournamentId в params; ставить после requireTournamentStaff.
+ */
+export const requireTournamentOrganizerOrAdmin = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userRoles =
+      req.userRoles && req.userRoles.length > 0
+        ? req.userRoles
+        : req.userRole
+          ? [req.userRole]
+          : [];
+
+    if (userRoles.includes(UserRole.ADMIN)) {
+      next();
+      return;
+    }
+
+    if (!userRoles.includes(UserRole.MANAGER) || req.userId == null) {
+      res.status(403).json({
+        success: false,
+        message: "Недостаточно прав для выполнения этой операции",
+      });
+      return;
+    }
+
+    const tournamentId = parseInt(req.params.tournamentId, 10);
+    if (isNaN(tournamentId)) {
+      res.status(400).json({
+        success: false,
+        message: "Неверный ID турнира",
+      });
+      return;
+    }
+
+    const tournament = await TournamentModel.getTournamentById(tournamentId);
+    if (!tournament) {
+      res.status(404).json({
+        success: false,
+        message: "Турнир не найден",
+      });
+      return;
+    }
+
+    if (
+      tournament.organizer_user_id != null &&
+      tournament.organizer_user_id !== req.userId
+    ) {
+      res.status(403).json({
+        success: false,
+        message:
+          "Управлять турниром может только его организатор или администратор",
+      });
+      return;
+    }
+
+    next();
+  } catch (error) {
+    console.error("requireTournamentOrganizerOrAdmin:", error);
+    res.status(500).json({
+      success: false,
+      message: "Ошибка проверки прав на турнир",
+    });
+  }
+};
 
 /** Просмотр списка турниров и карточки турнира: организаторы и член президиума */
 export const requireTournamentViewer = requireRole([

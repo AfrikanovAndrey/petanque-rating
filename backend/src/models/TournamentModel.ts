@@ -25,13 +25,40 @@ import {
 
 export class TournamentModel {
   private static mapTournamentRow(row: Tournament & RowDataPacket): Tournament {
-    return {
+    const organizerName = (row as RowDataPacket).organizer_name as
+      | string
+      | undefined;
+    const organizerUsername = (row as RowDataPacket).organizer_username as
+      | string
+      | undefined;
+    const organizerUserId =
+      row.organizer_user_id == null ? null : Number(row.organizer_user_id);
+
+    const tournament: Tournament = {
       ...row,
+      organizer_user_id: organizerUserId,
       tiebreaker_order: parseTiebreakerOrder(row.tiebreaker_order),
       group_draw: parseGroupDraw(row.group_draw),
       swiss_seed: parseSwissSeed(row.swiss_seed),
       cup_stage_config: parseCupStageConfig(row.cup_stage_config),
     };
+
+    delete (tournament as Tournament & { organizer_name?: unknown })
+      .organizer_name;
+    delete (tournament as Tournament & { organizer_username?: unknown })
+      .organizer_username;
+
+    if (organizerUserId != null) {
+      tournament.organizer = {
+        id: organizerUserId,
+        name: organizerName ?? "",
+        username: organizerUsername ?? "",
+      };
+    } else {
+      tournament.organizer = null;
+    }
+
+    return tournament;
   }
 
   /**
@@ -59,12 +86,15 @@ export class TournamentModel {
     const [rows] = await pool.execute<Tournament[] & RowDataPacket[]>(
       `SELECT
         t.*,
+        u.name AS organizer_name,
+        u.username AS organizer_username,
         CASE
           WHEN t.status IN ('DRAFT', 'REGISTRATION', 'FINAL_REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
           ELSE COALESCE(res.cnt, 0)
         END AS teams_count,
         COALESCE(pend.cnt, 0) AS pending_registration_teams_count
       FROM tournaments t
+      LEFT JOIN users u ON u.id = t.organizer_user_id
       LEFT JOIN (
         SELECT tournament_id, COUNT(DISTINCT team_id) AS cnt
         FROM tournament_registrations
@@ -91,7 +121,13 @@ export class TournamentModel {
 
   static async getTournamentById(id: number): Promise<Tournament | null> {
     const [rows] = await pool.execute<Tournament[] & RowDataPacket[]>(
-      "SELECT * FROM tournaments WHERE id = ?",
+      `SELECT
+        t.*,
+        u.name AS organizer_name,
+        u.username AS organizer_username
+      FROM tournaments t
+      LEFT JOIN users u ON u.id = t.organizer_user_id
+      WHERE t.id = ?`,
       [id],
     );
     return rows[0] ? this.mapTournamentRow(rows[0]) : null;
@@ -114,10 +150,11 @@ export class TournamentModel {
     connection?: PoolConnection,
     regulations: string | null = null,
     tournamentStatus: TournamentStatus = TournamentStatus.FINISHED,
+    organizerUserId: number | null = null,
   ): Promise<number> {
     const executor = connection || pool;
     const [result] = await executor.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, type, category, date, manual, status, regulations) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tournaments (name, type, category, date, manual, status, regulations, organizer_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         name,
         type,
@@ -126,9 +163,22 @@ export class TournamentModel {
         manual,
         tournamentStatus,
         regulations,
+        organizerUserId,
       ],
     );
     return result.insertId;
+  }
+
+  /** Сменить организатора турнира (только ADMIN через API). */
+  static async setOrganizerUserId(
+    tournamentId: number,
+    organizerUserId: number,
+  ): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      "UPDATE tournaments SET organizer_user_id = ? WHERE id = ?",
+      [organizerUserId, tournamentId],
+    );
+    return result.affectedRows > 0;
   }
 
   static async updateTournament(

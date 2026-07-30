@@ -3,6 +3,7 @@ import multer from "multer";
 import { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import * as XLSX from "xlsx";
 import { pool } from "../config/database";
+import { AuthRequest } from "../middleware/auth";
 import { LicensedPlayerModel } from "../models/LicensedPlayerModel";
 import { PlayerModel } from "../models/PlayerModel";
 import { TeamModel } from "../models/TeamModel";
@@ -11,6 +12,7 @@ import { TournamentRegistrationModel } from "../models/TournamentRegistrationMod
 import { TournamentGroupMatchModel } from "../models/TournamentGroupMatchModel";
 import { TournamentCupMatchModel } from "../models/TournamentCupMatchModel";
 import { TournamentSwissMatchModel } from "../models/TournamentSwissMatchModel";
+import { UserModel } from "../models/UserModel";
 import {
   buildGroupStageViews,
   validateMatchScores,
@@ -56,6 +58,7 @@ import {
   TournamentPlayFormat,
   TournamentStatus,
   TournamentType,
+  UserRole,
 } from "../types";
 import { parseRegistrationCsv } from "../utils/registrationCsv";
 import {
@@ -263,7 +266,10 @@ export class AdminController {
         tournament_name,
         tournament_date,
         tournament_type as TournamentType,
-        requestedCategory
+        requestedCategory,
+        {
+          organizerUserId: (req as AuthRequest).userId ?? null,
+        }
       );
 
       res.json({
@@ -361,7 +367,11 @@ export class AdminController {
         tournament_name,
         tournament_date,
         tournament_type,
-        requestedCategory
+        requestedCategory,
+        undefined,
+        {
+          organizerUserId: (req as AuthRequest).userId ?? null,
+        }
       );
 
       res.json({
@@ -959,6 +969,7 @@ export class AdminController {
    */
   static async createTournament(req: Request, res: Response): Promise<void> {
     try {
+      const authReq = req as AuthRequest;
       const { name, date, type, category, regulations } = req.body;
 
       if (!name || typeof name !== "string" || !name.trim()) {
@@ -1023,6 +1034,7 @@ export class AdminController {
         undefined,
         regulationsText,
         TournamentStatus.DRAFT,
+        authReq.userId ?? null,
       );
 
       res.status(201).json({
@@ -3976,6 +3988,84 @@ export class AdminController {
       }
     } catch (error) {
       console.error("Ошибка при обновлении турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /** Сменить организатора турнира (только ADMIN). */
+  static async setTournamentOrganizer(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const organizerUserId = parseInt(
+        String((req.body as { organizer_user_id?: unknown }).organizer_user_id),
+        10,
+      );
+
+      if (isNaN(tournamentId) || isNaN(organizerUserId)) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите турнир и organizer_user_id",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      const user = await UserModel.getUserById(organizerUserId);
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: "Пользователь не найден",
+        });
+        return;
+      }
+
+      const roles =
+        user.roles && user.roles.length > 0 ? user.roles : [user.role];
+      const canBeOrganizer =
+        roles.includes(UserRole.ADMIN) || roles.includes(UserRole.MANAGER);
+      if (!canBeOrganizer) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Организатором может быть только пользователь с ролью ADMIN или MANAGER",
+        });
+        return;
+      }
+
+      const ok = await TournamentModel.setOrganizerUserId(
+        tournamentId,
+        organizerUserId,
+      );
+      if (!ok) {
+        res.status(400).json({
+          success: false,
+          message: "Не удалось назначить организатора",
+        });
+        return;
+      }
+
+      const updated = await TournamentModel.getTournamentById(tournamentId);
+      res.json({
+        success: true,
+        message: "Организатор турнира обновлён",
+        data: updated,
+      });
+    } catch (error) {
+      console.error("Ошибка смены организатора турнира:", error);
       res.status(500).json({
         success: false,
         message: "Внутренняя ошибка сервера",

@@ -7,8 +7,10 @@ import {
   ShieldCheckIcon,
   TrashIcon,
   TrophyIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -26,6 +28,7 @@ import {
   getTournamentStatusText,
   getTournamentTypeIcons,
   hasAnyUserRole,
+  canManageTournamentData,
   handleApiError,
   hasActiveTournamentFilters,
   loadAdminTournamentFiltersFromCookie,
@@ -72,7 +75,14 @@ const AdminTournaments: React.FC = () => {
     { id: number; name: string; date: string; type: TournamentType; category: string } | null
   >(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingTournament, setEditingTournament] = useState<any>(null);
+  const [editingTournament, setEditingTournament] = useState<Tournament | null>(
+    null
+  );
+  const [organizerModalTournament, setOrganizerModalTournament] =
+    useState<Tournament | null>(null);
+  const [organizerModalUserId, setOrganizerModalUserId] = useState<number | "">(
+    ""
+  );
 
   const queryClient = useQueryClient();
 
@@ -112,10 +122,24 @@ const AdminTournaments: React.FC = () => {
     UserRole.MANAGER,
   ]);
 
+  const isAdmin = hasAnyUserRole(currentUser, [UserRole.ADMIN]);
+
   const canValidateResults = hasAnyUserRole(currentUser, [
     UserRole.ADMIN,
     UserRole.PRESIDIUM_MEMBER,
   ]);
+
+  const { data: staffUsers } = useQuery(
+    "tournamentOrganizerCandidates",
+    async () => {
+      const response = await adminApi.getUsers();
+      const users = response.data.users || [];
+      return users.filter((u: { id: number; role?: UserRole; roles?: UserRole[] }) =>
+        hasAnyUserRole(u, [UserRole.ADMIN, UserRole.MANAGER])
+      );
+    },
+    { enabled: isAdmin, staleTime: 60_000 }
+  );
 
   // Загружаем список турниров
   const {
@@ -234,6 +258,7 @@ const AdminTournaments: React.FC = () => {
         queryClient.invalidateQueries("fullRating");
         queryClient.invalidateQueries("dashboardRating");
         setIsEditModalOpen(false);
+        setEditingTournament(null);
         resetEdit();
       },
       onError: (error) => {
@@ -259,6 +284,31 @@ const AdminTournaments: React.FC = () => {
       },
     }
   );
+
+  const setOrganizerMutation = useMutation(
+    async (data: { tournamentId: number; organizerUserId: number }) => {
+      return await adminApi.setTournamentOrganizer(
+        data.tournamentId,
+        data.organizerUserId
+      );
+    },
+    {
+      onSuccess: () => {
+        toast.success("Организатор турнира обновлён");
+        queryClient.invalidateQueries("tournaments");
+        setOrganizerModalTournament(null);
+        setOrganizerModalUserId("");
+      },
+      onError: (error) => {
+        toast.error(handleApiError(error));
+      },
+    }
+  );
+
+  const openOrganizerModal = (tournament: Tournament) => {
+    setOrganizerModalTournament(tournament);
+    setOrganizerModalUserId(tournament.organizer_user_id ?? "");
+  };
 
   // Мутация для пересчёта очков конкретного турнира
   const recalculateMutation = useMutation(
@@ -288,16 +338,19 @@ const AdminTournaments: React.FC = () => {
     }
   };
 
-  const handleOpenEditModal = (tournament: any) => {
+  const handleOpenEditModal = (tournament: Tournament) => {
+    const categoryRaw = String(tournament.category ?? "");
+    const category =
+      categoryRaw === "FEDERAL" || categoryRaw === "1" ? "1" : "2";
     setEditingTournament(tournament);
+    setIsEditModalOpen(true);
     resetEdit({
       name: tournament.name,
       type: tournament.type,
-      category: tournament.category === "FEDERAL" ? "1" : "2",
-      date: formatDateForInput(tournament.date),
+      category,
+      date: formatDateForInput(String(tournament.date ?? "")),
       status: tournament.status ?? TournamentStatus.FINISHED,
     });
-    setIsEditModalOpen(true);
   };
 
   const onSubmitEdit = (data: TournamentEditForm) => {
@@ -462,7 +515,10 @@ const AdminTournaments: React.FC = () => {
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Учёт в рейтинге
-                  </th>      
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Организатор
+                  </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
                   </th>
@@ -482,12 +538,17 @@ const AdminTournaments: React.FC = () => {
                   const isDraft = tournament.status === TournamentStatus.DRAFT;
                   const isFinished =
                     tournament.status === TournamentStatus.FINISHED;
+                  const canManageThis = canManageTournamentData(
+                    currentUser,
+                    tournament
+                  );
                   const opensSnapshotView =
-                    isRegistration ||
-                    isFinalRegistration ||
-                    isInProgress ||
-                    isDraft ||
-                    isFinished;
+                    isFinished ||
+                    ((isRegistration ||
+                      isFinalRegistration ||
+                      isInProgress ||
+                      isDraft) &&
+                      canManageThis);
                   return (
                   <tr
                     key={tournament.id}
@@ -611,6 +672,13 @@ const AdminTournaments: React.FC = () => {
                         )}
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {tournament.organizer?.name ||
+                        tournament.organizer?.username ||
+                        (tournament.organizer_user_id != null
+                          ? `#${tournament.organizer_user_id}`
+                          : "—")}
+                    </td>
                     <td
                       className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
                       onClick={(e) => e.stopPropagation()}
@@ -642,7 +710,7 @@ const AdminTournaments: React.FC = () => {
                               />
                             </button>
                           )}
-                        {canManageTournaments && (
+                        {canManageThis && (
                           <>
                             <button
                               type="button"
@@ -695,7 +763,11 @@ const AdminTournaments: React.FC = () => {
                             )}
                             <button
                               type="button"
-                              onClick={() => handleOpenEditModal(tournament)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleOpenEditModal(tournament);
+                              }}
                               className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
                               title="Редактировать турнир"
                             >
@@ -704,17 +776,27 @@ const AdminTournaments: React.FC = () => {
                           </>
                         )}
                         {hasAnyUserRole(currentUser, [UserRole.ADMIN]) && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDelete(tournament.id, tournament.name)
-                            }
-                            disabled={deleteMutation.isLoading}
-                            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                            title="Удалить турнир"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openOrganizerModal(tournament)}
+                              className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
+                              title="Сменить организатора"
+                            >
+                              <UserCircleIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDelete(tournament.id, tournament.name)
+                              }
+                              disabled={deleteMutation.isLoading}
+                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                              title="Удалить турнир"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -966,15 +1048,36 @@ const AdminTournaments: React.FC = () => {
       />
 
       {/* Модальное окно редактирования турнира */}
-      {isEditModalOpen && editingTournament && (
-        <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
-          <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+      {isEditModalOpen &&
+        editingTournament &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] bg-gray-600 bg-opacity-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-tournament-title"
+            onClick={() => {
+              setIsEditModalOpen(false);
+              setEditingTournament(null);
+            }}
+          >
+            <div
+              className="card max-w-lg w-full max-h-[90vh] overflow-y-auto p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2
+                id="edit-tournament-title"
+                className="text-xl font-semibold text-gray-900"
+              >
                 Редактировать турнир
               </h2>
               <button
-                onClick={() => setIsEditModalOpen(false)}
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingTournament(null);
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 ✕
@@ -1122,6 +1225,31 @@ const AdminTournaments: React.FC = () => {
                 )}
               </div>
 
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Организатор турнира
+                  </label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    {editingTournament.organizer?.name ||
+                      editingTournament.organizer?.username ||
+                      "Не назначен"}
+                    . Чтобы сменить — кнопка с иконкой пользователя в колонке
+                    «Действия».
+                  </p>
+                </div>
+              )}
+
+              {!isAdmin && editingTournament.organizer && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Организатор</p>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {editingTournament.organizer.name ||
+                      editingTournament.organizer.username}
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
@@ -1141,7 +1269,107 @@ const AdminTournaments: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+      {/* Модальное окно смены организатора (ADMIN) */}
+      {organizerModalTournament &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] bg-gray-600 bg-opacity-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => {
+              setOrganizerModalTournament(null);
+              setOrganizerModalUserId("");
+            }}
+          >
+            <div
+              className="card max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Сменить организатора
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setOrganizerModalTournament(null);
+                  setOrganizerModalUserId("");
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Турнир:{" "}
+              <span className="font-medium text-gray-900">
+                {organizerModalTournament.name}
+              </span>
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Организатор
+            </label>
+            <select
+              className="input-field mb-4"
+              value={
+                organizerModalUserId === ""
+                  ? ""
+                  : String(organizerModalUserId)
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setOrganizerModalUserId(v === "" ? "" : Number(v));
+              }}
+            >
+              <option value="" disabled>
+                Выберите пользователя
+              </option>
+              {(staffUsers ?? []).map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.username})
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={setOrganizerMutation.isLoading}
+                onClick={() => {
+                  setOrganizerModalTournament(null);
+                  setOrganizerModalUserId("");
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={
+                  setOrganizerMutation.isLoading ||
+                  organizerModalUserId === "" ||
+                  organizerModalUserId ===
+                    organizerModalTournament.organizer_user_id
+                }
+                onClick={() => {
+                  if (organizerModalUserId === "") {
+                    return;
+                  }
+                  setOrganizerMutation.mutate({
+                    tournamentId: organizerModalTournament.id,
+                    organizerUserId: Number(organizerModalUserId),
+                  });
+                }}
+              >
+                {setOrganizerMutation.isLoading ? "Сохранение…" : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
