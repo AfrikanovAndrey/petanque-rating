@@ -52,14 +52,22 @@ export type SwissSeedEntry = {
   random_tie: number;
 };
 
+export type CupThirdPlaceByCup = Partial<
+  Record<"A" | "B" | "C" | "D", boolean>
+>;
+
 export type CupStageConfig = {
   a: number;
   b: number;
   c: number;
   d: number;
   ab_playoff: boolean;
-  /** Матч за 3-е место в кубках (по умолчанию true) */
-  third_place?: boolean;
+  /**
+   * Матч за 3-е место.
+   * - boolean (legacy): одно значение для всех кубков;
+   * - объект: по кубкам; A в UI не спрашиваем и всегда true.
+   */
+  third_place?: boolean | CupThirdPlaceByCup;
   /** Сохранённые составы при старте (для AB → A/B и отображения) */
   pools?: Partial<
     Record<"AB" | "A" | "B" | "C" | "D", Array<{

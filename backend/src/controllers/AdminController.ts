@@ -36,6 +36,7 @@ import {
   parseCupStageConfig,
   rankTeamsFromGroups,
   rankTeamsFromSwiss,
+  resolveCupThirdPlace,
   validateCupStageConfig,
   type CupBracketCode,
   type QualifiedTeam,
@@ -2408,10 +2409,13 @@ export class AdminController {
     );
 
     let court = Math.max(0, ...all.map((m) => m.court ?? 0)) + 1;
-    const bracketOpts = { thirdPlace: config.third_place !== false };
-    const aFixtures = generateBracketFixtures("A", winners, court, bracketOpts);
+    const aFixtures = generateBracketFixtures("A", winners, court, {
+      thirdPlace: resolveCupThirdPlace(config, "A"),
+    });
     court += aFixtures.length;
-    const bFixtures = generateBracketFixtures("B", losers, court, bracketOpts);
+    const bFixtures = generateBracketFixtures("B", losers, court, {
+      thirdPlace: resolveCupThirdPlace(config, "B"),
+    });
     await TournamentCupMatchModel.insertFixtures(tournamentId, [
       ...aFixtures,
       ...bFixtures,

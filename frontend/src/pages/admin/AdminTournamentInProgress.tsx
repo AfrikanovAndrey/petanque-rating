@@ -472,6 +472,8 @@ const AdminTournamentInProgress: React.FC = () => {
           swiss={data.swiss}
           readOnly={Boolean(data.cups && data.cups.length > 0)}
           defaultCollapsed={Boolean(data.cups && data.cups.length > 0)}
+          tournamentName={tournament.name}
+          showPrint
         />
       )}
 

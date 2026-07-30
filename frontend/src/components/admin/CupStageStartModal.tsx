@@ -29,7 +29,10 @@ const CupStageStartModal: React.FC<Props> = ({
   const [c, setC] = useState(0);
   const [d, setD] = useState(0);
   const [abPlayoff, setAbPlayoff] = useState(false);
-  const [thirdPlace, setThirdPlace] = useState(true);
+  // Кубок A всегда с матчем за 3-е; B/C/D — по выбору (если сетка ≥ 4).
+  const [thirdPlaceB, setThirdPlaceB] = useState(true);
+  const [thirdPlaceC, setThirdPlaceC] = useState(true);
+  const [thirdPlaceD, setThirdPlaceD] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -38,7 +41,9 @@ const CupStageStartModal: React.FC<Props> = ({
       setC(0);
       setD(0);
       setAbPlayoff(false);
-      setThirdPlace(true);
+      setThirdPlaceB(true);
+      setThirdPlaceC(true);
+      setThirdPlaceD(true);
     }
   }, [open]);
 
@@ -56,6 +61,49 @@ const CupStageStartModal: React.FC<Props> = ({
     return a + b + c + d;
   }, [a, b, c, d, abPlayoff]);
 
+  const cupRows = useMemo(
+    () =>
+      [
+        {
+          cup: "A" as const,
+          size: a,
+          setSize: setA,
+          required: true,
+          thirdChecked: true,
+          setThird: null as ((v: boolean) => void) | null,
+          thirdFixed: true,
+        },
+        {
+          cup: "B" as const,
+          size: b,
+          setSize: setB,
+          required: false,
+          thirdChecked: thirdPlaceB,
+          setThird: setThirdPlaceB,
+          thirdFixed: false,
+        },
+        {
+          cup: "C" as const,
+          size: c,
+          setSize: setC,
+          required: false,
+          thirdChecked: thirdPlaceC,
+          setThird: setThirdPlaceC,
+          thirdFixed: false,
+        },
+        {
+          cup: "D" as const,
+          size: d,
+          setSize: setD,
+          required: false,
+          thirdChecked: thirdPlaceD,
+          setThird: setThirdPlaceD,
+          thirdFixed: false,
+        },
+      ] as const,
+    [a, b, c, d, thirdPlaceB, thirdPlaceC, thirdPlaceD]
+  );
+
   const mutation = useMutation(
     () =>
       adminApi.startCupStage(tournamentId, {
@@ -64,7 +112,12 @@ const CupStageStartModal: React.FC<Props> = ({
         c,
         d,
         ab_playoff: abPlayoff,
-        third_place: thirdPlace,
+        third_place: {
+          A: true,
+          B: b >= 4 ? thirdPlaceB : false,
+          C: c >= 4 ? thirdPlaceC : false,
+          D: d >= 4 ? thirdPlaceD : false,
+        },
       }),
     {
       onSuccess: (res) => {
@@ -109,33 +162,78 @@ const CupStageStartModal: React.FC<Props> = ({
             <strong>{availableTeams}</strong>. Размеры сеток — степени двойки.
           </p>
 
-          {(
-            [
-              ["A", a, setA, true],
-              ["B", b, setB, false],
-              ["C", c, setC, false],
-              ["D", d, setD, false],
-            ] as const
-          ).map(([label, value, setter, required]) => (
-            <label key={label} className="flex items-center justify-between gap-3">
-              <span className="font-medium text-gray-800">
-                Кубок {label}
-                {required ? " *" : " (опционально)"}
-              </span>
-              <select
-                className="rounded-md border border-gray-300 px-3 py-1.5"
-                value={value}
-                disabled={abPlayoff && (label === "A" || label === "B")}
-                onChange={(e) => setter(Number(e.target.value))}
-              >
-                {(required ? A_OPTIONS : SIZE_OPTIONS).map((n) => (
-                  <option key={n} value={n}>
-                    {n === 0 ? "Выкл." : n}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
+          <div className="overflow-x-auto rounded-md border border-gray-200">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left text-gray-600">
+                  <th className="border-b border-gray-200 px-3 py-2 font-medium">
+                    Кубок
+                  </th>
+                  <th className="border-b border-gray-200 px-3 py-2 font-medium">
+                    Команд
+                  </th>
+                  <th className="border-b border-gray-200 px-3 py-2 font-medium">
+                    Игра за 3 место
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {cupRows.map((row) => {
+                  const sizeDisabled =
+                    abPlayoff && (row.cup === "A" || row.cup === "B");
+                  const thirdEnabled = row.size >= 4;
+                  const options = row.required ? A_OPTIONS : SIZE_OPTIONS;
+                  return (
+                    <tr key={row.cup} className="border-t border-gray-100">
+                      <td className="px-3 py-2 font-medium text-gray-900">
+                        Кубок {row.cup}
+                        {row.required ? (
+                          <span className="text-gray-400"> *</span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          className="rounded-md border border-gray-300 px-2 py-1.5"
+                          value={row.size}
+                          disabled={sizeDisabled}
+                          aria-label={`Число команд кубка ${row.cup}`}
+                          onChange={(e) => row.setSize(Number(e.target.value))}
+                        >
+                          {options.map((n) => (
+                            <option key={n} value={n}>
+                              {n === 0 ? "Выкл." : n}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.thirdFixed ? (
+                          <label className="inline-flex items-center gap-2 text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={thirdEnabled}
+                              disabled
+                              readOnly
+                              aria-label={`Игра за 3 место, кубок ${row.cup}`}
+                            />
+                            <span className="text-xs text-gray-500">всегда</span>
+                          </label>
+                        ) : (
+                          <input
+                            type="checkbox"
+                            checked={thirdEnabled && row.thirdChecked}
+                            disabled={!thirdEnabled || row.setThird == null}
+                            aria-label={`Игра за 3 место, кубок ${row.cup}`}
+                            onChange={(e) => row.setThird?.(e.target.checked)}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           <label className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
             <input
@@ -152,24 +250,6 @@ const CupStageStartModal: React.FC<Props> = ({
               <span className="mt-0.5 block text-gray-600">
                 16 лучших → 8 матчей; победители в A, проигравшие в B (требует
                 A=8 и B=8).
-              </span>
-            </span>
-          </label>
-
-          <label className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={thirdPlace}
-              onChange={(e) => setThirdPlace(e.target.checked)}
-            />
-            <span>
-              <span className="font-medium text-gray-900">
-                Игра за 3-е место
-              </span>
-              <span className="mt-0.5 block text-gray-600">
-                В каждом кубке (A–D) с сеткой от 4 команд — матч между
-                проигравшими полуфинала.
               </span>
             </span>
           </label>

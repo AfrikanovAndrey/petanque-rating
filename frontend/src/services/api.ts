@@ -355,7 +355,9 @@ export const adminApi = {
       c?: number;
       d?: number;
       ab_playoff?: boolean;
-      third_place?: boolean;
+      third_place?:
+        | boolean
+        | Partial<Record<"A" | "B" | "C" | "D", boolean>>;
     }
   ): Promise<
     AxiosResponse<

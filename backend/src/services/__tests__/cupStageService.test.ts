@@ -1,10 +1,12 @@
 import {
   allocateCups,
   buildAbResultQualified,
+  buildAllCupFixtures,
   generateBracketFixtures,
   pairSeededBracket,
   rankTeamsFromGroups,
   rankTeamsFromSwiss,
+  resolveCupThirdPlace,
   standardBracketSeedOrder,
   type CupStageConfig,
   type QualifiedTeam,
@@ -235,6 +237,59 @@ describe("generateBracketFixtures", () => {
       (f) => !f.is_third_place && f.round_number === 2,
     );
     expect(semis.every((f) => f.loser_next_match_round == null)).toBe(true);
+  });
+});
+
+describe("resolveCupThirdPlace", () => {
+  it("для объекта: A всегда true, B/C/D по флагам", () => {
+    const config: CupStageConfig = {
+      a: 8,
+      b: 4,
+      c: 4,
+      d: 0,
+      ab_playoff: false,
+      third_place: { A: false, B: false, C: true, D: false },
+    };
+    expect(resolveCupThirdPlace(config, "A")).toBe(true);
+    expect(resolveCupThirdPlace(config, "B")).toBe(false);
+    expect(resolveCupThirdPlace(config, "C")).toBe(true);
+    expect(resolveCupThirdPlace(config, "D")).toBe(false);
+  });
+
+  it("legacy boolean применяется ко всем кубкам", () => {
+    const off: CupStageConfig = {
+      a: 8,
+      b: 4,
+      c: 0,
+      d: 0,
+      ab_playoff: false,
+      third_place: false,
+    };
+    expect(resolveCupThirdPlace(off, "A")).toBe(false);
+    expect(resolveCupThirdPlace(off, "B")).toBe(false);
+  });
+});
+
+describe("buildAllCupFixtures per-cup third place", () => {
+  it("создаёт матч за 3-е в A и C, но не в B", () => {
+    const ranked = Array.from({ length: 16 }, (_, i) =>
+      team(i + 1, (i % 4) + 1, Math.floor(i / 4) + 1),
+    );
+    const config: CupStageConfig = {
+      a: 8,
+      b: 4,
+      c: 4,
+      d: 0,
+      ab_playoff: false,
+      third_place: { A: true, B: false, C: true, D: false },
+    };
+    const alloc = allocateCups(rankTeamsFromGroups(ranked), config);
+    const fixtures = buildAllCupFixtures(alloc, config);
+    const thirdByCup = (cup: string) =>
+      fixtures.filter((f) => f.cup === cup && f.is_third_place).length;
+    expect(thirdByCup("A")).toBe(1);
+    expect(thirdByCup("B")).toBe(0);
+    expect(thirdByCup("C")).toBe(1);
   });
 });
 

@@ -1,4 +1,10 @@
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon } from "@heroicons/react/24/outline";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PencilIcon,
+  PrinterIcon,
+} from "@heroicons/react/24/outline";
 import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useMutation, useQueryClient } from "react-query";
@@ -6,6 +12,7 @@ import { adminApi } from "../../services/api";
 import {
   TiebreakerCriterion,
   TournamentSwissMatchView,
+  TournamentSwissStanding,
   TournamentSwissStageView,
 } from "../../types";
 import { handleApiError } from "../../utils";
@@ -14,6 +21,7 @@ import {
   getTiebreakerLabel,
   getTiebreakerShortLabel,
   isSwissFreeTeamId,
+  SWISS_FREE_TEAM_NAME,
 } from "../../utils/tournamentPlaySettings";
 
 type Props = {
@@ -22,6 +30,10 @@ type Props = {
   readOnly?: boolean;
   /** Свернуть блок по умолчанию (например, после начала финала) */
   defaultCollapsed?: boolean;
+  /** Название турнира для шапки печати */
+  tournamentName?: string;
+  /** Кнопки печати (только админка) */
+  showPrint?: boolean;
 };
 
 type TabId = "standings" | number;
@@ -35,6 +47,216 @@ function formatDiff(diff: number): string {
     return `+${diff}`;
   }
   return String(diff);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function openPrintWindow(documentTitle: string, bodyHtml: string): void {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("title", documentTitle);
+  iframe.setAttribute("aria-hidden", "true");
+  // Не window.open — стандартный диалог ОС без разрешения всплывающих окон.
+  // Размер не нулевой: иначе часть браузеров печатает пустую страницу.
+  iframe.style.position = "fixed";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "800px";
+  iframe.style.height = "600px";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  document.body.appendChild(iframe);
+
+  const frameWindow = iframe.contentWindow;
+  const frameDocument = frameWindow?.document;
+  if (!frameWindow || !frameDocument) {
+    iframe.remove();
+    toast.error("Не удалось открыть диалог печати");
+    return;
+  }
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) {
+      return;
+    }
+    cleaned = true;
+    iframe.remove();
+  };
+
+  frameDocument.open();
+  frameDocument.write(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(documentTitle)}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; color: #111; margin: 24px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .meta { color: #555; margin: 0 0 16px; font-size: 12px; }
+    table { border-collapse: collapse; width: auto; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; }
+    th { background: #f3f4f6; font-weight: 600; text-align: center; }
+    td.num, th.num { text-align: center; }
+    td.team { text-align: left; white-space: nowrap; }
+    .matches { width: 100%; max-width: 640px; }
+    .match { display: grid; grid-template-columns: 1fr auto auto auto 1fr auto; gap: 8px; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+    .match .a { text-align: right; }
+    .match .b { text-align: left; }
+    .match .score { font-weight: 600; min-width: 1.5rem; text-align: center; }
+    .match .court { color: #555; font-size: 12px; white-space: nowrap; }
+    @media print {
+      body { margin: 12px; }
+    }
+  </style>
+</head>
+<body>
+${bodyHtml}
+</body>
+</html>`);
+  frameDocument.close();
+
+  const triggerPrint = () => {
+    try {
+      frameWindow.focus();
+      frameWindow.print();
+    } finally {
+      window.setTimeout(cleanup, 1000);
+    }
+  };
+
+  frameWindow.addEventListener("afterprint", cleanup);
+  window.setTimeout(triggerPrint, 100);
+}
+
+function buildStandingsPrintHtml(options: {
+  tournamentName?: string;
+  title: string;
+  sortLegend: string;
+  completedRounds: number;
+  tiebreakerOrder: TiebreakerCriterion[];
+  standings: TournamentSwissStanding[];
+}): string {
+  const {
+    tournamentName,
+    title,
+    sortLegend,
+    completedRounds,
+    tiebreakerOrder,
+    standings,
+  } = options;
+  const headerCells = [
+    { label: "Место", className: "num" },
+    { label: "Команда", className: "team" },
+    { label: "Победы", className: "num" },
+    ...tiebreakerOrder.map((c) => ({
+      label: getTiebreakerShortLabel(c),
+      className: "num",
+    })),
+    { label: "Сид", className: "num" },
+  ]
+    .map(
+      ({ label, className }) =>
+        `<th class="${className}">${escapeHtml(label)}</th>`
+    )
+    .join("");
+
+  const rows = standings
+    .map((row) => {
+      const cells = [
+        `<td class="num">${completedRounds > 0 ? row.place : "—"}</td>`,
+        `<td class="team">${escapeHtml(teamLabel(row.players))}</td>`,
+        `<td class="num">${row.wins}</td>`,
+        ...tiebreakerOrder.map((criterion) => {
+          const value = row.tiebreakers?.[criterion];
+          const display =
+            value == null
+              ? "—"
+              : criterion === TiebreakerCriterion.POINT_DIFF
+                ? formatDiff(value)
+                : String(value);
+          return `<td class="num">${escapeHtml(display)}</td>`;
+        }),
+        `<td class="num">${row.seed}</td>`,
+      ];
+      return `<tr>${cells.join("")}</tr>`;
+    })
+    .join("");
+
+  const metaParts = [
+    tournamentName ? escapeHtml(tournamentName) : null,
+    sortLegend ? `Сортировка: ${escapeHtml(sortLegend)}` : null,
+  ].filter(Boolean);
+
+  return `
+    <h1>${escapeHtml(title)}</h1>
+    ${metaParts.length ? `<p class="meta">${metaParts.join(" · ")}</p>` : ""}
+    <table>
+      <thead><tr>${headerCells}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function buildRoundPrintHtml(options: {
+  tournamentName?: string;
+  roundNumber: number;
+  matches: TournamentSwissMatchView[];
+  nameById: Map<number, string>;
+}): string {
+  const { tournamentName, roundNumber, matches, nameById } = options;
+  const title = `Тур ${roundNumber}`;
+  const rows = matches
+    .map((m) => {
+      const aName = escapeHtml(
+        nameById.get(m.team_a_id) ?? `Команда #${m.team_a_id}`
+      );
+      const bName = m.is_bye
+        ? escapeHtml(SWISS_FREE_TEAM_NAME)
+        : escapeHtml(
+            m.team_b_id != null
+              ? nameById.get(m.team_b_id) ?? `Команда #${m.team_b_id}`
+              : "—"
+          );
+      const scoreA = m.is_bye
+        ? "13"
+        : m.score_a != null
+          ? String(m.score_a)
+          : "—";
+      const scoreB = m.is_bye
+        ? "7"
+        : m.score_b != null
+          ? String(m.score_b)
+          : "—";
+      const court =
+        m.is_bye || m.court == null ? "—" : String(m.court);
+      return `<div class="match">
+        <span class="a">${aName}</span>
+        <span class="score">${scoreA}</span>
+        <span>:</span>
+        <span class="score">${scoreB}</span>
+        <span class="b">${bName}</span>
+        <span class="court">дорожка ${escapeHtml(court)}</span>
+      </div>`;
+    })
+    .join("");
+
+  return `
+    <h1>${escapeHtml(title)}</h1>
+    ${
+      tournamentName
+        ? `<p class="meta">${escapeHtml(tournamentName)}</p>`
+        : ""
+    }
+    <div class="matches">${rows}</div>
+  `;
 }
 
 const SwissMatchScoreInputs: React.FC<{
@@ -365,6 +587,8 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
   swiss,
   readOnly = false,
   defaultCollapsed = false,
+  tournamentName,
+  showPrint = false,
 }) => {
   const rounds = useMemo(() => {
     const byRound = new Map<number, TournamentSwissMatchView[]>();
@@ -549,6 +773,40 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
     currentRoundComplete &&
     !nextRoundExists;
 
+  const printStandings = () => {
+    const title = standingsTitle;
+    openPrintWindow(
+      tournamentName ? `${tournamentName} — ${title}` : title,
+      buildStandingsPrintHtml({
+        tournamentName,
+        title,
+        sortLegend:
+          swiss.completed_rounds > 0 && tiebreakerOrder.length > 0
+            ? sortLegend
+            : "",
+        completedRounds: swiss.completed_rounds,
+        tiebreakerOrder,
+        standings: sortedStandings,
+      })
+    );
+  };
+
+  const printActiveRound = () => {
+    if (typeof selectedTab !== "number" || !activeRound) {
+      return;
+    }
+    const title = `Тур ${selectedTab}`;
+    openPrintWindow(
+      tournamentName ? `${tournamentName} — ${title}` : title,
+      buildRoundPrintHtml({
+        tournamentName,
+        roundNumber: selectedTab,
+        matches: activeRound.matches,
+        nameById,
+      })
+    );
+  };
+
   return (
     <div className="card overflow-hidden">
       <button
@@ -612,11 +870,28 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
 
           {selectedTab === "standings" ? (
             <div className="space-y-2">
-              {swiss.completed_rounds > 0 && tiebreakerOrder.length > 0 && (
-                <p className="text-xs text-gray-500">
-                  Сортировка мест: {sortLegend}
-                </p>
-              )}
+              {(swiss.completed_rounds > 0 && tiebreakerOrder.length > 0) ||
+              showPrint ? (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {swiss.completed_rounds > 0 && tiebreakerOrder.length > 0 ? (
+                    <p className="text-xs text-gray-500">
+                      Сортировка мест: {sortLegend}
+                    </p>
+                  ) : (
+                    <span />
+                  )}
+                  {showPrint && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      onClick={printStandings}
+                    >
+                      <PrinterIcon className="h-4 w-4" aria-hidden />
+                      Печать
+                    </button>
+                  )}
+                </div>
+              ) : null}
               <div className="flex justify-center overflow-x-auto">
                 <table className="w-auto border-collapse text-sm">
                   <thead>
@@ -693,6 +968,18 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
             </div>
           ) : activeRound ? (
             <div className="space-y-3">
+              {showPrint && (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    onClick={printActiveRound}
+                  >
+                    <PrinterIcon className="h-4 w-4" aria-hidden />
+                    Печать
+                  </button>
+                </div>
+              )}
               {(canRollbackRound || canAdvanceRound) && (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-gray-500">

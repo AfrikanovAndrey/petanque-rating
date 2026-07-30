@@ -68,11 +68,22 @@ export function parseCupStageConfig(raw: unknown): CupStageConfig | null {
   if (ab && !(a === 8 && b === 8)) {
     return null;
   }
-  // По умолчанию матч за 3-е есть (в т.ч. для старых конфигов без поля)
-  const thirdPlace =
-    obj.third_place === undefined || obj.third_place === null
-      ? true
-      : Boolean(obj.third_place);
+  // По умолчанию матч за 3-е есть (в т.ч. для старых конфигов без поля).
+  // boolean — legacy на все кубки; объект — по кубкам (A всегда true в новой логике).
+  let thirdPlace: CupStageConfig["third_place"] = true;
+  if (obj.third_place !== undefined && obj.third_place !== null) {
+    if (typeof obj.third_place === "boolean") {
+      thirdPlace = obj.third_place;
+    } else if (typeof obj.third_place === "object") {
+      const tp = obj.third_place as Record<string, unknown>;
+      thirdPlace = {
+        A: tp.A === undefined || tp.A === null ? true : Boolean(tp.A),
+        B: tp.B === undefined || tp.B === null ? true : Boolean(tp.B),
+        C: tp.C === undefined || tp.C === null ? true : Boolean(tp.C),
+        D: tp.D === undefined || tp.D === null ? true : Boolean(tp.D),
+      };
+    }
+  }
   const config: CupStageConfig = {
     a,
     b,
@@ -116,6 +127,25 @@ export function validateCupStageConfig(
     return "Укажите хотя бы кубок A";
   }
   return null;
+}
+
+/** Нужен ли матч за 3-е в кубке. Кубок A в новой схеме всегда true. */
+export function resolveCupThirdPlace(
+  config: CupStageConfig,
+  cup: "A" | "B" | "C" | "D",
+): boolean {
+  const tp = config.third_place;
+  if (tp === undefined || tp === null) {
+    return true;
+  }
+  if (typeof tp === "boolean") {
+    return tp;
+  }
+  if (cup === "A") {
+    return true;
+  }
+  const value = tp[cup];
+  return value === undefined || value === null ? true : Boolean(value);
 }
 
 function compareStrength(a: QualifiedTeam, b: QualifiedTeam): number {
@@ -505,7 +535,6 @@ export function buildAllCupFixtures(
 ): CupMatchFixture[] {
   const all: CupMatchFixture[] = [];
   let court = 1;
-  const bracketOpts = { thirdPlace: config.third_place !== false };
 
   if (config.ab_playoff) {
     const ab = generateAbPlayoffFixtures(allocation.ab, court);
@@ -520,7 +549,9 @@ export function buildAllCupFixtures(
       if (teams.length === 0) {
         continue;
       }
-      const fixtures = generateBracketFixtures(code, teams, court, bracketOpts);
+      const fixtures = generateBracketFixtures(code, teams, court, {
+        thirdPlace: resolveCupThirdPlace(config, code),
+      });
       all.push(...fixtures);
       court += fixtures.length;
     }
@@ -533,7 +564,9 @@ export function buildAllCupFixtures(
     if (teams.length === 0) {
       continue;
     }
-    const fixtures = generateBracketFixtures(code, teams, court, bracketOpts);
+    const fixtures = generateBracketFixtures(code, teams, court, {
+      thirdPlace: resolveCupThirdPlace(config, code),
+    });
     all.push(...fixtures);
     court += fixtures.length;
   }
