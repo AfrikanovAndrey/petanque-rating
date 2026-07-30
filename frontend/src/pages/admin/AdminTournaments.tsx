@@ -15,13 +15,6 @@ import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { adminApi, createBlankTournament } from "../../services/api";
 import {
-  getCupPositionText,
-  Tournament,
-  TournamentStatus,
-  TournamentType,
-  UserRole,
-} from "../../types";
-import {
   applyTournamentListFilters,
   buildYearTabs,
   cn,
@@ -42,6 +35,12 @@ import {
 } from "../../utils";
 import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
 import TournamentListFiltersPanel from "../../components/TournamentListFiltersPanel";
+import {
+  Tournament,
+  TournamentStatus,
+  TournamentType,
+  UserRole,
+} from "../../types";
 
 interface TournamentEditForm {
   name: string;
@@ -73,9 +72,7 @@ const AdminTournaments: React.FC = () => {
     { id: number; name: string; date: string; type: TournamentType; category: string } | null
   >(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedTournament, setSelectedTournament] = useState<any>(null);
   const [editingTournament, setEditingTournament] = useState<any>(null);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -281,23 +278,6 @@ const AdminTournaments: React.FC = () => {
     }
   );
 
-  // Мутация для получения деталей турнира
-  const detailsMutation = useMutation(
-    async (tournamentId: number) => {
-      const response = await adminApi.getTournamentDetails(tournamentId);
-      return response.data.data;
-    },
-    {
-      onSuccess: (data) => {
-        setSelectedTournament(data);
-        setIsDetailsModalOpen(true);
-      },
-      onError: (error) => {
-        toast.error(handleApiError(error));
-      },
-    }
-  );
-
   const handleDelete = (tournamentId: number, tournamentName: string) => {
     if (
       window.confirm(
@@ -306,10 +286,6 @@ const AdminTournaments: React.FC = () => {
     ) {
       deleteMutation.mutate(tournamentId);
     }
-  };
-
-  const handleViewDetails = (tournamentId: number) => {
-    detailsMutation.mutate(tournamentId);
   };
 
   const handleOpenEditModal = (tournament: any) => {
@@ -504,11 +480,14 @@ const AdminTournaments: React.FC = () => {
                   const isInProgress =
                     tournament.status === TournamentStatus.IN_PROGRESS;
                   const isDraft = tournament.status === TournamentStatus.DRAFT;
+                  const isFinished =
+                    tournament.status === TournamentStatus.FINISHED;
                   const opensSnapshotView =
                     isRegistration ||
                     isFinalRegistration ||
                     isInProgress ||
-                    isDraft;
+                    isDraft ||
+                    isFinished;
                   return (
                   <tr
                     key={tournament.id}
@@ -527,7 +506,9 @@ const AdminTournaments: React.FC = () => {
                                   ? `/admin/tournaments/${tournament.id}/registration`
                                   : isFinalRegistration
                                     ? `/admin/tournaments/${tournament.id}/final-registration`
-                                    : `/admin/tournaments/${tournament.id}/in-progress`
+                                    : isFinished
+                                      ? `/admin/tournaments/${tournament.id}/finished`
+                                      : `/admin/tournaments/${tournament.id}/in-progress`
                             )
                         : undefined
                     }
@@ -535,24 +516,9 @@ const AdminTournaments: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">                    
                         <div className="flex items-center">
-                          {opensSnapshotView ? (
-                            <span className="text-sm font-medium text-gray-900">
-                              {tournament.name}
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetails(tournament.id);
-                              }}
-                              disabled={detailsMutation.isLoading}
-                              className="text-sm font-medium text-gray-900 hover:text-primary-600 hover:underline text-left cursor-pointer"
-                              title="Просмотр результатов"
-                            >
-                              {tournament.name}
-                            </button>
-                          )}
+                          <span className="text-sm font-medium text-gray-900">
+                            {tournament.name}
+                          </span>
                           {getTournamentTypeIcons(tournament.type)}
                         </div>
                       </div>
@@ -995,14 +961,7 @@ const AdminTournaments: React.FC = () => {
         }}
         tournament={replaceResultsTournament ?? undefined}
         onAfterSuccess={() => {
-          const t = replaceResultsTournament;
-          if (
-            t &&
-            isDetailsModalOpen &&
-            selectedTournament?.id === t.id
-          ) {
-            detailsMutation.mutate(t.id);
-          }
+          void queryClient.invalidateQueries("tournaments");
         }}
       />
 
@@ -1181,131 +1140,6 @@ const AdminTournaments: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Модальное окно с деталями турнира */}
-      {isDetailsModalOpen && selectedTournament && (
-        <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
-          <div className="card max-w-4xl w-full max-h-[80vh] flex flex-col">
-            {/* Заголовок - фиксированный */}
-            <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-200 flex-shrink-0">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {selectedTournament.tournament.name}
-                </h2>
-                <p className="text-gray-600">
-                  {formatDate(selectedTournament.tournament.date)}
-                </p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => setIsDetailsModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none p-1"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Содержимое - скроллируемое */}
-            <div className="overflow-y-auto flex-1 p-6 pt-4">
-              {(() => {
-                // Группируем результаты по кубкам
-                const cupA = selectedTournament.results.filter(
-                  (result: any) => result.cup === "A"
-                );
-                const cupB = selectedTournament.results.filter(
-                  (result: any) => result.cup === "B"
-                );
-
-                const sortResults = (results: any[]) => {
-                  return results.sort((a: any, b: any) => {
-                    // Порядок позиций по приоритету (лучшие позиции первыми)
-                    const positionPriority: Record<string, number> = {
-                      WINNER: 1,
-                      "1": 1, // тоже победитель
-                      RUNNER_UP: 2,
-                      "2": 2, // тоже второе место
-                      THIRD_PLACE: 3,
-                      "3": 3, // тоже третье место
-                      ROUND_OF_4: 4,
-                      "1/2": 4, // полуфинал
-                      ROUND_OF_8: 5,
-                      "1/4": 5, // четвертьфинал
-                      ROUND_OF_16: 6,
-                      "1/8": 6, // 1/8 финала
-                    };
-
-                    const aPriority = positionPriority[a.cup_position] || 999;
-                    const bPriority = positionPriority[b.cup_position] || 999;
-
-                    return aPriority - bPriority;
-                  });
-                };
-
-                const renderCupTable = (results: any[], cupTitle: string) => {
-                  if (results.length === 0) return null;
-
-                  const sortedResults = sortResults(results);
-
-                  return (
-                    <div key={cupTitle} className="mb-6">
-                      <div className="mb-4">
-                        <h4 className="text-md font-medium text-gray-900">
-                          {cupTitle}
-                        </h4>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                Место
-                              </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                Команда
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {sortedResults.map((result: any) => (
-                              <tr key={result.id}>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <div className="flex flex-col">
-                                    <div className="text-sm font-medium text-gray-900">
-                                      {getCupPositionText(
-                                        result.cup_position,
-                                        result.cup
-                                      )}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                  <div className="flex flex-col">
-                                    <span className="font-semibold">
-                                      {result.team_players}
-                                    </span>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                };
-
-                return (
-                  <div className="space-y-6">
-                    {renderCupTable(cupA, "Кубок A")}
-                    {renderCupTable(cupB, "Кубок B")}
-                  </div>
-                );
-              })()}
-            </div>
           </div>
         </div>
       )}

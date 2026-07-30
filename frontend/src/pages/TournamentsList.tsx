@@ -1,7 +1,5 @@
 import {
   CalendarIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   TrophyIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
@@ -10,11 +8,7 @@ import { useQuery } from "react-query";
 import { Link } from "react-router-dom";
 import TournamentListFiltersPanel from "../components/TournamentListFiltersPanel";
 import { tournamentsApi } from "../services/api";
-import {
-  TournamentResult,
-  TournamentStatus,
-  TournamentWithResults,
-} from "../types";
+import { TournamentStatus } from "../types";
 import {
   applyTournamentListFilters,
   buildYearTabs,
@@ -25,7 +19,6 @@ import {
   getTornamentCategoryText,
   getTournamentStatusText,
   getTournamentTypeIcons,
-  handleApiError,
   loadTournamentFiltersFromCookie,
   saveTournamentFiltersToCookie,
   type TournamentListFilters,
@@ -34,22 +27,14 @@ import {
   canUsePreferenceCookies,
   COOKIE_CONSENT_RESET_EVENT,
 } from "../utils/cookieConsent";
-import { getCupPositionText } from "../types";
 
 const TournamentsList: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [expandedTournament, setExpandedTournament] = useState<number | null>(
-    null
-  );
-  const [tournamentDetails, setTournamentDetails] = useState<
-    Record<number, TournamentWithResults>
-  >({});
   const [filters, setFilters] = useState<TournamentListFilters>(() =>
     loadTournamentFiltersFromCookie()
   );
 
-  // Загружаем список турниров
   const {
     data: tournaments,
     isLoading,
@@ -96,10 +81,6 @@ const TournamentsList: React.FC = () => {
     saveTournamentFiltersToCookie(filters);
   }, [filters]);
 
-  useEffect(() => {
-    setExpandedTournament(null);
-  }, [selectedYear, filters]);
-
   const yearTournaments = useMemo(() => {
     if (!tournaments || selectedYear === null) {
       return [];
@@ -111,45 +92,6 @@ const TournamentsList: React.FC = () => {
     () => applyTournamentListFilters(yearTournaments, filters),
     [yearTournaments, filters]
   );
-
-  // Загружаем детали конкретного турнира
-  const loadTournamentDetails = async (
-    tournamentId: number,
-    forceReload = false
-  ) => {
-    if (tournamentDetails[tournamentId] && !forceReload) {
-      return; // Уже загружены
-    }
-
-    try {
-      const response = await tournamentsApi.getTournamentDetails(tournamentId);
-      const tournamentData = response.data.data;
-      if (tournamentData) {
-        setTournamentDetails((prev: Record<number, TournamentWithResults>) => ({
-          ...prev,
-          [tournamentId]: tournamentData,
-        }));
-      }
-    } catch (error) {
-      console.error(
-        "Ошибка при загрузке деталей турнира:",
-        handleApiError(error)
-      );
-    }
-  };
-
-  const handleToggleExpand = async (tournamentId: number) => {
-    if (expandedTournament === tournamentId) {
-      setExpandedTournament(null);
-    } else {
-      setExpandedTournament(tournamentId);
-      await loadTournamentDetails(tournamentId);
-    }
-  };
-
-  const getPositionBadge = (position: string, cup?: "A" | "B" | "C" | null) => {
-    return getCupPositionText(position, cup);
-  };
 
   if (isLoading) {
     return (
@@ -174,16 +116,27 @@ const TournamentsList: React.FC = () => {
     );
   }
 
+  const publicSnapshotPath = (tournament: {
+    id: number;
+    status?: TournamentStatus | null;
+  }) => {
+    if (tournament.status === TournamentStatus.REGISTRATION) {
+      return `/tournaments/${tournament.id}/registration`;
+    }
+    if (tournament.status === TournamentStatus.FINISHED) {
+      return `/tournaments/${tournament.id}/finished`;
+    }
+    return `/tournaments/${tournament.id}/in-progress`;
+  };
+
   return (
     <div className="space-y-6">
-      {/* Заголовок */}
       <div className="text-center px-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
           Турниры
         </h1>
       </div>
 
-      {/* Вкладки по годам */}
       {yearTabs.length > 0 && selectedYear !== null && (
         <div
           className="flex flex-wrap justify-center gap-2"
@@ -216,280 +169,99 @@ const TournamentsList: React.FC = () => {
         </div>
       )}
 
-      {/* Список турниров */}
       {tournaments && tournaments.length > 0 ? (
         yearTournaments.length > 0 ? (
-        displayedTournaments.length > 0 ? (
-        <div className="space-y-4">
-          {displayedTournaments.map((tournament) => {
-              const isExpanded = expandedTournament === tournament.id;
-              const details = tournamentDetails[tournament.id];
-              const isRegistration =
-                tournament.status === TournamentStatus.REGISTRATION;
-              const isFinalRegistration =
-                tournament.status === TournamentStatus.FINAL_REGISTRATION;
-              const isInProgress =
-                tournament.status === TournamentStatus.IN_PROGRESS;
-              const navigatesToPublicSnapshot =
-                isRegistration || isFinalRegistration || isInProgress;
+          displayedTournaments.length > 0 ? (
+            <div className="space-y-4">
+              {displayedTournaments.map((tournament) => {
+                const navigatesToPublicSnapshot =
+                  tournament.status === TournamentStatus.REGISTRATION ||
+                  tournament.status === TournamentStatus.FINAL_REGISTRATION ||
+                  tournament.status === TournamentStatus.IN_PROGRESS ||
+                  tournament.status === TournamentStatus.FINISHED;
 
-              const rowSummary = (
-                <div className="flex items-start sm:items-center justify-between">
-                  <div className="flex-1 min-w-0 mr-2">
-                    <div className="flex items-center mb-1 flex-wrap gap-1">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
-                        {tournament.name}
-                      </h3>
-                      {getTournamentTypeIcons(tournament.type)}
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center text-xs sm:text-sm text-gray-500 gap-1 sm:gap-4">
-                      <div className="flex items-center">
-                        <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                        {formatDate(tournament.date)}
+                const rowSummary = (
+                  <div className="flex items-start sm:items-center justify-between">
+                    <div className="flex-1 min-w-0 mr-2">
+                      <div className="flex items-center mb-1 flex-wrap gap-1">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
+                          {tournament.name}
+                        </h3>
+                        {getTournamentTypeIcons(tournament.type)}
                       </div>
-                      <div className="flex items-center">
-                        {getTornamentCategoryText(tournament.category)}
-                      </div>
-                      <div className="flex items-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            tournament.status === TournamentStatus.REGISTRATION
-                              ? "bg-amber-100 text-amber-900"
-                              : tournament.status ===
-                                  TournamentStatus.FINAL_REGISTRATION
-                                ? "bg-emerald-100 text-emerald-900"
+                      <div className="flex flex-col sm:flex-row sm:items-center text-xs sm:text-sm text-gray-500 gap-1 sm:gap-4">
+                        <div className="flex items-center">
+                          <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          {formatDate(tournament.date)}
+                        </div>
+                        <div className="flex items-center">
+                          {getTornamentCategoryText(tournament.category)}
+                        </div>
+                        <div className="flex items-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              tournament.status === TournamentStatus.REGISTRATION
+                                ? "bg-amber-100 text-amber-900"
                                 : tournament.status ===
-                                    TournamentStatus.IN_PROGRESS
-                                  ? "bg-sky-100 text-sky-900"
-                                  : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {getTournamentStatusText(tournament.status)}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                        Команд: {tournament.teams_count ?? 0}
+                                    TournamentStatus.FINAL_REGISTRATION
+                                  ? "bg-emerald-100 text-emerald-900"
+                                  : tournament.status ===
+                                      TournamentStatus.IN_PROGRESS
+                                    ? "bg-sky-100 text-sky-900"
+                                    : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {getTournamentStatusText(tournament.status)}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          Команд: {tournament.teams_count ?? 0}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  {!navigatesToPublicSnapshot && (
-                    <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3">
-                      {isExpanded ? (
-                        <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-                      ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
+                );
 
-              return (
-                <div
-                  key={tournament.id}
-                  className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200"
-                >
-                  {navigatesToPublicSnapshot ? (
-                    <Link
-                      to={
-                        isRegistration
-                          ? `/tournaments/${tournament.id}/registration`
-                          : `/tournaments/${tournament.id}/in-progress`
-                      }
-                      className="block p-4 sm:p-6 text-inherit no-underline rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 hover:bg-gray-50/70"
-                    >
-                      {rowSummary}
-                    </Link>
-                  ) : (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className="p-4 sm:p-6 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-                      onClick={() => void handleToggleExpand(tournament.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          void handleToggleExpand(tournament.id);
-                        }
-                      }}
-                    >
-                      {rowSummary}
-                    </div>
-                  )}
-
-                  {/* Результаты турнира */}
-                  {!navigatesToPublicSnapshot && isExpanded && (
-                    <div className="border-t border-gray-200 px-4 sm:px-6 pb-4 sm:pb-6">
-                      {details ? (
-                        <div className="pt-4">
-                          {details.tournament.status ===
-                            TournamentStatus.FINISHED &&
-                            !details.tournament.results_validated_at &&
-                            (details.tournament.teams_count ?? 0) > 0 && (
-                            <p className="mb-4 text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                              Этот турнир ещё не признан президиумом для рейтинга:
-                              итоги доступны ниже, но в сумму очков общего рейтинга
-                              они пока не входят.
-                            </p>
-                          )}
-                          {(() => {
-                            // Группируем результаты по кубкам
-                            const cupA = details.results.filter(
-                              (result: TournamentResult) => result.cup === "A"
-                            );
-                            const cupB = details.results.filter(
-                              (result: TournamentResult) => result.cup === "B"
-                            );
-
-                            const renderCupTable = (
-                              results: TournamentResult[],
-                              cupTitle: string
-                            ) => {
-                              if (results.length === 0) return null;
-
-                              return (
-                                <div key={cupTitle} className="mb-6">
-                                  <div className="mb-4">
-                                    <h4 className="text-sm sm:text-md font-medium text-gray-900">
-                                      {cupTitle}
-                                    </h4>
-                                  </div>
-                                  {/* Таблица для десктопа */}
-                                  <div className="hidden sm:block overflow-x-auto">
-                                    <table className="min-w-full">
-                                      <thead className="bg-gray-50">
-                                        <tr>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Место
-                                          </th>
-                                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Команда
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="bg-white divide-y divide-gray-200">
-                                        {results.map(
-                                          (result: TournamentResult) => (
-                                            <tr
-                                              key={result.id}
-                                              className={
-                                                [
-                                                  "WINNER",
-                                                  "RUNNER_UP",
-                                                  "THIRD_PLACE",
-                                                ].includes(result.cup_position)
-                                                  ? "bg-gradient-to-r from-yellow-50 to-transparent"
-                                                  : ""
-                                              }
-                                            >
-                                              <td className="px-4 py-3 whitespace-nowrap">
-                                                <div className="flex flex-col">
-                                                  <div
-                                                    className={`text-sm font-medium`}
-                                                  >
-                                                    {getPositionBadge(
-                                                      result.cup_position || "",
-                                                      result.cup
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              </td>
-                                              <td className="px-4 py-3 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                  <div className="flex flex-col">
-                                                    <span className="font-semibold">
-                                                      {result.team_players}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                              </td>
-                                            </tr>
-                                          )
-                                        )}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                  {/* Карточки для мобильных */}
-                                  <div className="sm:hidden space-y-2">
-                                    {results.map((result: TournamentResult) => {
-                                      const isTopPosition = [
-                                        "WINNER",
-                                        "RUNNER_UP",
-                                        "THIRD_PLACE",
-                                      ].includes(result.cup_position);
-                                      return (
-                                        <div
-                                          key={result.id}
-                                          className={`p-3 rounded-lg border ${
-                                            isTopPosition
-                                              ? "bg-gradient-to-r from-yellow-50 to-transparent border-yellow-200"
-                                              : "bg-white border-gray-200"
-                                          }`}
-                                        >
-                                          <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                              <div className="text-sm font-medium text-gray-900 mb-1">
-                                                {getPositionBadge(
-                                                  result.cup_position || "",
-                                                  result.cup
-                                                )}
-                                              </div>
-                                              <div className="text-sm font-semibold text-gray-900 break-words">
-                                                {result.team_players}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              );
-                            };
-
-                            return (
-                              <div className="space-y-6">
-                                {renderCupTable(cupA, "Кубок A")}
-                                {renderCupTable(cupB, "Кубок B")}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      ) : (
-                        <div className="pt-4 text-center">
-                          <div className="animate-spin h-6 w-6 border-2 border-primary-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                          <p className="text-xs sm:text-sm text-gray-600">
-                            Загрузка результатов...
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-        </div>
-        ) : (
-          <div className="text-center py-12">
-            <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Нет турниров
-            </h3>
-            <p className="text-gray-500 mb-4">
-              Нет турниров по выбранным фильтрам
-            </p>
-            <button
-              type="button"
-              onClick={() =>
-                setFilters({ statuses: [], types: [], categories: [] })
-              }
-              className="text-sm font-medium text-primary-600 hover:text-primary-800"
-            >
-              Сбросить фильтры
-            </button>
-          </div>
-        )
+                return (
+                  <div
+                    key={tournament.id}
+                    className="bg-white rounded-lg shadow hover:shadow-md transition-shadow duration-200"
+                  >
+                    {navigatesToPublicSnapshot ? (
+                      <Link
+                        to={publicSnapshotPath(tournament)}
+                        className="block p-4 sm:p-6 text-inherit no-underline rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 hover:bg-gray-50/70"
+                      >
+                        {rowSummary}
+                      </Link>
+                    ) : (
+                      <div className="p-4 sm:p-6">{rowSummary}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Нет турниров
+              </h3>
+              <p className="text-gray-500 mb-4">
+                Нет турниров по выбранным фильтрам
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({ statuses: [], types: [], categories: [] })
+                }
+                className="text-sm font-medium text-primary-600 hover:text-primary-800"
+              >
+                Сбросить фильтры
+              </button>
+            </div>
+          )
         ) : (
           <div className="text-center py-12">
             <TrophyIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />

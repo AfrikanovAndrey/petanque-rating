@@ -16,10 +16,10 @@ type Props = {
   readOnly?: boolean;
 };
 
-const MATCH_H = 72;
-const MATCH_W = 268;
-const CONNECTOR_W = 36;
-const ROUND_GAP = 20;
+const MATCH_H = 56;
+const MATCH_W = 210;
+const CONNECTOR_W = 28;
+const ROUND_GAP = 14;
 const SLOT = MATCH_H + ROUND_GAP;
 
 function teamLabel(players: string[]): string {
@@ -250,7 +250,7 @@ const CupMatchCard: React.FC<{
   ) => {
     if (readOnly) {
       return (
-        <span className="w-full text-center text-sm font-bold tabular-nums text-gray-800">
+        <span className="w-full text-center text-xs font-bold tabular-nums text-gray-800">
           {display ?? "—"}
         </span>
       );
@@ -261,7 +261,7 @@ const CupMatchCard: React.FC<{
         inputMode="numeric"
         min={0}
         max={13}
-        className={`w-full bg-transparent text-center text-sm font-bold tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-gray-400/50 disabled:opacity-90 ${
+        className={`w-full bg-transparent text-center text-xs font-bold tabular-nums text-gray-900 outline-none focus:ring-1 focus:ring-gray-400/50 disabled:opacity-90 ${
           locked ? "text-emerald-700" : ""
         }`}
         value={value}
@@ -280,12 +280,12 @@ const CupMatchCard: React.FC<{
   };
 
   const courtLeft = (
-    <div className="absolute -left-14 top-1/2 z-10 flex w-12 -translate-y-1/2 flex-col items-center gap-0.5">
-      <span className="text-[10px] font-medium leading-none text-gray-600">
+    <div className="absolute -left-11 top-1/2 z-10 flex w-10 -translate-y-1/2 flex-col items-center gap-0.5">
+      <span className="text-[9px] font-medium leading-none text-gray-600">
         дорожка
       </span>
       {readOnly ? (
-        <span className="inline-flex h-9 w-12 items-center justify-center rounded-md border-2 border-amber-400 bg-amber-50 text-base font-bold text-amber-950">
+        <span className="inline-flex h-7 w-10 items-center justify-center rounded border-2 border-amber-400 bg-amber-50 text-sm font-bold text-amber-950">
           {match.court != null ? match.court : "—"}
         </span>
       ) : (
@@ -294,7 +294,7 @@ const CupMatchCard: React.FC<{
           min={1}
           max={99}
           inputMode="numeric"
-          className="h-9 w-12 rounded-md border-2 border-amber-400 bg-amber-50 px-1 text-center text-base font-bold text-amber-950 shadow-sm outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-60"
+          className="h-7 w-10 rounded border-2 border-amber-400 bg-amber-50 px-0.5 text-center text-sm font-bold text-amber-950 shadow-sm outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-60"
           value={court}
           disabled={saveMutation.isLoading}
           onChange={(e) => setCourt(e.target.value)}
@@ -318,12 +318,12 @@ const CupMatchCard: React.FC<{
       style={{ height: MATCH_H, width: MATCH_W }}
     >
       {courtLeft}
-      <div className="relative flex h-full w-full overflow-hidden rounded border-2 border-black bg-white">
+      <div className="relative flex h-full w-full overflow-hidden rounded border border-black bg-white">
         {/* Col 1: team names */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex min-h-0 flex-1 items-center border-b border-black/20 px-2.5">
+          <div className="flex min-h-0 flex-1 items-center border-b border-black/20 px-2">
             <span
-              className={`min-w-0 flex-1 truncate text-[13px] leading-tight ${
+              className={`min-w-0 flex-1 truncate text-[11px] leading-tight ${
                 isTbdA ? "italic text-gray-400" : "font-medium text-gray-900"
               }`}
               title={nameA}
@@ -331,9 +331,9 @@ const CupMatchCard: React.FC<{
               {isTbdA ? TBD : nameA}
             </span>
           </div>
-          <div className="flex min-h-0 flex-1 items-center px-2.5">
+          <div className="flex min-h-0 flex-1 items-center px-2">
             <span
-              className={`min-w-0 flex-1 truncate text-[13px] leading-tight ${
+              className={`min-w-0 flex-1 truncate text-[11px] leading-tight ${
                 isTbdB ? "italic text-gray-400" : "font-medium text-gray-900"
               }`}
               title={nameB}
@@ -344,7 +344,7 @@ const CupMatchCard: React.FC<{
         </div>
 
         {/* Col 2: scores */}
-        <div className="flex w-9 shrink-0 flex-col border-l-2 border-black bg-gray-100">
+        <div className="flex w-7 shrink-0 flex-col border-l border-black bg-gray-100">
           <div className="flex min-h-0 flex-1 items-center justify-center border-b border-black/20 px-0.5">
             {renderScore("a", scoreA, match.score_a, nameA)}
           </div>
@@ -355,28 +355,28 @@ const CupMatchCard: React.FC<{
 
         {/* Col 3: lock/edit spanning both rows */}
         {!readOnly && (
-          <div className="flex w-9 shrink-0 items-center justify-center border-l-2 border-black bg-gray-50">
+          <div className="flex w-7 shrink-0 items-center justify-center border-l border-black bg-gray-50">
             {!locked ? (
               <button
                 type="button"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40"
+                className="inline-flex h-6 w-6 items-center justify-center rounded bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40"
                 disabled={
                   saveMutation.isLoading || !match.team_a_id || !match.team_b_id
                 }
                 onClick={lockScore}
                 title="Зафиксировать счёт"
               >
-                <CheckIcon className="h-4 w-4" />
+                <CheckIcon className="h-3.5 w-3.5" />
               </button>
             ) : (
               <button
                 type="button"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
                 disabled={saveMutation.isLoading}
                 onClick={() => setLocked(false)}
                 title="Изменить счёт"
               >
-                <PencilIcon className="h-4 w-4" />
+                <PencilIcon className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -397,9 +397,9 @@ const CupPlaceCard: React.FC<{
       className="relative flex shrink-0 items-center"
       style={{ height: MATCH_H, width: MATCH_W }}
     >
-      <div className="flex h-9 w-full items-center overflow-hidden rounded border-2 border-black bg-white px-2.5">
+      <div className="flex h-7 w-full items-center overflow-hidden rounded border border-black bg-white px-2">
         <span
-          className={`min-w-0 truncate text-[13px] leading-tight ${
+          className={`min-w-0 truncate text-[11px] leading-tight ${
             isTbd ? "italic text-gray-400" : "font-medium text-gray-900"
           }`}
           title={name}
@@ -511,16 +511,16 @@ const CupBracketPanel: React.FC<{
       : baseHeight;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-50/80 p-5">
-      <div className="flex min-w-max items-start gap-0 pb-2">
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-50/80 p-3">
+      <div className="flex min-w-max items-start gap-0 pb-1">
         {rounds.map(({ round, matches }, roundIdx) => {
           const slotCount = matches.length;
           const pairCount = Math.max(1, Math.floor(slotCount / 2));
 
           return (
             <React.Fragment key={round}>
-              <div className="flex flex-col pl-16">
-                <p className="mb-3 h-4 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              <div className="flex flex-col pl-12">
+                <p className="mb-2 h-3.5 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                   {roundTitle(round, rounds.length, isAb)}
                 </p>
                 {useAbsolute ? (
@@ -561,7 +561,7 @@ const CupBracketPanel: React.FC<{
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-5" style={{ width: MATCH_W }}>
+                  <div className="flex flex-col gap-3" style={{ width: MATCH_W }}>
                     {matches.map((m) => (
                       <CupMatchCard
                         key={m.id}
@@ -586,7 +586,7 @@ const CupBracketPanel: React.FC<{
                 )}
               </div>
               {roundIdx < rounds.length - 1 && useAbsolute && (
-                <div className="flex flex-col pt-7">
+                <div className="flex flex-col pt-5">
                   <BracketConnectors
                     roundIdx={roundIdx}
                     pairCount={pairCount}
@@ -603,7 +603,7 @@ const CupBracketPanel: React.FC<{
 
         {showPlaces && (
           <>
-            <div className="flex flex-col pt-7">
+            <div className="flex flex-col pt-5">
               {useAbsolute ? (
                 <div
                   className="relative"
@@ -633,7 +633,7 @@ const CupBracketPanel: React.FC<{
               )}
             </div>
             <div className="flex flex-col pl-0">
-              <p className="mb-3 h-4" aria-hidden />
+              <p className="mb-2 h-3.5" aria-hidden />
               {useAbsolute ? (
                 <div
                   className="relative"
@@ -655,7 +655,7 @@ const CupBracketPanel: React.FC<{
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col gap-5" style={{ width: MATCH_W }}>
+                  <div className="flex flex-col gap-3" style={{ width: MATCH_W }}>
                   <CupPlaceCard players={championPlayers} />
                   {third && <CupPlaceCard players={thirdPlayers} />}
                 </div>

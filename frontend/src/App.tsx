@@ -13,6 +13,7 @@ import RatingTable from "./pages/RatingTable";
 import TournamentsList from "./pages/TournamentsList";
 import TournamentRegistrationPublic from "./pages/TournamentRegistrationPublic";
 import TournamentInProgressPublic from "./pages/TournamentInProgressPublic";
+import TournamentFinishedPublic from "./pages/TournamentFinishedPublic";
 import RatingRules from "./pages/RatingRules";
 import Licenses from "./pages/Licenses";
 import PersonalDataPolicy from "./pages/PersonalDataPolicy";
@@ -21,6 +22,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminTournaments from "./pages/admin/AdminTournaments";
 import AdminTournamentRegistration from "./pages/admin/AdminTournamentRegistration";
 import AdminTournamentInProgress from "./pages/admin/AdminTournamentInProgress";
+import AdminTournamentFinished from "./pages/admin/AdminTournamentFinished";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminPlayers from "./pages/admin/AdminPlayers";
 import AdminLicensedPlayers from "./pages/admin/AdminLicensedPlayers";
@@ -96,6 +98,15 @@ function App() {
               element={
                 <Layout>
                   <TournamentInProgressPublic />
+                </Layout>
+              }
+            />
+
+            <Route
+              path="/tournaments/:tournamentId/finished"
+              element={
+                <Layout>
+                  <TournamentFinishedPublic />
                 </Layout>
               }
             />
@@ -214,6 +225,19 @@ function App() {
                   <AdminRoleRoute allowedRoles={ROLES_TOURNAMENT_STAFF}>
                     <AdminLayout>
                       <AdminTournamentInProgress />
+                    </AdminLayout>
+                  </AdminRoleRoute>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/tournaments/:tournamentId/finished"
+              element={
+                <ProtectedRoute>
+                  <AdminRoleRoute allowedRoles={ROLES_TOURNAMENTS_PAGE}>
+                    <AdminLayout>
+                      <AdminTournamentFinished />
                     </AdminLayout>
                   </AdminRoleRoute>
                 </ProtectedRoute>

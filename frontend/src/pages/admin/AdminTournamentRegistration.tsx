@@ -1,6 +1,7 @@
 import {
   ArrowDownTrayIcon,
   ArrowLeftIcon,
+  ArrowUpTrayIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   ClipboardDocumentListIcon,
@@ -8,7 +9,7 @@ import {
   TrashIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
@@ -60,6 +61,7 @@ const AdminTournamentRegistration: React.FC = () => {
   );
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [startWizardOpen, setStartWizardOpen] = useState(false);
+  const csvImportInputRef = useRef<HTMLInputElement>(null);
   const [teamsSortColumn, setTeamsSortColumn] = useState<TeamsSortColumn | null>(
     null
   );
@@ -360,6 +362,44 @@ const AdminTournamentRegistration: React.FC = () => {
       },
       onError: (e) => {
         toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const importCsvMutation = useMutation(
+    async (file: File) => {
+      const response = await adminApi.importTournamentRegistrationsFromCsv(
+        tournamentId,
+        file
+      );
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Не удалось импортировать CSV");
+      }
+      return response.data;
+    },
+    {
+      onSuccess: (data) => {
+        toast.success(data.message || "Импорт завершён");
+        const errors = data.data?.errors ?? [];
+        if (errors.length > 0) {
+          const preview = errors.slice(0, 5).join("\n");
+          const more =
+            errors.length > 5 ? `\n… и ещё ${errors.length - 5}` : "";
+          toast.error(`Ошибки импорта:\n${preview}${more}`, {
+            duration: 10_000,
+          });
+        }
+        void queryClient.invalidateQueries(pageQueryKey);
+        void queryClient.invalidateQueries("tournaments");
+        if (csvImportInputRef.current) {
+          csvImportInputRef.current.value = "";
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+        if (csvImportInputRef.current) {
+          csvImportInputRef.current.value = "";
+        }
       },
     }
   );
@@ -713,14 +753,41 @@ const AdminTournamentRegistration: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               {(tournament.status === TournamentStatus.REGISTRATION ||
                 tournament.status === TournamentStatus.FINAL_REGISTRATION) && (
-                <button
-                  type="button"
-                  onClick={() => setRegisterModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700"
-                >
-                  <UserPlusIcon className="h-5 w-5 shrink-0" />
-                  Зарегистрировать команду
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setRegisterModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700"
+                  >
+                    <UserPlusIcon className="h-5 w-5 shrink-0" />
+                    Зарегистрировать команду
+                  </button>
+                  <input
+                    ref={csvImportInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) {
+                        return;
+                      }
+                      importCsvMutation.mutate(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => csvImportInputRef.current?.click()}
+                    disabled={importCsvMutation.isLoading}
+                    className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+                    title="Формат как при скачивании: №, состав команды, рейтинг"
+                  >
+                    <ArrowUpTrayIcon className="h-5 w-5 text-gray-500" />
+                    {importCsvMutation.isLoading
+                      ? "Импорт…"
+                      : "Импорт из CSV"}
+                  </button>
+                </>
               )}
               {teams.length > 0 && (
                 <button

@@ -60,6 +60,8 @@ export type CupStageConfig = {
   c: number;
   d: number;
   ab_playoff: boolean;
+  /** Матч за 3-е место в кубках (по умолчанию true) */
+  third_place?: boolean;
 };
 
 export type CupBracketCode = "AB" | "A" | "B" | "C" | "D";
@@ -158,6 +160,13 @@ export interface TournamentRegistrationPageData {
   cups?: TournamentCupStageView[];
 }
 
+/** Страница завершённого турнира: сведения, заявки, итоги кубков */
+export interface TournamentFinishedPageData {
+  tournament: Tournament;
+  teams: TournamentRegisteredTeam[];
+  results: TournamentResult[];
+}
+
 export interface TournamentGroupMatchView {
   id: number;
   round_number: number;
@@ -205,11 +214,13 @@ export interface TournamentSwissStanding {
   points_for: number;
   played: number;
   place: number;
+  tiebreakers: Partial<Record<TiebreakerCriterion, number>>;
 }
 
 export interface TournamentSwissStageView {
   swiss_rounds: number;
   completed_rounds: number;
+  tiebreaker_order: TiebreakerCriterion[];
   standings: TournamentSwissStanding[];
   matches: TournamentSwissMatchView[];
 }
@@ -305,7 +316,7 @@ export interface TournamentResult {
   team_id: number;
   cup_position: CupPosition;
   points: number;
-  cup?: "A" | "B" | null; // Кубок А или Б, null если не попал в кубки
+  cup?: "A" | "B" | "C" | "D" | null; // Кубок, null если не попал в кубки
   qualifying_wins?: number; // Количество побед команды в квалификационной части
   wins?: number; // Общее количество побед (qualifying_wins + бонусы за кубки)
   loses?: number; // Общее количество поражений

@@ -33,6 +33,7 @@ import {
 import {
   getPlayFormatLabel,
   getTiebreakerLabel,
+  isSwissFreeTeamId,
 } from "../../utils/tournamentPlaySettings";
 import CsvUtils from "../../utils/csv";
 
@@ -44,6 +45,7 @@ const AdminTournamentInProgress: React.FC = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [completionModalOpen, setCompletionModalOpen] = useState(false);
+  const [paramsOpen, setParamsOpen] = useState(false);
   const [registrationListOpen, setRegistrationListOpen] = useState(false);
   const [cupStageModalOpen, setCupStageModalOpen] = useState(false);
 
@@ -253,182 +255,107 @@ const AdminTournamentInProgress: React.FC = () => {
         </div>
       </div>
 
-      <div className="card min-w-0 p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Параметры турнира</h2>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <div>
-            <dt className="text-gray-500">Дата проведения</dt>
-            <dd className="mt-0.5 font-medium text-gray-900">
-              {formatDate(tournament.date)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Тип</dt>
-            <dd className="mt-0.5 font-medium text-gray-900 flex items-center flex-wrap gap-1">
-              {getTournamentTypeText(tournament.type as TournamentType)}
-              {getTournamentTypeIcons(tournament.type)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Категория</dt>
-            <dd className="mt-0.5 font-medium text-gray-900">
-              {getTornamentCategoryText(tournament.category)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Режим загрузки результатов</dt>
-            <dd className="mt-0.5 font-medium text-gray-900">
-              {tournament.manual ? "Ручной" : "Автоматический"}
-            </dd>
-          </div>
-          {tournament.play_format && (
-            <div>
-              <dt className="text-gray-500">Формат квалификации</dt>
-              <dd className="mt-0.5 font-medium text-gray-900">
-                {getPlayFormatLabel(tournament.play_format)}
-              </dd>
-            </div>
+      <div className="card overflow-hidden">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left hover:bg-gray-50"
+          aria-expanded={paramsOpen}
+          onClick={() => setParamsOpen((open) => !open)}
+        >
+          <h2 className="text-lg font-semibold text-gray-900">
+            Параметры турнира
+          </h2>
+          {paramsOpen ? (
+            <ChevronUpIcon className="h-5 w-5 shrink-0 text-gray-500" />
+          ) : (
+            <ChevronDownIcon className="h-5 w-5 shrink-0 text-gray-500" />
           )}
-          {tournament.play_format === TournamentPlayFormat.GROUPS &&
-            tournament.group_size != null && (
+        </button>
+        {paramsOpen && (
+          <div className="space-y-4 border-t border-gray-200 px-6 py-4">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div>
-                <dt className="text-gray-500">Размер группы</dt>
+                <dt className="text-gray-500">Дата проведения</dt>
                 <dd className="mt-0.5 font-medium text-gray-900">
-                  {tournament.group_size}
+                  {formatDate(tournament.date)}
                 </dd>
               </div>
-            )}
-          {tournament.play_format === TournamentPlayFormat.SWISS &&
-            tournament.swiss_rounds != null && (
               <div>
-                <dt className="text-gray-500">Количество туров</dt>
-                <dd className="mt-0.5 font-medium text-gray-900">
-                  {tournament.swiss_rounds}
+                <dt className="text-gray-500">Тип</dt>
+                <dd className="mt-0.5 font-medium text-gray-900 flex items-center flex-wrap gap-1">
+                  {getTournamentTypeText(tournament.type as TournamentType)}
+                  {getTournamentTypeIcons(tournament.type)}
                 </dd>
               </div>
-            )}
-        </dl>
-        {tournament.play_format === TournamentPlayFormat.SWISS &&
-          tournament.tiebreaker_order &&
-          tournament.tiebreaker_order.length > 0 && (
+              <div>
+                <dt className="text-gray-500">Категория</dt>
+                <dd className="mt-0.5 font-medium text-gray-900">
+                  {getTornamentCategoryText(tournament.category)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-500">Режим загрузки результатов</dt>
+                <dd className="mt-0.5 font-medium text-gray-900">
+                  {tournament.manual ? "Ручной" : "Автоматический"}
+                </dd>
+              </div>
+              {tournament.play_format && (
+                <div>
+                  <dt className="text-gray-500">Формат квалификации</dt>
+                  <dd className="mt-0.5 font-medium text-gray-900">
+                    {getPlayFormatLabel(tournament.play_format)}
+                  </dd>
+                </div>
+              )}
+              {tournament.play_format === TournamentPlayFormat.GROUPS &&
+                tournament.group_size != null && (
+                  <div>
+                    <dt className="text-gray-500">Размер группы</dt>
+                    <dd className="mt-0.5 font-medium text-gray-900">
+                      {tournament.group_size}
+                    </dd>
+                  </div>
+                )}
+              {tournament.play_format === TournamentPlayFormat.SWISS &&
+                tournament.swiss_rounds != null && (
+                  <div>
+                    <dt className="text-gray-500">Количество туров</dt>
+                    <dd className="mt-0.5 font-medium text-gray-900">
+                      {tournament.swiss_rounds}
+                    </dd>
+                  </div>
+                )}
+            </dl>
+            {tournament.play_format === TournamentPlayFormat.SWISS &&
+              tournament.tiebreaker_order &&
+              tournament.tiebreaker_order.length > 0 && (
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-sm font-medium text-gray-700">
+                    Порядок дополнительных показателей
+                  </p>
+                  <ol className="mt-2 list-decimal list-inside text-sm text-gray-700 space-y-1">
+                    {tournament.tiebreaker_order.map((criterion) => (
+                      <li key={criterion}>{getTiebreakerLabel(criterion)}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             <div className="pt-2 border-t border-gray-100">
-              <p className="text-sm font-medium text-gray-700">
-                Порядок дополнительных показателей
-              </p>
-              <ol className="mt-2 list-decimal list-inside text-sm text-gray-700 space-y-1">
-                {tournament.tiebreaker_order.map((criterion) => (
-                  <li key={criterion}>{getTiebreakerLabel(criterion)}</li>
-                ))}
-              </ol>
+              <p className="text-sm font-medium text-gray-700">Описание</p>
+              <div className="mt-2 min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                {tournament.regulations?.trim() ? (
+                  <RegulationsMarkdown
+                    source={tournament.regulations}
+                    className="text-sm"
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500">Не указан</p>
+                )}
+              </div>
             </div>
-          )}
-        <div className="pt-2 border-t border-gray-100">
-          <p className="text-sm font-medium text-gray-700">Описание</p>
-          <div className="mt-2 min-w-0 rounded-lg border border-gray-100 bg-gray-50 p-4">
-            {tournament.regulations?.trim() ? (
-              <RegulationsMarkdown
-                source={tournament.regulations}
-                className="text-sm"
-              />
-            ) : (
-              <p className="text-sm text-gray-500">Не указан</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {data.groups && data.groups.length > 0 && (
-        <TournamentGroupStageResults
-          tournamentId={tournamentId}
-          groups={data.groups}
-          readOnly={Boolean(data.cups && data.cups.length > 0)}
-        />
-      )}
-
-      {data.swiss && (
-        <TournamentSwissStageResults
-          tournamentId={tournamentId}
-          swiss={data.swiss}
-          readOnly={Boolean(data.cups && data.cups.length > 0)}
-        />
-      )}
-
-      {tournament.play_format === TournamentPlayFormat.GROUPS &&
-        data.groups &&
-        data.groups.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            {!(data.cups && data.cups.length > 0) ? (
-              <button
-                type="button"
-                className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-                disabled={
-                  !data.groups.every(
-                    (g) =>
-                      g.matches.length > 0 &&
-                      g.matches.every(
-                        (m) => m.score_a != null && m.score_b != null
-                      )
-                  )
-                }
-                onClick={() => setCupStageModalOpen(true)}
-              >
-                Начать финальную часть
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Сбросить финальную часть? Все счета кубков будут удалены."
-                    )
-                  ) {
-                    return;
-                  }
-                  void adminApi.resetCupStage(tournamentId).then((res) => {
-                    if (res.data.success) {
-                      toast.success("Финал сброшен");
-                      void queryClient.invalidateQueries([
-                        "tournamentInProgress",
-                        tournamentId,
-                      ]);
-                    } else {
-                      toast.error(res.data.message || "Не удалось сбросить");
-                    }
-                  });
-                }}
-              >
-                Сбросить финал
-              </button>
-            )}
           </div>
         )}
-
-      {data.cups && data.cups.length > 0 && (
-        <TournamentCupStageResults
-          tournamentId={tournamentId}
-          cups={data.cups}
-        />
-      )}
-
-      <CupStageStartModal
-        open={cupStageModalOpen}
-        onClose={() => setCupStageModalOpen(false)}
-        tournamentId={tournamentId}
-        availableTeams={
-          data.groups?.reduce(
-            (sum, g) => sum + g.teams.filter((t) => t.place > 0).length,
-            0
-          ) ?? 0
-        }
-        onSuccess={() => {
-          void queryClient.invalidateQueries([
-            "tournamentInProgress",
-            tournamentId,
-          ]);
-        }}
-      />
+      </div>
 
       <div className="card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-6 py-4">
@@ -530,6 +457,111 @@ const AdminTournamentInProgress: React.FC = () => {
             </div>
           ))}
       </div>
+
+      {data.groups && data.groups.length > 0 && (
+        <TournamentGroupStageResults
+          tournamentId={tournamentId}
+          groups={data.groups}
+          readOnly={Boolean(data.cups && data.cups.length > 0)}
+        />
+      )}
+
+      {data.swiss && (
+        <TournamentSwissStageResults
+          tournamentId={tournamentId}
+          swiss={data.swiss}
+          readOnly={Boolean(data.cups && data.cups.length > 0)}
+          defaultCollapsed={Boolean(data.cups && data.cups.length > 0)}
+        />
+      )}
+
+      {((tournament.play_format === TournamentPlayFormat.GROUPS &&
+        data.groups &&
+        data.groups.length > 0) ||
+        (tournament.play_format === TournamentPlayFormat.SWISS &&
+          data.swiss)) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {!(data.cups && data.cups.length > 0) ? (
+              <button
+                type="button"
+                className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                disabled={
+                  tournament.play_format === TournamentPlayFormat.GROUPS
+                    ? !data.groups!.every(
+                        (g) =>
+                          g.matches.length > 0 &&
+                          g.matches.every(
+                            (m) => m.score_a != null && m.score_b != null
+                          )
+                      )
+                    : !(
+                        data.swiss &&
+                        data.swiss.swiss_rounds > 0 &&
+                        data.swiss.completed_rounds >= data.swiss.swiss_rounds
+                      )
+                }
+                onClick={() => setCupStageModalOpen(true)}
+              >
+                Начать финальную часть
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Сбросить финальную часть? Все счета кубков будут удалены."
+                    )
+                  ) {
+                    return;
+                  }
+                  void adminApi.resetCupStage(tournamentId).then((res) => {
+                    if (res.data.success) {
+                      toast.success("Финал сброшен");
+                      void queryClient.invalidateQueries([
+                        "tournamentInProgress",
+                        tournamentId,
+                      ]);
+                    } else {
+                      toast.error(res.data.message || "Не удалось сбросить");
+                    }
+                  });
+                }}
+              >
+                Сбросить финал
+              </button>
+            )}
+          </div>
+        )}
+
+      {data.cups && data.cups.length > 0 && (
+        <TournamentCupStageResults
+          tournamentId={tournamentId}
+          cups={data.cups}
+        />
+      )}
+
+      <CupStageStartModal
+        open={cupStageModalOpen}
+        onClose={() => setCupStageModalOpen(false)}
+        tournamentId={tournamentId}
+        availableTeams={
+          tournament.play_format === TournamentPlayFormat.SWISS
+            ? data.swiss?.standings.filter((s) => !isSwissFreeTeamId(s.team_id))
+                .length ?? 0
+            : data.groups?.reduce(
+                (sum, g) => sum + g.teams.filter((t) => t.place > 0).length,
+                0
+              ) ?? 0
+        }
+        onSuccess={() => {
+          void queryClient.invalidateQueries([
+            "tournamentInProgress",
+            tournamentId,
+          ]);
+        }}
+      />
 
       <TournamentResultsUploadModal
         variant="complete-in-progress"

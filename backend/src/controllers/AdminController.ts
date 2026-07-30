@@ -16,6 +16,7 @@ import {
   validateMatchScores,
 } from "../services/groupStageService";
 import {
+  appendSwissFreeSeedIfOdd,
   buildSwissStageView,
   isRoundComplete,
   nextCourtStart,
@@ -34,6 +35,7 @@ import {
   generateBracketFixtures,
   parseCupStageConfig,
   rankTeamsFromGroups,
+  rankTeamsFromSwiss,
   validateCupStageConfig,
   type CupBracketCode,
   type QualifiedTeam,
@@ -54,7 +56,13 @@ import {
   TournamentStatus,
   TournamentType,
 } from "../types";
+import { parseRegistrationCsv } from "../utils/registrationCsv";
+import {
+  getExpectedSlotCount,
+  legacyPlayerIdsToRequestSlots,
+} from "../utils/registrationRosterUtils";
 import { TournamentController } from "./TournamentController";
+import { TournamentParser } from "./TournamentParser";
 import type { TournamentCupMatchRow } from "../models/TournamentCupMatchModel";
 import type { RegisteredTeamRow } from "../models/TournamentRegistrationModel";
 
@@ -107,6 +115,32 @@ export const licensedPlayersUploadMiddleware = upload.single(
   "licensed_players_file"
 );
 export const playersTextUploadMiddleware = textUpload.single("players_file");
+
+const registrationCsvUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    const name = file.originalname.toLowerCase();
+    const okExt = name.endsWith(".csv") || name.endsWith(".txt");
+    const okMime =
+      file.mimetype === "text/csv" ||
+      file.mimetype === "text/plain" ||
+      file.mimetype === "application/vnd.ms-excel" ||
+      file.mimetype === "application/octet-stream" ||
+      file.mimetype === "";
+    if (okExt || okMime) {
+      cb(null, true);
+    } else {
+      cb(new Error("Разрешены только CSV-файлы (.csv)"));
+    }
+  },
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+});
+
+export const registrationCsvUploadMiddleware = registrationCsvUpload.single(
+  "registration_csv"
+);
 
 export class AdminController {
   /** Статусы, в которых можно подтверждать/менять/добавлять заявки. */
@@ -1301,6 +1335,7 @@ export class AdminController {
           tournament.swiss_seed ?? null,
           tournament.swiss_rounds ?? 0,
           teams,
+          tournament.tiebreaker_order ?? [],
         );
       }
 
@@ -1333,6 +1368,92 @@ export class AdminController {
       });
     } catch (error) {
       console.error("Ошибка страницы «турнир в процессе»:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка загрузки данных",
+      });
+    }
+  }
+
+  /**
+   * Страница завершённого турнира: сведения, заявки, итоги кубков.
+   */
+  static async getTournamentFinishedPage(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (Number.isNaN(tournamentId) || tournamentId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.FINISHED) {
+        res.status(400).json({
+          success: false,
+          message: "Эта страница доступна только для завершённых турниров",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+
+      const results = await TournamentModel.getTournamentResults(tournamentId);
+      const filteredResults = results.filter((result) => result.cup);
+      const positionPriority: Record<string, number> = {
+        WINNER: 1,
+        "1": 1,
+        RUNNER_UP: 2,
+        "2": 2,
+        THIRD_PLACE: 3,
+        "3": 3,
+        ROUND_OF_4: 4,
+        "1/2": 4,
+        ROUND_OF_8: 5,
+        "1/4": 5,
+        ROUND_OF_16: 6,
+        "1/8": 6,
+      };
+      const sortedResults = filteredResults.sort((a, b) => {
+        if (a.cup !== b.cup) {
+          return (a.cup || "").localeCompare(b.cup || "");
+        }
+        const aPriority = a.cup_position
+          ? positionPriority[a.cup_position] || 999
+          : 999;
+        const bPriority = b.cup_position
+          ? positionPriority[b.cup_position] || 999
+          : 999;
+        return aPriority - bPriority;
+      });
+
+      res.json({
+        success: true,
+        data: {
+          tournament,
+          teams,
+          results: sortedResults,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка страницы завершённого турнира:", error);
       res.status(500).json({
         success: false,
         message: "Ошибка загрузки данных",
@@ -1505,11 +1626,13 @@ export class AdminController {
       })),
       tournamentType,
     );
-    const seeds = seedTeamsByRating(
-      teams.map((t) => ({
-        team_id: t.team_id,
-        rating: ratings.get(t.team_id) ?? 0,
-      })),
+    const seeds = appendSwissFreeSeedIfOdd(
+      seedTeamsByRating(
+        teams.map((t) => ({
+          team_id: t.team_id,
+          rating: ratings.get(t.team_id) ?? 0,
+        })),
+      ),
     );
     await TournamentModel.saveSwissSeed(tournamentId, seeds);
     await TournamentSwissMatchModel.deleteByTournament(tournamentId);
@@ -1551,6 +1674,7 @@ export class AdminController {
     swissSeed: SwissSeedEntry[] | null,
     swissRounds: number,
     teams: RegisteredTeamRow[],
+    tiebreakerOrder: TiebreakerCriterion[] | null | undefined = [],
   ) {
     if (!swissSeed?.length || swissRounds < 1) {
       return null;
@@ -1561,6 +1685,7 @@ export class AdminController {
       teams,
       AdminController.swissRowsToViews(rows),
       swissRounds,
+      tiebreakerOrder,
     );
   }
 
@@ -1774,6 +1899,7 @@ export class AdminController {
         teams,
         AdminController.swissRowsToViews(rows),
         swissRounds,
+        tournament.tiebreaker_order,
       );
 
       res.json({
@@ -1783,6 +1909,263 @@ export class AdminController {
       });
     } catch (error) {
       console.error("Ошибка обновления матча швейцарки:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /**
+   * Откат швейцарки к предыдущему туру: удаляет указанный тур и все последующие.
+   * Счета более ранних туров сохраняются для корректировки.
+   */
+  static async rollbackSwissRound(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const fromRound = parseInt(req.params.roundNumber, 10);
+      if (
+        isNaN(tournamentId) ||
+        isNaN(fromRound) ||
+        fromRound < 2
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите турнир и номер тура начиная со 2-го",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Откат доступен только в статусе «В процессе»",
+        });
+        return;
+      }
+      if (tournament.play_format !== TournamentPlayFormat.SWISS) {
+        res.status(400).json({
+          success: false,
+          message: "Откат доступен только для швейцарки",
+        });
+        return;
+      }
+      if (!tournament.swiss_seed?.length || !tournament.swiss_rounds) {
+        res.status(400).json({
+          success: false,
+          message: "Сиды швейцарки не сформированы",
+        });
+        return;
+      }
+
+      const cupCount =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (cupCount > 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "После начала финала швейцарку нельзя изменять. Сбросьте финал.",
+        });
+        return;
+      }
+
+      const rowsBefore =
+        await TournamentSwissMatchModel.listByTournament(tournamentId);
+      const maxRound = rowsBefore.reduce(
+        (max, m) => Math.max(max, m.round_number),
+        0,
+      );
+      if (fromRound > maxRound) {
+        res.status(400).json({
+          success: false,
+          message: `Тур ${fromRound} ещё не сформирован`,
+        });
+        return;
+      }
+
+      await TournamentSwissMatchModel.deleteRoundsFrom(
+        tournamentId,
+        fromRound,
+      );
+
+      const rows =
+        await TournamentSwissMatchModel.listByTournament(tournamentId);
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const swiss = buildSwissStageView(
+        tournament.swiss_seed,
+        teams,
+        AdminController.swissRowsToViews(rows),
+        tournament.swiss_rounds,
+        tournament.tiebreaker_order,
+      );
+
+      res.json({
+        success: true,
+        message: `Удалён тур ${fromRound}${maxRound > fromRound ? ` и последующие` : ""}. Можно править тур ${fromRound - 1}.`,
+        data: { swiss },
+      });
+    } catch (error) {
+      console.error("Ошибка отката тура швейцарки:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /**
+   * Сформировать следующий тур швейцарки по итогам указанного завершённого тура
+   * (если следующего ещё нет).
+   */
+  static async advanceSwissRound(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const fromRound = parseInt(req.params.roundNumber, 10);
+      if (isNaN(tournamentId) || isNaN(fromRound) || fromRound < 1) {
+        res.status(400).json({
+          success: false,
+          message: "Укажите турнир и номер завершённого тура",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Доступно только в статусе «В процессе»",
+        });
+        return;
+      }
+      if (tournament.play_format !== TournamentPlayFormat.SWISS) {
+        res.status(400).json({
+          success: false,
+          message: "Доступно только для швейцарки",
+        });
+        return;
+      }
+      if (!tournament.swiss_seed?.length || !tournament.swiss_rounds) {
+        res.status(400).json({
+          success: false,
+          message: "Сиды швейцарки не сформированы",
+        });
+        return;
+      }
+      if (fromRound >= tournament.swiss_rounds) {
+        res.status(400).json({
+          success: false,
+          message: "Это последний запланированный тур",
+        });
+        return;
+      }
+
+      const cupCount =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (cupCount > 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "После начала финала швейцарку нельзя изменять. Сбросьте финал.",
+        });
+        return;
+      }
+
+      let rows =
+        await TournamentSwissMatchModel.listByTournament(tournamentId);
+      const scoreRows = AdminController.swissRowsToScores(rows);
+      if (!rows.some((m) => m.round_number === fromRound)) {
+        res.status(400).json({
+          success: false,
+          message: `Тур ${fromRound} не найден`,
+        });
+        return;
+      }
+      if (!isRoundComplete(scoreRows, fromRound)) {
+        res.status(400).json({
+          success: false,
+          message: `Сначала завершите все партии тура ${fromRound}`,
+        });
+        return;
+      }
+
+      const nextRound = fromRound + 1;
+      if (rows.some((m) => m.round_number === nextRound)) {
+        res.status(400).json({
+          success: false,
+          message: `Тур ${nextRound} уже сформирован`,
+        });
+        return;
+      }
+
+      try {
+        const fixtures = pairNextRoundByScoreGroups(
+          tournament.swiss_seed,
+          scoreRows,
+          nextRound,
+          nextCourtStart(rows),
+        );
+        await TournamentSwissMatchModel.insertFixtures(
+          tournamentId,
+          fixtures,
+        );
+        rows = await TournamentSwissMatchModel.listByTournament(tournamentId);
+      } catch (pairError) {
+        console.error("Ошибка паринга следующего тура швейцарки:", pairError);
+        res.status(400).json({
+          success: false,
+          message:
+            pairError instanceof Error
+              ? pairError.message
+              : "Не удалось сформировать пары следующего тура",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const swiss = buildSwissStageView(
+        tournament.swiss_seed,
+        teams,
+        AdminController.swissRowsToViews(rows),
+        tournament.swiss_rounds,
+        tournament.tiebreaker_order,
+      );
+
+      res.json({
+        success: true,
+        message: `Сформирован тур ${nextRound}`,
+        data: { swiss },
+      });
+    } catch (error) {
+      console.error("Ошибка перехода к следующему туру швейцарки:", error);
       res.status(500).json({
         success: false,
         message: "Внутренняя ошибка сервера",
@@ -2025,9 +2408,10 @@ export class AdminController {
     );
 
     let court = Math.max(0, ...all.map((m) => m.court ?? 0)) + 1;
-    const aFixtures = generateBracketFixtures("A", winners, court);
+    const bracketOpts = { thirdPlace: config.third_place !== false };
+    const aFixtures = generateBracketFixtures("A", winners, court, bracketOpts);
     court += aFixtures.length;
-    const bFixtures = generateBracketFixtures("B", losers, court);
+    const bFixtures = generateBracketFixtures("B", losers, court, bracketOpts);
     await TournamentCupMatchModel.insertFixtures(tournamentId, [
       ...aFixtures,
       ...bFixtures,
@@ -2063,16 +2447,6 @@ export class AdminController {
         });
         return;
       }
-      if (
-        tournament.play_format !== TournamentPlayFormat.GROUPS ||
-        !tournament.group_draw?.length
-      ) {
-        res.status(400).json({
-          success: false,
-          message: "Финал после групп доступен только для формата GROUPS",
-        });
-        return;
-      }
 
       const existing =
         await TournamentCupMatchModel.countByTournament(tournamentId);
@@ -2091,6 +2465,7 @@ export class AdminController {
         c: raw.c ?? 0,
         d: raw.d ?? 0,
         ab_playoff: raw.ab_playoff ?? false,
+        third_place: raw.third_place ?? true,
       });
       if (!config) {
         res.status(400).json({
@@ -2105,29 +2480,74 @@ export class AdminController {
           tournamentId,
           tournament.type as TournamentType,
         );
-      const groupMatches =
-        await TournamentGroupMatchModel.listByTournament(tournamentId);
-      const groups = buildGroupStageViews(
-        tournament.group_draw,
-        teams,
-        groupMatches,
-      );
 
-      const allPlayed = groups.every(
-        (g) =>
-          g.matches.length > 0 &&
-          g.matches.every((m) => m.score_a != null && m.score_b != null),
-      );
-      if (!allPlayed) {
+      let ranked: QualifiedTeam[];
+
+      if (tournament.play_format === TournamentPlayFormat.GROUPS) {
+        if (!tournament.group_draw?.length) {
+          res.status(400).json({
+            success: false,
+            message: "Нет жеребьёвки групп",
+          });
+          return;
+        }
+        const groupMatches =
+          await TournamentGroupMatchModel.listByTournament(tournamentId);
+        const groups = buildGroupStageViews(
+          tournament.group_draw,
+          teams,
+          groupMatches,
+        );
+
+        const allPlayed = groups.every(
+          (g) =>
+            g.matches.length > 0 &&
+            g.matches.every((m) => m.score_a != null && m.score_b != null),
+        );
+        if (!allPlayed) {
+          res.status(400).json({
+            success: false,
+            message: "Сначала введите результаты всех матчей группового этапа",
+          });
+          return;
+        }
+
+        ranked = rankTeamsFromGroups(
+          AdminController.collectQualifiedFromGroups(groups),
+        );
+      } else if (tournament.play_format === TournamentPlayFormat.SWISS) {
+        if (!tournament.swiss_seed?.length || !tournament.swiss_rounds) {
+          res.status(400).json({
+            success: false,
+            message: "Швейцарка не сформирована",
+          });
+          return;
+        }
+        const swissMatches =
+          await TournamentSwissMatchModel.listByTournament(tournamentId);
+        const swiss = buildSwissStageView(
+          tournament.swiss_seed,
+          teams,
+          AdminController.swissRowsToViews(swissMatches),
+          tournament.swiss_rounds,
+          tournament.tiebreaker_order,
+        );
+        if (swiss.completed_rounds < tournament.swiss_rounds) {
+          res.status(400).json({
+            success: false,
+            message: `Сначала завершите все туры швейцарки (${swiss.completed_rounds} из ${tournament.swiss_rounds})`,
+          });
+          return;
+        }
+        ranked = rankTeamsFromSwiss(swiss.standings);
+      } else {
         res.status(400).json({
           success: false,
-          message: "Сначала введите результаты всех матчей группового этапа",
+          message: "Финал доступен после групп или швейцарки",
         });
         return;
       }
 
-      const qualified = AdminController.collectQualifiedFromGroups(groups);
-      const ranked = rankTeamsFromGroups(qualified);
       const err = validateCupStageConfig(config, ranked.length);
       if (err) {
         res.status(400).json({ success: false, message: err });
@@ -2360,6 +2780,160 @@ export class AdminController {
   ): Promise<void> {
     req.params.id = req.params.tournamentId;
     return TournamentController.registerPublicTeam(req, res);
+  }
+
+  /**
+   * Импорт списка команд из CSV (формат как при скачивании: №,состав команды,рейтинг).
+   */
+  static async importTournamentRegistrationsFromCsv(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (Number.isNaN(tournamentId) || tournamentId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира",
+        });
+        return;
+      }
+
+      const file = req.file;
+      if (!file?.buffer) {
+        res.status(400).json({
+          success: false,
+          message: "Загрузите CSV-файл",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+
+      if (
+        !AdminController.isRegistrationEditableStatus(tournament.status)
+      ) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Импорт доступен только в статусах «Регистрация» и «Финальная регистрация»",
+        });
+        return;
+      }
+
+      const content = file.buffer.toString("utf8");
+      const parsed = parseRegistrationCsv(content);
+      if (parsed.error) {
+        res.status(400).json({
+          success: false,
+          message: parsed.error,
+        });
+        return;
+      }
+
+      const ttype = tournament.type as TournamentType;
+      const expected = getExpectedSlotCount(ttype);
+      const minPlayers =
+        ttype === TournamentType.TRIPLETTE ? 3 : expected;
+      const maxPlayers = expected;
+
+      let imported = 0;
+      let skippedDuplicates = 0;
+      const errors: string[] = [];
+
+      for (const row of parsed.teams) {
+        const label =
+          row.rowNumber != null
+            ? `Строка ${row.lineNumber} (№${row.rowNumber})`
+            : `Строка ${row.lineNumber}`;
+        const names = row.playerNames;
+
+        if (names.length < minPlayers || names.length > maxPlayers) {
+          errors.push(
+            `${label}: для этого типа турнира нужно ${
+              minPlayers === maxPlayers
+                ? `${minPlayers}`
+                : `${minPlayers}–${maxPlayers}`
+            } игрок(ов), в файле — ${names.length} (${names.join(", ")})`,
+          );
+          continue;
+        }
+
+        const playerIds: number[] = [];
+        let resolveFailed = false;
+        for (const name of names) {
+          try {
+            const player = await TournamentParser.detectPlayer(name);
+            playerIds.push(player.id);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            errors.push(`${label}: ${msg}`);
+            resolveFailed = true;
+            break;
+          }
+        }
+        if (resolveFailed) {
+          continue;
+        }
+
+        if (new Set(playerIds).size !== playerIds.length) {
+          errors.push(`${label}: один игрок указан в составе дважды`);
+          continue;
+        }
+
+        const slots = legacyPlayerIdsToRequestSlots(ttype, playerIds);
+        if (!slots) {
+          errors.push(`${label}: не удалось сформировать состав`);
+          continue;
+        }
+
+        const result = await TournamentController.registerTeamWithSlots(
+          tournamentId,
+          ttype,
+          slots,
+        );
+        if (!result.success) {
+          if (result.status === 409) {
+            skippedDuplicates += 1;
+          } else {
+            errors.push(`${label}: ${result.message}`);
+          }
+          continue;
+        }
+        imported += 1;
+      }
+
+      const parts = [`Добавлено команд: ${imported}`];
+      if (skippedDuplicates > 0) {
+        parts.push(`уже были зарегистрированы: ${skippedDuplicates}`);
+      }
+      if (errors.length > 0) {
+        parts.push(`ошибок: ${errors.length}`);
+      }
+
+      res.json({
+        success: true,
+        message: parts.join(". "),
+        data: {
+          imported,
+          skipped_duplicates: skippedDuplicates,
+          errors,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка импорта CSV регистрации:", error);
+      res.status(500).json({
+        success: false,
+        message: "Ошибка импорта CSV",
+      });
+    }
   }
 
   /**

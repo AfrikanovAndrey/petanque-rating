@@ -29,6 +29,7 @@ const CupStageStartModal: React.FC<Props> = ({
   const [c, setC] = useState(0);
   const [d, setD] = useState(0);
   const [abPlayoff, setAbPlayoff] = useState(false);
+  const [thirdPlace, setThirdPlace] = useState(true);
 
   useEffect(() => {
     if (open) {
@@ -37,6 +38,7 @@ const CupStageStartModal: React.FC<Props> = ({
       setC(0);
       setD(0);
       setAbPlayoff(false);
+      setThirdPlace(true);
     }
   }, [open]);
 
@@ -62,6 +64,7 @@ const CupStageStartModal: React.FC<Props> = ({
         c,
         d,
         ab_playoff: abPlayoff,
+        third_place: thirdPlace,
       }),
     {
       onSuccess: (res) => {
@@ -149,6 +152,24 @@ const CupStageStartModal: React.FC<Props> = ({
               <span className="mt-0.5 block text-gray-600">
                 16 лучших → 8 матчей; победители в A, проигравшие в B (требует
                 A=8 и B=8).
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={thirdPlace}
+              onChange={(e) => setThirdPlace(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-gray-900">
+                Игра за 3-е место
+              </span>
+              <span className="mt-0.5 block text-gray-600">
+                В каждом кубке (A–D) с сеткой от 4 команд — матч между
+                проигравшими полуфинала.
               </span>
             </span>
           </label>

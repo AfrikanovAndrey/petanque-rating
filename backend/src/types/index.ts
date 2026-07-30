@@ -58,6 +58,8 @@ export type CupStageConfig = {
   c: number;
   d: number;
   ab_playoff: boolean;
+  /** Матч за 3-е место в кубках (по умолчанию true) */
+  third_place?: boolean;
   /** Сохранённые составы при старте (для AB → A/B и отображения) */
   pools?: Partial<
     Record<"AB" | "A" | "B" | "C" | "D", Array<{

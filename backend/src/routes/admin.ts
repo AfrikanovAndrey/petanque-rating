@@ -3,6 +3,7 @@ import {
   AdminController,
   licensedPlayersUploadMiddleware,
   playersTextUploadMiddleware,
+  registrationCsvUploadMiddleware,
   uploadMiddleware,
 } from "../controllers/AdminController";
 import { SettingsController } from "../controllers/SettingsController";
@@ -169,6 +170,13 @@ router.get(
   AdminController.getTournamentInProgressPage,
 );
 
+// GET /api/admin/tournaments/:tournamentId/finished — завершённый турнир
+router.get(
+  "/tournaments/:tournamentId/finished",
+  requireTournamentViewer,
+  AdminController.getTournamentFinishedPage,
+);
+
 // PUT /api/admin/tournaments/:tournamentId/group-matches/:matchId — счёт матча группы
 router.put(
   "/tournaments/:tournamentId/group-matches/:matchId",
@@ -195,6 +203,36 @@ router.put(
       `Обновление матча швейцарки #${req.params.matchId} турнира ID ${req.params.tournamentId}`,
   }),
   AdminController.updateTournamentSwissMatch,
+);
+
+// DELETE /api/admin/tournaments/:tournamentId/swiss/rounds/:roundNumber
+// — удалить тур и последующие (откат к предыдущему)
+router.delete(
+  "/tournaments/:tournamentId/swiss/rounds/:roundNumber",
+  requireTournamentStaff,
+  auditLog({
+    action: "ROLLBACK_TOURNAMENT_SWISS_ROUND",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Откат швейцарки с тура ${req.params.roundNumber} турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.rollbackSwissRound,
+);
+
+// POST /api/admin/tournaments/:tournamentId/swiss/rounds/:roundNumber/advance
+// — сформировать следующий тур по итогам указанного
+router.post(
+  "/tournaments/:tournamentId/swiss/rounds/:roundNumber/advance",
+  requireTournamentStaff,
+  auditLog({
+    action: "ADVANCE_TOURNAMENT_SWISS_ROUND",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Переход к следующему туру после тура ${req.params.roundNumber} турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.advanceSwissRound,
 );
 
 // POST /api/admin/tournaments/:tournamentId/cup-stage/start
@@ -309,6 +347,21 @@ router.post(
       `Регистрация команды на турнир ID ${req.params.tournamentId}`,
   }),
   AdminController.registerTournamentTeam,
+);
+
+// POST /api/admin/tournaments/:tournamentId/registration/import-csv — импорт команд из CSV
+router.post(
+  "/tournaments/:tournamentId/registration/import-csv",
+  requireTournamentStaff,
+  registrationCsvUploadMiddleware,
+  auditLog({
+    action: "IMPORT_TOURNAMENT_REGISTRATIONS_CSV",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Импорт заявок из CSV на турнир ID ${req.params.tournamentId}`,
+  }),
+  AdminController.importTournamentRegistrationsFromCsv,
 );
 
 // POST /api/admin/tournaments/:tournamentId/registration/:teamId/confirm — подтвердить заявку команды

@@ -68,7 +68,19 @@ export function parseCupStageConfig(raw: unknown): CupStageConfig | null {
   if (ab && !(a === 8 && b === 8)) {
     return null;
   }
-  const config: CupStageConfig = { a, b, c, d, ab_playoff: ab };
+  // По умолчанию матч за 3-е есть (в т.ч. для старых конфигов без поля)
+  const thirdPlace =
+    obj.third_place === undefined || obj.third_place === null
+      ? true
+      : Boolean(obj.third_place);
+  const config: CupStageConfig = {
+    a,
+    b,
+    c,
+    d,
+    ab_playoff: ab,
+    third_place: thirdPlace,
+  };
   if (obj.pools && typeof obj.pools === "object") {
     config.pools = obj.pools as CupStageConfig["pools"];
   }
@@ -141,6 +153,54 @@ export function rankTeamsFromGroups(teams: QualifiedTeam[]): QualifiedTeam[] {
   return ranked;
 }
 
+/**
+ * Квалификация из швейцарки: порядок итогов (место 1…N).
+ * group_number = 0 — одна «корзина» (для паринга кубка).
+ */
+export function rankTeamsFromSwiss(
+  standings: Array<{
+    team_id: number;
+    place: number;
+    wins: number;
+    point_diff: number;
+    points_for: number;
+  }>,
+): QualifiedTeam[] {
+  return [...standings]
+    .filter((s) => s.place > 0 && s.team_id > 0)
+    .sort((a, b) => {
+      if (a.place !== b.place) {
+        return a.place - b.place;
+      }
+      return compareStrength(
+        {
+          team_id: a.team_id,
+          group_number: 0,
+          place: a.place,
+          wins: a.wins,
+          point_diff: a.point_diff,
+          points_for: a.points_for,
+        },
+        {
+          team_id: b.team_id,
+          group_number: 0,
+          place: b.place,
+          wins: b.wins,
+          point_diff: b.point_diff,
+          points_for: b.points_for,
+        },
+      );
+    })
+    .map((s) => ({
+      team_id: s.team_id,
+      group_number: 0,
+      place: s.place,
+      wins: s.wins,
+      point_diff: s.point_diff,
+      points_for: s.points_for,
+    }));
+}
+
 export function allocateCups(
   ranked: QualifiedTeam[],
   config: CupStageConfig,
@@ -180,6 +240,58 @@ export function allocateCups(
 type Pair = [QualifiedTeam, QualifiedTeam];
 
 /**
+ * Классический порядок посева в сетке (слоты слева направо сверху вниз).
+ * Для 8:  [1, 8, 4, 5, 2, 7, 3, 6]
+ *   → пары 1–8, 4–5 | 2–7, 3–6.
+ * Для 16: [1, 16, 8, 9, 4, 13, 5, 12, 2, 15, 7, 10, 3, 14, 6, 11]
+ *   → после 1/8 при победах фаворитов те же четвертьфиналы:
+ *     1–8, 4–5 | 2–7, 3–6.
+ */
+export function standardBracketSeedOrder(size: number): number[] {
+  if (!isPowerOfTwo(size)) {
+    throw new Error("Размер сетки должен быть степенью двойки");
+  }
+  let bracket = [1];
+  while (bracket.length < size) {
+    const next: number[] = [];
+    const sum = bracket.length * 2 + 1;
+    for (const seed of bracket) {
+      next.push(seed);
+      next.push(sum - seed);
+    }
+    bracket = next;
+  }
+  return bracket;
+}
+
+/**
+ * Пары 1-го раунда по посеву: teams[0] = сид 1, …, teams[n-1] = сид n.
+ * Ветки для 8: (1–8, 4–5) и (2–7, 3–6).
+ * Для 16 то же правило расширяется: 1/8 даёт 1–16/8–9, 4–13/5–12, …
+ * чтобы в 1/4 сложились те же пары сидов 1–8, 4–5 | 2–7, 3–6.
+ */
+export function pairSeededBracket(teams: QualifiedTeam[]): Pair[] {
+  if (!isPowerOfTwo(teams.length)) {
+    throw new Error("Размер сетки должен быть степенью двойки");
+  }
+  const order = standardBracketSeedOrder(teams.length);
+  const pairs: Pair[] = [];
+  for (let i = 0; i < order.length; i += 2) {
+    const seedA = order[i];
+    const seedB = order[i + 1];
+    const a = teams[seedA - 1];
+    const b = teams[seedB - 1];
+    if (seedA <= seedB) {
+      pairs.push([a, b]);
+    } else {
+      pairs.push([b, a]);
+    }
+  }
+  return pairs;
+}
+
+/**
+ * @deprecated Используйте pairSeededBracket для сеток кубка.
  * Пары 1-го раунда: максимум P1×P2, без повтора группы по возможности.
  */
 export function pairFirstRound(teams: QualifiedTeam[]): Pair[] {
@@ -283,20 +395,22 @@ export function generateBracketFixtures(
   cup: CupBracketCode,
   teams: QualifiedTeam[],
   courtStart: number = 1,
+  options?: { thirdPlace?: boolean },
 ): CupMatchFixture[] {
   if (!isPowerOfTwo(teams.length)) {
     throw new Error(`Размер сетки ${cup} должен быть степенью двойки`);
   }
 
+  const withThirdPlace = options?.thirdPlace !== false;
   const size = teams.length;
   const rounds = Math.log2(size);
-  const pairs = orderPairsForBracket(pairFirstRound(teams));
+  const pairs = pairSeededBracket(teams);
   const fixtures: CupMatchFixture[] = [];
   let court = courtStart;
 
   // Round 1
   // При size=4 первый раунд — полуфинал: проигравшие идут в матч за 3-е.
-  const round1IsSemi = rounds === 2 && size >= 4;
+  const round1IsSemi = withThirdPlace && rounds === 2 && size >= 4;
   for (let i = 0; i < pairs.length; i++) {
     const [a, b] = pairs[i];
     const nextRound = rounds === 1 ? null : 2;
@@ -324,7 +438,7 @@ export function generateBracketFixtures(
   // Later rounds (empty slots)
   for (let round = 2; round <= rounds; round++) {
     const matchCount = size / 2 ** round;
-    const isSemi = round === rounds - 1 && size >= 4;
+    const isSemi = withThirdPlace && round === rounds - 1 && size >= 4;
     const isFinal = round === rounds;
     for (let i = 0; i < matchCount; i++) {
       const hasNext = round < rounds;
@@ -348,7 +462,7 @@ export function generateBracketFixtures(
     }
   }
 
-  if (size >= 4) {
+  if (withThirdPlace && size >= 4) {
     fixtures.push(
       emptyFixture({
         cup,
@@ -371,7 +485,7 @@ export function generateAbPlayoffFixtures(
   if (teams.length !== 16) {
     throw new Error("Стыковая игра AB требует ровно 16 команд");
   }
-  const pairs = orderPairsForBracket(pairFirstRound(teams));
+  const pairs = pairSeededBracket(teams);
   let court = courtStart;
   return pairs.map(([a, b], i) =>
     emptyFixture({
@@ -391,6 +505,7 @@ export function buildAllCupFixtures(
 ): CupMatchFixture[] {
   const all: CupMatchFixture[] = [];
   let court = 1;
+  const bracketOpts = { thirdPlace: config.third_place !== false };
 
   if (config.ab_playoff) {
     const ab = generateAbPlayoffFixtures(allocation.ab, court);
@@ -405,7 +520,7 @@ export function buildAllCupFixtures(
       if (teams.length === 0) {
         continue;
       }
-      const fixtures = generateBracketFixtures(code, teams, court);
+      const fixtures = generateBracketFixtures(code, teams, court, bracketOpts);
       all.push(...fixtures);
       court += fixtures.length;
     }
@@ -418,7 +533,7 @@ export function buildAllCupFixtures(
     if (teams.length === 0) {
       continue;
     }
-    const fixtures = generateBracketFixtures(code, teams, court);
+    const fixtures = generateBracketFixtures(code, teams, court, bracketOpts);
     all.push(...fixtures);
     court += fixtures.length;
   }

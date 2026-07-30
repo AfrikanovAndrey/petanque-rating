@@ -1,18 +1,27 @@
-import { CheckIcon, PencilIcon } from "@heroicons/react/24/outline";
-import React, { useMemo, useState } from "react";
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon } from "@heroicons/react/24/outline";
+import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useMutation, useQueryClient } from "react-query";
 import { adminApi } from "../../services/api";
 import {
+  TiebreakerCriterion,
   TournamentSwissMatchView,
   TournamentSwissStageView,
 } from "../../types";
 import { handleApiError } from "../../utils";
+import {
+  compareSwissStandings,
+  getTiebreakerLabel,
+  getTiebreakerShortLabel,
+  isSwissFreeTeamId,
+} from "../../utils/tournamentPlaySettings";
 
 type Props = {
   tournamentId?: number;
   swiss: TournamentSwissStageView;
   readOnly?: boolean;
+  /** Свернуть блок по умолчанию (например, после начала финала) */
+  defaultCollapsed?: boolean;
 };
 
 type TabId = "standings" | number;
@@ -174,13 +183,39 @@ const SwissMatchScoreInputs: React.FC<{
   };
 
   if (match.is_bye) {
+    const scoreBoxClass = readOnly
+      ? "inline-flex w-10 justify-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-1 text-center font-medium text-gray-900"
+      : "inline-flex w-14 justify-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-1 text-center text-sm font-medium text-gray-900";
     return (
-      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
-        <span className="min-w-0 flex-1 truncate font-medium" title={teamAName}>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span
+          className="min-w-0 flex-1 text-right text-gray-800 truncate font-medium"
+          title={teamAName}
+        >
           {teamAName}
         </span>
-        <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-900">
-          bye · автопобеда
+        <span className={scoreBoxClass}>13</span>
+        <span className="text-gray-400">:</span>
+        <span className={scoreBoxClass}>7</span>
+        <span
+          className="min-w-0 flex-1 text-left font-medium text-amber-900 truncate"
+          title="Свободен · автопобеда"
+        >
+          Свободен
+        </span>
+        {!readOnly && (
+          <span
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-[10px] font-medium leading-none text-amber-900"
+            title="Автопобеда"
+          >
+            авто
+          </span>
+        )}
+        <span className="shrink-0 text-sm font-medium text-gray-600">
+          дорожка
+        </span>
+        <span className="inline-flex h-9 w-12 shrink-0 items-center justify-center rounded-md border-2 border-amber-400 bg-amber-50 text-base font-bold text-amber-950">
+          —
         </span>
       </div>
     );
@@ -329,6 +364,7 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
   tournamentId,
   swiss,
   readOnly = false,
+  defaultCollapsed = false,
 }) => {
   const rounds = useMemo(() => {
     const byRound = new Map<number, TournamentSwissMatchView[]>();
@@ -352,6 +388,13 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
   }, [swiss.standings]);
 
   const [activeTab, setActiveTab] = useState<TabId>("standings");
+  const [sectionOpen, setSectionOpen] = useState(!defaultCollapsed);
+
+  useEffect(() => {
+    if (defaultCollapsed) {
+      setSectionOpen(false);
+    }
+  }, [defaultCollapsed]);
 
   const selectedTab: TabId =
     activeTab === "standings" ||
@@ -369,143 +412,372 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
       ? `Итоги швейцарки (после ${swiss.completed_rounds} туров)`
       : "Итоги швейцарки";
 
+  const tiebreakerOrder = swiss.tiebreaker_order ?? [];
+
+  // Победы → коэффициенты из настроек турнира → сид (как на бэкенде).
+  // «Свободен» в итогах не показываем.
+  const sortedStandings = useMemo(() => {
+    const order = swiss.tiebreaker_order ?? [];
+    return swiss.standings
+      .filter((row) => !isSwissFreeTeamId(row.team_id))
+      .slice()
+      .sort((a, b) => compareSwissStandings(a, b, order))
+      .map((row, index) => ({
+        ...row,
+        place: index + 1,
+      }));
+  }, [swiss.standings, swiss.tiebreaker_order]);
+
+  const sortLegend = [
+    "Победы",
+    ...tiebreakerOrder.map((c) => getTiebreakerShortLabel(c)),
+    "сид",
+  ].join(" → ");
+
+  const queryClient = useQueryClient();
+
+  const applySwissUpdate = (
+    nextSwiss: TournamentSwissStageView,
+    options?: { goToRound?: number; successMessage?: string }
+  ) => {
+    if (tournamentId == null) {
+      return;
+    }
+    queryClient.setQueryData(
+      ["tournamentInProgress", tournamentId],
+      (old: unknown) => {
+        if (!old || typeof old !== "object") {
+          return old;
+        }
+        return { ...(old as object), swiss: nextSwiss };
+      }
+    );
+    void queryClient.invalidateQueries([
+      "tournamentInProgress",
+      tournamentId,
+    ]);
+    if (options?.goToRound != null) {
+      setActiveTab(options.goToRound);
+    }
+    if (options?.successMessage) {
+      toast.success(options.successMessage);
+    }
+  };
+
+  const rollbackMutation = useMutation(
+    async (fromRound: number) => {
+      if (tournamentId == null) {
+        throw new Error("Не указан турнир");
+      }
+      const response = await adminApi.rollbackSwissRound(
+        tournamentId,
+        fromRound
+      );
+      if (!response.data.success || !response.data.data?.swiss) {
+        throw new Error(response.data.message || "Не удалось откатить тур");
+      }
+      return { swiss: response.data.data.swiss, fromRound };
+    },
+    {
+      onSuccess: ({ swiss: nextSwiss, fromRound }) => {
+        applySwissUpdate(nextSwiss, {
+          goToRound: fromRound - 1,
+          successMessage: `Тур ${fromRound} удалён. Можно править тур ${fromRound - 1}.`,
+        });
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const advanceMutation = useMutation(
+    async (fromRound: number) => {
+      if (tournamentId == null) {
+        throw new Error("Не указан турнир");
+      }
+      const response = await adminApi.advanceSwissRound(
+        tournamentId,
+        fromRound
+      );
+      if (!response.data.success || !response.data.data?.swiss) {
+        throw new Error(
+          response.data.message || "Не удалось сформировать следующий тур"
+        );
+      }
+      return { swiss: response.data.data.swiss, nextRound: fromRound + 1 };
+    },
+    {
+      onSuccess: ({ swiss: nextSwiss, nextRound }) => {
+        applySwissUpdate(nextSwiss, {
+          goToRound: nextRound,
+          successMessage: `Сформирован тур ${nextRound}`,
+        });
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const canRollbackRound =
+    !readOnly &&
+    tournamentId != null &&
+    typeof selectedTab === "number" &&
+    selectedTab >= 2;
+
+  const currentRoundComplete =
+    typeof selectedTab === "number" &&
+    activeRound != null &&
+    activeRound.matches.length > 0 &&
+    activeRound.matches.every(
+      (m) => m.is_bye || (m.score_a != null && m.score_b != null)
+    );
+
+  const nextRoundExists =
+    typeof selectedTab === "number" &&
+    rounds.some((r) => r.round_number === selectedTab + 1);
+
+  // Кнопка «К следующему туру»: туры 1 … N−1, когда тур сыгран, а следующего ещё нет
+  // (в т.ч. после отката к предыдущему).
+  const canAdvanceRound =
+    !readOnly &&
+    tournamentId != null &&
+    typeof selectedTab === "number" &&
+    selectedTab >= 1 &&
+    selectedTab < swiss.swiss_rounds &&
+    currentRoundComplete &&
+    !nextRoundExists;
+
   return (
-    <div className="card p-6 space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">
-          Швейцарская система
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Запланировано туров: {swiss.swiss_rounds}
-        </p>
-      </div>
-
-      <div
-        className="flex flex-wrap gap-1 border-b border-gray-200"
-        role="tablist"
-        aria-label="Туры швейцарки"
+    <div className="card overflow-hidden">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left hover:bg-gray-50"
+        aria-expanded={sectionOpen}
+        onClick={() => setSectionOpen((open) => !open)}
       >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={selectedTab === "standings"}
-          className={`rounded-t-md px-3 py-2 text-sm font-medium ${
-            selectedTab === "standings"
-              ? "border border-b-white border-gray-200 bg-white text-primary-700 -mb-px"
-              : "text-gray-600 hover:text-gray-900"
-          }`}
-          onClick={() => setActiveTab("standings")}
-        >
-          {standingsTitle}
-        </button>
-        {rounds.map(({ round_number }) => (
-          <button
-            key={round_number}
-            type="button"
-            role="tab"
-            aria-selected={selectedTab === round_number}
-            className={`rounded-t-md px-3 py-2 text-sm font-medium ${
-              selectedTab === round_number
-                ? "border border-b-white border-gray-200 bg-white text-primary-700 -mb-px"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-            onClick={() => setActiveTab(round_number)}
-          >
-            Тур {round_number}
-          </button>
-        ))}
-      </div>
-
-      {selectedTab === "standings" ? (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
-                  Место
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600">
-                  Команда
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
-                  Стартовая позиция
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
-                  Победы
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
-                  ±
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
-                  Очки+
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
-                  Игры
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {swiss.standings.map((row) => {
-                const name = teamLabel(row.players);
-                return (
-                  <tr key={row.team_id} className="bg-white">
-                    <td className="border border-gray-200 px-2 py-1 text-center text-gray-700">
-                      {swiss.completed_rounds > 0 ? row.place : "—"}
-                    </td>
-                    <td
-                      className="border border-gray-200 px-2 py-1 font-medium text-gray-900"
-                      title={name}
-                    >
-                      {name}
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1 text-left text-gray-600 whitespace-nowrap">
-                      {row.seed} (рейтинг: {row.rating}, random:{" "}
-                      {row.random_tie})
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1 text-center font-medium text-gray-900">
-                      {row.wins}
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1 text-center text-gray-700">
-                      {formatDiff(row.point_diff)}
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1 text-center text-gray-700">
-                      {row.points_for}
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1 text-center text-gray-600">
-                      {row.played}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Швейцарская система
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {swiss.completed_rounds === swiss.swiss_rounds ? `Завершена` : `Проведено туров: ${swiss.completed_rounds}`}
+          </p>
         </div>
-      ) : activeRound ? (
-        <ul className="space-y-2">
-          {activeRound.matches.map((m) => {
-            const aName =
-              nameById.get(m.team_a_id) ?? `Команда #${m.team_a_id}`;
-            const bName =
-              m.team_b_id != null
-                ? nameById.get(m.team_b_id) ?? `Команда #${m.team_b_id}`
-                : "";
-            return (
-              <li
-                key={m.id}
-                className="rounded-md border border-gray-200 bg-white px-3 py-2"
+        {sectionOpen ? (
+          <ChevronUpIcon className="h-5 w-5 shrink-0 text-gray-500" />
+        ) : (
+          <ChevronDownIcon className="h-5 w-5 shrink-0 text-gray-500" />
+        )}
+      </button>
+
+      {sectionOpen && (
+        <div className="space-y-4 border-t border-gray-200 px-6 py-4">
+          <div
+            className="flex flex-wrap gap-1 border-b border-gray-200"
+            role="tablist"
+            aria-label="Туры швейцарки"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selectedTab === "standings"}
+              className={`rounded-t-md px-3 py-2 text-sm font-medium ${
+                selectedTab === "standings"
+                  ? "border border-b-white border-gray-200 bg-white text-primary-700 -mb-px"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+              onClick={() => setActiveTab("standings")}
+            >
+              {standingsTitle}
+            </button>
+            {rounds.map(({ round_number }) => (
+              <button
+                key={round_number}
+                type="button"
+                role="tab"
+                aria-selected={selectedTab === round_number}
+                className={`rounded-t-md px-3 py-2 text-sm font-medium ${
+                  selectedTab === round_number
+                    ? "border border-b-white border-gray-200 bg-white text-primary-700 -mb-px"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+                onClick={() => setActiveTab(round_number)}
               >
-                <SwissMatchScoreInputs
-                  tournamentId={tournamentId}
-                  match={m}
-                  teamAName={aName}
-                  teamBName={bName}
-                  readOnly={readOnly}
-                />
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+                Тур {round_number}
+              </button>
+            ))}
+          </div>
+
+          {selectedTab === "standings" ? (
+            <div className="space-y-2">
+              {swiss.completed_rounds > 0 && tiebreakerOrder.length > 0 && (
+                <p className="text-xs text-gray-500">
+                  Сортировка мест: {sortLegend}
+                </p>
+              )}
+              <div className="flex justify-center overflow-x-auto">
+                <table className="w-auto border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
+                        Место
+                      </th>
+                      <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600">
+                        Команда
+                      </th>
+                      <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
+                        Победы
+                      </th>
+                      {tiebreakerOrder.map((criterion) => (
+                        <th
+                          key={criterion}
+                          className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600"
+                          title={getTiebreakerLabel(criterion)}
+                        >
+                          {getTiebreakerShortLabel(criterion)}
+                        </th>
+                      ))}
+                      <th
+                        className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-500"
+                        title="Стартовый номер посева"
+                      >
+                        Сид
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedStandings.map((row) => {
+                      const name = teamLabel(row.players);
+                      return (
+                        <tr key={row.team_id} className="bg-white">
+                          <td className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center font-semibold text-gray-900">
+                            {swiss.completed_rounds > 0 ? row.place : "—"}
+                          </td>
+                          <td className="whitespace-nowrap border border-gray-200 px-2 py-1 font-medium text-gray-900">
+                            {name}
+                          </td>
+                          <td className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center font-semibold text-gray-900">
+                            {row.wins}
+                          </td>
+                          {tiebreakerOrder.map((criterion) => {
+                            const value = row.tiebreakers?.[criterion];
+                            const display =
+                              value == null
+                                ? "—"
+                                : criterion === TiebreakerCriterion.POINT_DIFF
+                                  ? formatDiff(value)
+                                  : String(value);
+                            return (
+                              <td
+                                key={criterion}
+                                className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center text-gray-700"
+                              >
+                                {display}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center text-gray-500"
+                            title={`Рейтинг: ${row.rating}, random: ${row.random_tie}`}
+                          >
+                            {row.seed}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : activeRound ? (
+            <div className="space-y-3">
+              {(canRollbackRound || canAdvanceRound) && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-gray-500">
+                    {canAdvanceRound
+                      ? `Тур ${selectedTab} завершён. Сформируйте следующий, чтобы продолжить.`
+                      : `Чтобы исправить счета тура ${selectedTab - 1}, удалите текущий тур и все последующие.`}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canRollbackRound && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                        disabled={
+                          rollbackMutation.isLoading ||
+                          advanceMutation.isLoading
+                        }
+                        onClick={() => {
+                          const fromRound = selectedTab as number;
+                          if (
+                            !window.confirm(
+                              `Удалить тур ${fromRound}${
+                                swiss.matches.some(
+                                  (m) => m.round_number > fromRound
+                                )
+                                  ? " и все последующие"
+                                  : ""
+                              }? Счета тура ${fromRound - 1} останутся — их можно будет изменить.`
+                            )
+                          ) {
+                            return;
+                          }
+                          rollbackMutation.mutate(fromRound);
+                        }}
+                      >
+                        Вернуться к туру {selectedTab - 1}
+                      </button>
+                    )}
+                    {canAdvanceRound && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
+                        disabled={
+                          advanceMutation.isLoading ||
+                          rollbackMutation.isLoading
+                        }
+                        onClick={() => {
+                          advanceMutation.mutate(selectedTab as number);
+                        }}
+                      >
+                        {advanceMutation.isLoading
+                          ? "Формирование…"
+                          : `К следующему туру (${(selectedTab as number) + 1})`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <ul className="mx-auto w-full max-w-2xl space-y-2">
+                {activeRound.matches.map((m) => {
+                  const aName =
+                    nameById.get(m.team_a_id) ?? `Команда #${m.team_a_id}`;
+                  const bName =
+                    m.team_b_id != null
+                      ? nameById.get(m.team_b_id) ?? `Команда #${m.team_b_id}`
+                      : "";
+                  return (
+                    <li
+                      key={m.id}
+                      className="rounded-md border border-gray-200 bg-white px-3 py-2"
+                    >
+                      <SwissMatchScoreInputs
+                        tournamentId={tournamentId}
+                        match={m}
+                        teamAName={aName}
+                        teamBName={bName}
+                        readOnly={readOnly}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 };

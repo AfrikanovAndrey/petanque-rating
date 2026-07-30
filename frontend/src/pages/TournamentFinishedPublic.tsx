@@ -2,16 +2,15 @@ import {
   ArrowLeftIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  PlayCircleIcon,
+  TrophyIcon,
 } from "@heroicons/react/24/outline";
 import React, { useMemo, useState } from "react";
 import { useQuery } from "react-query";
 import { Link, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../components/RegulationsMarkdown";
-import TournamentGroupStageResults from "../components/admin/TournamentGroupStageResults";
-import TournamentCupStageResults from "../components/admin/TournamentCupStageResults";
-import TournamentSwissStageResults from "../components/admin/TournamentSwissStageResults";
-import { getPublicTournamentInProgress, ratingApi } from "../services/api";
+import TournamentFinishedCupResults from "../components/TournamentFinishedCupResults";
+import { getPublicTournamentFinished, ratingApi } from "../services/api";
+import { TournamentStatus, TournamentType } from "../types";
 import {
   formatDate,
   formatDateTime,
@@ -21,9 +20,8 @@ import {
   getTournamentTypeText,
   handleApiError,
 } from "../utils";
-import { TournamentStatus, TournamentType } from "../types";
 
-const TournamentInProgressPublic: React.FC = () => {
+const TournamentFinishedPublic: React.FC = () => {
   const { tournamentId: tournamentIdParam } = useParams<{
     tournamentId: string;
   }>();
@@ -32,9 +30,9 @@ const TournamentInProgressPublic: React.FC = () => {
   const [registrationListOpen, setRegistrationListOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery(
-    ["publicTournamentInProgress", tournamentId],
+    ["publicTournamentFinished", tournamentId],
     async () => {
-      const response = await getPublicTournamentInProgress(tournamentId);
+      const response = await getPublicTournamentFinished(tournamentId);
       if (!response.data.success || !response.data.data) {
         throw new Error(response.data.message || "Не удалось загрузить данные");
       }
@@ -47,10 +45,12 @@ const TournamentInProgressPublic: React.FC = () => {
   );
 
   const { data: fullRating } = useQuery(
-    ["publicInProgressFullRating"],
+    ["publicFinishedFullRating"],
     async () => {
       const response = await ratingApi.getFullRating();
-      return response.data.success && response.data.data ? response.data.data : [];
+      return response.data.success && response.data.data
+        ? response.data.data
+        : [];
     },
     {
       retry: false,
@@ -112,7 +112,7 @@ const TournamentInProgressPublic: React.FC = () => {
     return null;
   }
 
-  const { tournament, teams } = data;
+  const { tournament, teams, results } = data;
 
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
@@ -147,19 +147,22 @@ const TournamentInProgressPublic: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             {tournament.name}
-          </h1>            
-          <PlayCircleIcon
-            className={`h-9 w-9 shrink-0 ${
-              tournament.status === TournamentStatus.FINAL_REGISTRATION
-                ? "text-emerald-600"
-                : "text-sky-600"
-            }`}
-          />
+          </h1>
+          <TrophyIcon className="h-9 w-9 shrink-0 text-amber-600" />
           <p className="mt-1 text-gray-600">
             {getTournamentStatusText(tournament.status)}
-          </p>            
+          </p>
         </div>
       </div>
+
+      {tournament.status === TournamentStatus.FINISHED &&
+        !tournament.results_validated_at &&
+        (tournament.teams_count ?? 0) > 0 && (
+          <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Этот турнир ещё не признан президиумом для рейтинга: итоги доступны
+            ниже, но в сумму очков общего рейтинга они пока не входят.
+          </p>
+        )}
 
       <div className="min-w-0 bg-white rounded-lg shadow overflow-hidden">
         <button
@@ -240,8 +243,7 @@ const TournamentInProgressPublic: React.FC = () => {
               Список регистрации
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Публичный список — только подтверждённые заявки. Всего:{" "}
-              {teams.length}
+              Подтверждённые заявки. Всего: {teams.length}
             </p>
           </div>
           {registrationListOpen ? (
@@ -253,7 +255,7 @@ const TournamentInProgressPublic: React.FC = () => {
         {registrationListOpen &&
           (teams.length === 0 ? (
             <div className="px-4 sm:px-6 py-12 text-center text-gray-500">
-              Пока нет подтверждённых команд.
+              Нет подтверждённых заявок.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -297,26 +299,14 @@ const TournamentInProgressPublic: React.FC = () => {
           ))}
       </div>
 
-      {data.groups && data.groups.length > 0 && (
-        <TournamentGroupStageResults
-          groups={data.groups}
-          readOnly
-        />
-      )}
-
-      {data.swiss && (
-        <TournamentSwissStageResults
-          swiss={data.swiss}
-          readOnly
-          defaultCollapsed={Boolean(data.cups && data.cups.length > 0)}
-        />
-      )}
-
-      {data.cups && data.cups.length > 0 && (
-        <TournamentCupStageResults cups={data.cups} readOnly />
-      )}
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Результаты турнира
+        </h2>
+        <TournamentFinishedCupResults results={results} />
+      </div>
     </div>
   );
 };
 
-export default TournamentInProgressPublic;
+export default TournamentFinishedPublic;

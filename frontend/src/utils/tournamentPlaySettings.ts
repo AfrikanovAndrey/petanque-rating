@@ -32,6 +32,62 @@ export function getTiebreakerLabel(criterion: TiebreakerCriterion): string {
   }
 }
 
+/** Короткие подписи для заголовков таблицы итогов. */
+export function getTiebreakerShortLabel(criterion: TiebreakerCriterion): string {
+  switch (criterion) {
+    case TiebreakerCriterion.BUCHHOLZ:
+      return "Бухгольц";
+    case TiebreakerCriterion.DOUBLE_BUCHHOLZ:
+      return "Дв. Бухгольц";
+    case TiebreakerCriterion.BERGER:
+      return "Бергер";
+    case TiebreakerCriterion.PROGRESS:
+      return "Прогресс";
+    case TiebreakerCriterion.POINT_DIFF:
+      return "Разн. очков";
+    default:
+      return criterion;
+  }
+}
+
+/** Технический участник швейцарки при нечётном числе команд. */
+export const SWISS_FREE_TEAM_ID = -1;
+export const SWISS_FREE_TEAM_NAME = "Свободен";
+
+export function isSwissFreeTeamId(teamId: number): boolean {
+  return teamId === SWISS_FREE_TEAM_ID;
+}
+
+/**
+ * Порядок строк «Итоги швейцарки»:
+ * победы DESC → коэффициенты из настроек турнира DESC → сид ASC.
+ */
+export function compareSwissStandings(
+  a: {
+    wins: number;
+    seed: number;
+    tiebreakers?: Partial<Record<TiebreakerCriterion, number>>;
+  },
+  b: {
+    wins: number;
+    seed: number;
+    tiebreakers?: Partial<Record<TiebreakerCriterion, number>>;
+  },
+  tiebreakerOrder: TiebreakerCriterion[],
+): number {
+  if (b.wins !== a.wins) {
+    return b.wins - a.wins;
+  }
+  for (const criterion of tiebreakerOrder) {
+    const av = a.tiebreakers?.[criterion] ?? 0;
+    const bv = b.tiebreakers?.[criterion] ?? 0;
+    if (bv !== av) {
+      return bv - av;
+    }
+  }
+  return a.seed - b.seed;
+}
+
 export function getPlayFormatLabel(format: TournamentPlayFormat): string {
   switch (format) {
     case TournamentPlayFormat.GROUPS:

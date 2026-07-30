@@ -5,6 +5,7 @@ import {
   LoginCredentials,
   AuthResponse,
   Tournament,
+  TournamentFinishedPageData,
   TournamentGroupDrawGroup,
   TournamentPlayFormat,
   TournamentRegisteredTeam,
@@ -126,6 +127,12 @@ export const getPublicTournamentInProgress = (
   AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
 > => api.get(`/rating/tournaments/${tournamentId}/in-progress`);
 
+/** Публичная страница завершённого турнира (GET /rating/tournaments/:id/finished) */
+export const getPublicTournamentFinished = (
+  tournamentId: number
+): Promise<AxiosResponse<ApiResponse<TournamentFinishedPageData>>> =>
+  api.get(`/rating/tournaments/${tournamentId}/finished`);
+
 /** Публичная заявка команды на турнир (статус REGISTRATION) */
 export const registerTeamForTournamentPublic = (
   tournamentId: number,
@@ -148,6 +155,7 @@ export const tournamentsApi = {
 
   getTournamentRegistrationPublic: getPublicTournamentRegistration,
   getTournamentInProgressPublic: getPublicTournamentInProgress,
+  getTournamentFinishedPublic: getPublicTournamentFinished,
 };
 
 // === API АВТОРИЗАЦИИ ===
@@ -282,6 +290,11 @@ export const adminApi = {
     AxiosResponse<ApiResponse<TournamentRegistrationPageData>>
   > => api.get(`/admin/tournaments/${tournamentId}/in-progress`),
 
+  getTournamentFinishedPage: (
+    tournamentId: number
+  ): Promise<AxiosResponse<ApiResponse<TournamentFinishedPageData>>> =>
+    api.get(`/admin/tournaments/${tournamentId}/finished`),
+
   updateTournamentGroupMatch: (
     tournamentId: number,
     matchId: number,
@@ -312,6 +325,28 @@ export const adminApi = {
       data
     ),
 
+  /** Удалить тур швейцарки и все последующие (откат к предыдущему). */
+  rollbackSwissRound: (
+    tournamentId: number,
+    roundNumber: number
+  ): Promise<
+    AxiosResponse<ApiResponse<{ swiss: TournamentSwissStageView }>>
+  > =>
+    api.delete(
+      `/admin/tournaments/${tournamentId}/swiss/rounds/${roundNumber}`
+    ),
+
+  /** Сформировать следующий тур по итогам указанного завершённого. */
+  advanceSwissRound: (
+    tournamentId: number,
+    roundNumber: number
+  ): Promise<
+    AxiosResponse<ApiResponse<{ swiss: TournamentSwissStageView }>>
+  > =>
+    api.post(
+      `/admin/tournaments/${tournamentId}/swiss/rounds/${roundNumber}/advance`
+    ),
+
   startCupStage: (
     tournamentId: number,
     data: {
@@ -320,6 +355,7 @@ export const adminApi = {
       c?: number;
       d?: number;
       ab_playoff?: boolean;
+      third_place?: boolean;
     }
   ): Promise<
     AxiosResponse<
@@ -417,6 +453,31 @@ export const adminApi = {
     slots: RegisterTournamentSlotPayload[]
   ): Promise<AxiosResponse<ApiResponse<unknown>>> =>
     api.post(`/admin/tournaments/${tournamentId}/registration`, { slots }),
+
+  /** Импорт команд из CSV (формат как при скачивании) */
+  importTournamentRegistrationsFromCsv: (
+    tournamentId: number,
+    file: File
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        imported: number;
+        skipped_duplicates: number;
+        errors: string[];
+      }>
+    >
+  > => {
+    const formData = new FormData();
+    formData.append("registration_csv", file);
+    return api.post(
+      `/admin/tournaments/${tournamentId}/registration/import-csv`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000,
+      }
+    );
+  },
 
   // Подтвердить заявку команды на турнир
   confirmTournamentRegistration: (

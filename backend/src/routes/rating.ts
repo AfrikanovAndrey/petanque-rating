@@ -49,6 +49,12 @@ router.get(
   TournamentController.getPublicTournamentInProgress,
 );
 
+// GET /api/rating/tournaments/:id/finished — завершённый турнир (публичный доступ)
+router.get(
+  "/tournaments/:id/finished",
+  TournamentController.getPublicTournamentFinished,
+);
+
 // POST /api/rating/tournaments/:id/register-team — заявка команды (публичный доступ)
 router.post(
   "/tournaments/:id/register-team",

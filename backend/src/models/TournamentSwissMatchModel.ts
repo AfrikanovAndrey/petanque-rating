@@ -85,7 +85,7 @@ export class TournamentSwissMatchModel {
           f.is_bye ? 1 : 0,
           f.court,
           f.is_bye ? (f.score_a ?? 13) : null,
-          f.is_bye ? (f.score_b ?? 0) : null,
+          f.is_bye ? (f.score_b ?? 7) : null,
         );
         return "(?, ?, ?, ?, ?, ?, ?, ?)";
       })

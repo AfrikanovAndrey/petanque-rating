@@ -301,6 +301,34 @@ export class TournamentController {
   }
 
   // Получить турнир с результатами (публичный доступ)
+  /** Результаты кубков для страницы завершённого турнира (и getTournamentDetails). */
+  private static async getSortedCupResults(tournamentId: number) {
+    const results = await TournamentModel.getTournamentResults(tournamentId);
+    const filteredResults = results.filter((result) => result.cup);
+
+    const positionPriority: Record<CupPosition, number> = {
+      [CupPosition.WINNER]: 1,
+      [CupPosition.RUNNER_UP]: 2,
+      [CupPosition.THIRD_PLACE]: 3,
+      [CupPosition.ROUND_OF_4]: 4,
+      [CupPosition.ROUND_OF_8]: 5,
+      [CupPosition.ROUND_OF_16]: 6,
+    };
+
+    return filteredResults.sort((a, b) => {
+      if (a.cup !== b.cup) {
+        return a.cup!.localeCompare(b.cup!);
+      }
+      const aPriority = a.cup_position
+        ? positionPriority[a.cup_position] || 999
+        : 999;
+      const bPriority = b.cup_position
+        ? positionPriority[b.cup_position] || 999
+        : 999;
+      return aPriority - bPriority;
+    });
+  }
+
   static async getTournamentDetails(req: Request, res: Response) {
     const tournamentId = parseInt(req.params.id);
 
@@ -325,37 +353,8 @@ export class TournamentController {
           .json({ success: false, message: "Турнир не найден" });
       }
 
-      const results = await TournamentModel.getTournamentResults(tournamentId);
-
-      // Применяем фильтрацию по кубкам
-      const filteredResults = results.filter((result) => result.cup);
-
-      const sortedResults = filteredResults.sort((a, b) => {
-        // Порядок позиций по приоритету (лучшие позиции первыми)
-        const positionPriority: Record<CupPosition, number> = {
-          [CupPosition.WINNER]: 1,
-          [CupPosition.RUNNER_UP]: 2,
-          [CupPosition.THIRD_PLACE]: 3,
-          [CupPosition.ROUND_OF_4]: 4,
-          [CupPosition.ROUND_OF_8]: 5,
-          [CupPosition.ROUND_OF_16]: 6,
-        };
-
-        // Сначала сортируем по кубку (A, затем B)
-        if (a.cup !== b.cup) {
-          return a.cup!.localeCompare(b.cup!);
-        }
-
-        // Затем сортируем по приоритету позиции внутри одного кубка
-        const aPriority = a.cup_position
-          ? positionPriority[a.cup_position] || 999
-          : 999;
-        const bPriority = b.cup_position
-          ? positionPriority[b.cup_position] || 999
-          : 999;
-
-        return aPriority - bPriority;
-      });
+      const sortedResults =
+        await TournamentController.getSortedCupResults(tournamentId);
 
       res.json({
         success: true,
@@ -372,6 +371,62 @@ export class TournamentController {
       res
         .status(500)
         .json({ success: false, message: "Внутренняя ошибка сервера" });
+    }
+  }
+
+  /**
+   * Публичная страница завершённого турнира: сведения, заявки, итоги кубков.
+   */
+  static async getPublicTournamentFinished(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const tournamentId = parseInt(req.params.id);
+
+    if (isNaN(tournamentId)) {
+      res.status(400).json({ success: false, message: "Неверный ID турнира" });
+      return;
+    }
+
+    try {
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({ success: false, message: "Турнир не найден" });
+        return;
+      }
+
+      if (tournament.status !== TournamentStatus.FINISHED) {
+        res.status(400).json({
+          success: false,
+          message: "Страница доступна только для завершённых турниров",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+          { confirmedOnly: true },
+        );
+
+      const results =
+        await TournamentController.getSortedCupResults(tournamentId);
+
+      res.json({
+        success: true,
+        data: {
+          tournament,
+          teams,
+          results,
+        },
+      });
+    } catch (error) {
+      console.error("Ошибка публичной страницы завершённого турнира:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
     }
   }
 
@@ -510,6 +565,7 @@ export class TournamentController {
             court: m.court,
           })),
           tournament.swiss_rounds,
+          tournament.tiebreaker_order,
         );
       }
 
@@ -701,10 +757,35 @@ export class TournamentController {
       return;
     }
 
+    const result = await TournamentController.registerTeamWithSlots(
+      tournamentId,
+      ttype,
+      requestSlots,
+    );
+    if (!result.success) {
+      res.status(result.status).json({
+        success: false,
+        message: result.message,
+      });
+      return;
+    }
+    res.json({ success: true, message: "Команда успешно зарегистрирована" });
+  }
+
+  /**
+   * Зарегистрировать команду по слотам (общая логика для публичной/админской регистрации и CSV-импорта).
+   */
+  static async registerTeamWithSlots(
+    tournamentId: number,
+    ttype: TournamentType,
+    requestSlots: RegistrationRosterRequestSlot[],
+  ): Promise<
+    | { success: true; teamId: number }
+    | { success: false; status: number; message: string }
+  > {
     const shapeErr = validateRegistrationRequestSlotsShape(ttype, requestSlots);
     if (shapeErr) {
-      res.status(400).json({ success: false, message: shapeErr });
-      return;
+      return { success: false, status: 400, message: shapeErr };
     }
 
     const dbIdsOrdered: number[] = [];
@@ -715,11 +796,11 @@ export class TournamentController {
     }
     const uniqueDb = [...new Set(dbIdsOrdered)];
     if (uniqueDb.length !== dbIdsOrdered.length) {
-      res.status(400).json({
+      return {
         success: false,
+        status: 400,
         message: "Один игрок из базы указан в составе дважды",
-      });
-      return;
+      };
     }
 
     const hasNew = requestSlots.some((s) => s.kind === "new");
@@ -727,11 +808,11 @@ export class TournamentController {
       (s) => s.kind === "player" || s.kind === "new",
     );
     if (!hasFilled) {
-      res.status(400).json({
+      return {
         success: false,
+        status: 400,
         message: "Укажите хотя бы одного игрока",
-      });
-      return;
+      };
     }
 
     let lockKey = "";
@@ -750,11 +831,11 @@ export class TournamentController {
       const got = (lockRows[0] as { got?: number })?.got;
       if (got !== 1) {
         await connection.rollback();
-        res.status(503).json({
+        return {
           success: false,
+          status: 503,
           message: "Сервер занят, повторите попытку через несколько секунд",
-        });
-        return;
+        };
       }
       lockAcquired = true;
 
@@ -770,11 +851,11 @@ export class TournamentController {
         );
         if (playerRows.length !== uniqueDb.length) {
           await connection.rollback();
-          res.status(400).json({
+          return {
             success: false,
+            status: 400,
             message: "Один или несколько игроков не найдены",
-          });
-          return;
+          };
         }
         for (const r of playerRows) {
           const row = r as {
@@ -801,18 +882,17 @@ export class TournamentController {
       );
       if (rosterError) {
         await connection.rollback();
-        res.status(400).json({ success: false, message: rosterError });
-        return;
+        return { success: false, status: 400, message: rosterError };
       }
 
       const stored = buildStoredRosterFromRequestSlots(requestSlots, idToName);
       if (!stored) {
         await connection.rollback();
-        res.status(400).json({
+        return {
           success: false,
+          status: 400,
           message: "Не удалось разобрать состав команды",
-        });
-        return;
+        };
       }
 
       let teamId: number;
@@ -832,11 +912,11 @@ export class TournamentController {
       );
       if (already) {
         await connection.rollback();
-        res.status(409).json({
+        return {
           success: false,
+          status: 409,
           message: "Эта команда уже зарегистрирована на турнир",
-        });
-        return;
+        };
       }
 
       await TournamentRegistrationModel.addRegistration(
@@ -846,14 +926,15 @@ export class TournamentController {
         stored,
       );
       await connection.commit();
-      res.json({ success: true, message: "Команда успешно зарегистрирована" });
+      return { success: true, teamId };
     } catch (error) {
       await connection.rollback();
-      console.error("Ошибка публичной регистрации команды:", error);
-      res.status(500).json({
+      console.error("Ошибка регистрации команды:", error);
+      return {
         success: false,
+        status: 500,
         message: "Внутренняя ошибка сервера",
-      });
+      };
     } finally {
       if (lockAcquired && lockKey) {
         try {

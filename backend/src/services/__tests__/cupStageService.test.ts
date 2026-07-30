@@ -2,8 +2,10 @@ import {
   allocateCups,
   buildAbResultQualified,
   generateBracketFixtures,
-  pairFirstRound,
+  pairSeededBracket,
   rankTeamsFromGroups,
+  rankTeamsFromSwiss,
+  standardBracketSeedOrder,
   type CupStageConfig,
   type QualifiedTeam,
 } from "../cupStageService";
@@ -52,28 +54,91 @@ describe("rankTeamsFromGroups", () => {
   });
 });
 
-describe("pairFirstRound", () => {
-  it("максимально сводит первые со вторыми и избегает одной группы", () => {
-    const teams = [
-      team(11, 1, 1),
-      team(21, 2, 1),
-      team(31, 3, 1),
-      team(41, 4, 1),
-      team(51, 5, 1),
-      team(12, 1, 2),
-      team(22, 2, 2),
-      team(32, 3, 2),
-    ];
-    const pairs = pairFirstRound(teams);
-    expect(pairs).toHaveLength(4);
-    const p1vsp2 = pairs.filter(
-      ([a, b]) =>
-        (a.place === 1 && b.place === 2) || (a.place === 2 && b.place === 1),
+describe("rankTeamsFromSwiss", () => {
+  it("упорядочивает по месту итогов швейцарки", () => {
+    const ranked = rankTeamsFromSwiss([
+      { team_id: 3, place: 2, wins: 2, point_diff: 5, points_for: 20 },
+      { team_id: 1, place: 1, wins: 3, point_diff: 10, points_for: 30 },
+      { team_id: 2, place: 3, wins: 1, point_diff: -2, points_for: 15 },
+    ]);
+    expect(ranked.map((t) => t.team_id)).toEqual([1, 3, 2]);
+    expect(ranked[0].group_number).toBe(0);
+  });
+});
+
+describe("pairSeededBracket", () => {
+  it("для 8: ветки 1–8, 4–5 и 2–7, 3–6", () => {
+    expect(standardBracketSeedOrder(8)).toEqual([1, 8, 4, 5, 2, 7, 3, 6]);
+    const teams = Array.from({ length: 8 }, (_, i) =>
+      team(i + 1, 1, i + 1),
     );
-    expect(p1vsp2.length).toBeGreaterThanOrEqual(3);
-    for (const [a, b] of pairs) {
-      expect(a.group_number).not.toBe(b.group_number);
-    }
+    const pairs = pairSeededBracket(teams);
+    expect(pairs.map(([a, b]) => [a.team_id, b.team_id])).toEqual([
+      [1, 8],
+      [4, 5],
+      [2, 7],
+      [3, 6],
+    ]);
+  });
+
+  it("для 4: 1–4 и 2–3", () => {
+    expect(standardBracketSeedOrder(4)).toEqual([1, 4, 2, 3]);
+    const teams = Array.from({ length: 4 }, (_, i) =>
+      team(i + 1, 1, i + 1),
+    );
+    const pairs = pairSeededBracket(teams);
+    expect(pairs.map(([a, b]) => [a.team_id, b.team_id])).toEqual([
+      [1, 4],
+      [2, 3],
+    ]);
+  });
+
+  it("для 16: 1/8 сводит так, что 1/4 = 1–8, 4–5 | 2–7, 3–6", () => {
+    expect(standardBracketSeedOrder(16)).toEqual([
+      1, 16, 8, 9, 4, 13, 5, 12, 2, 15, 7, 10, 3, 14, 6, 11,
+    ]);
+    const teams = Array.from({ length: 16 }, (_, i) =>
+      team(i + 1, 1, i + 1),
+    );
+    const pairs = pairSeededBracket(teams);
+    expect(pairs.map(([a, b]) => [a.team_id, b.team_id])).toEqual([
+      [1, 16],
+      [8, 9],
+      [4, 13],
+      [5, 12],
+      [2, 15],
+      [7, 10],
+      [3, 14],
+      [6, 11],
+    ]);
+
+    const fixtures = generateBracketFixtures("A", teams, 1, {
+      thirdPlace: false,
+    });
+    const r1 = fixtures
+      .filter((f) => f.round_number === 1)
+      .sort((a, b) => a.match_index - b.match_index);
+    // Соседние матчи 1/8 кормят один четвертьфинал → при победах сидов
+    // в 1/4: 1–8, 4–5, 2–7, 3–6
+    const qfFeed = r1.map((f) => ({
+      pair: [f.team_a_id, f.team_b_id],
+      qf: f.next_match_index,
+      slot: f.next_slot,
+    }));
+    expect(qfFeed).toEqual([
+      { pair: [1, 16], qf: 0, slot: "a" },
+      { pair: [8, 9], qf: 0, slot: "b" },
+      { pair: [4, 13], qf: 1, slot: "a" },
+      { pair: [5, 12], qf: 1, slot: "b" },
+      { pair: [2, 15], qf: 2, slot: "a" },
+      { pair: [7, 10], qf: 2, slot: "b" },
+      { pair: [3, 14], qf: 3, slot: "a" },
+      { pair: [6, 11], qf: 3, slot: "b" },
+    ]);
+    const qf = fixtures
+      .filter((f) => f.round_number === 2)
+      .sort((a, b) => a.match_index - b.match_index);
+    expect(qf.map((f) => f.next_match_index)).toEqual([0, 0, 1, 1]);
   });
 });
 
@@ -111,7 +176,21 @@ describe("generateBracketFixtures", () => {
     const fixtures = generateBracketFixtures("A", teams, 1);
     expect(fixtures.filter((f) => !f.is_third_place)).toHaveLength(7);
     expect(fixtures.filter((f) => f.is_third_place)).toHaveLength(1);
-    expect(fixtures.filter((f) => f.round_number === 1)).toHaveLength(4);
+    const r1 = fixtures
+      .filter((f) => f.round_number === 1)
+      .sort((a, b) => a.match_index - b.match_index);
+    expect(r1).toHaveLength(4);
+    expect(r1.map((f) => [f.team_a_id, f.team_b_id])).toEqual([
+      [1, 8],
+      [4, 5],
+      [2, 7],
+      [3, 6],
+    ]);
+    // Ветки: (1–8, 4–5) → полуфинал 0; (2–7, 3–6) → полуфинал 1
+    expect(r1[0].next_match_index).toBe(0);
+    expect(r1[1].next_match_index).toBe(0);
+    expect(r1[2].next_match_index).toBe(1);
+    expect(r1[3].next_match_index).toBe(1);
     const semis = fixtures.filter(
       (f) => !f.is_third_place && f.round_number === 2,
     );
@@ -134,6 +213,28 @@ describe("generateBracketFixtures", () => {
     expect(r1[1].loser_next_match_round).toBe(2);
     expect(r1[1].loser_next_slot).toBe("b");
     expect(fixtures.filter((f) => f.is_third_place)).toHaveLength(1);
+  });
+
+  it("без thirdPlace не создаёт матч за 3 место и не ведёт проигравших SF", () => {
+    const teams = [
+      team(1, 1, 1),
+      team(2, 2, 1),
+      team(3, 3, 1),
+      team(4, 4, 1),
+      team(5, 1, 2),
+      team(6, 2, 2),
+      team(7, 3, 2),
+      team(8, 4, 2),
+    ];
+    const fixtures = generateBracketFixtures("A", teams, 1, {
+      thirdPlace: false,
+    });
+    expect(fixtures.filter((f) => !f.is_third_place)).toHaveLength(7);
+    expect(fixtures.filter((f) => f.is_third_place)).toHaveLength(0);
+    const semis = fixtures.filter(
+      (f) => !f.is_third_place && f.round_number === 2,
+    );
+    expect(semis.every((f) => f.loser_next_match_round == null)).toBe(true);
   });
 });
 
