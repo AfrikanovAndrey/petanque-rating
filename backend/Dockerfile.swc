@@ -3,59 +3,42 @@
 # Требует намного меньше памяти чем TypeScript (< 256 MB)
 # Использование: docker build -f Dockerfile.swc .
 # Кэш npm (--mount=type=cache) ускоряет повторные сборки; нужен BuildKit (Docker 23+ / compose v2 по умолчанию).
+# node_modules ставятся один раз в builder, затем npm prune — без второго npm ci в production
+# (на VPS с ~512 MB RAM повторный npm ci легко занимает 5+ минут).
 
 FROM node:18-alpine AS builder
 
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем package.json и package-lock.json
 COPY package*.json ./
 
-# Устанавливаем все зависимости строго по lock-файлу (включая dev для сборки SWC)
+# Меньше параллелизма и без audit/fund — экономия RAM/CPU на слабых VPS
 RUN --mount=type=cache,target=/root/.npm,id=npm-backend \
-    npm ci
+    npm ci --no-audit --no-fund --maxsockets=3
 
-# Копируем исходный код и конфигурацию SWC
 COPY . .
 
-# Компилируем TypeScript с использованием SWC (быстро и мало памяти)
-RUN npm run build:swc
+RUN npm run build:swc \
+ && npm prune --omit=dev --no-audit --no-fund
 
-# Production stage
+# Production stage: копируем уже собранное, без повторной установки зависимостей
 FROM node:18-alpine AS production
 
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем package.json и package-lock.json
 COPY package*.json ./
-
-# Production-зависимости по lock-файлу (typescript и ts-node уже в dependencies)
-RUN --mount=type=cache,target=/root/.npm,id=npm-backend \
-    npm ci --omit=dev
-
-# Копируем скомпилированный код из builder stage
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-
-# Копируем исходники для миграций (нужны для ts-node)
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-# Создаем пользователя для безопасности
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+RUN addgroup -g 1001 -S nodejs \
+ && adduser -S nodejs -u 1001 \
+ && mkdir -p /app/uploads \
+ && chown -R nodejs:nodejs /app
 
-# Создаем директорию для загрузок и назначаем права
-RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app/uploads
-RUN chown -R nodejs:nodejs /app
-
-# Переключаемся на пользователя nodejs
 USER nodejs
 
-# Открываем порт
 EXPOSE 3001
 
-# Команда запуска
 CMD ["npm", "start"]
-
