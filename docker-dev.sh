@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# BuildKit нужен для RUN --mount=type=cache в Dockerfile.swc
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
 # Цвета для вывода
 RED='\033[0;31m'
 GREEN='\033[0;32m'
