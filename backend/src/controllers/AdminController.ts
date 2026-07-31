@@ -39,8 +39,10 @@ import {
   rankTeamsFromGroups,
   rankTeamsFromSwiss,
   resolveCupThirdPlace,
+  resolveManualCupAllocation,
   validateCupStageConfig,
   type CupBracketCode,
+  type ManualCupPoolsInput,
   type QualifiedTeam,
 } from "../services/cupStageService";
 import {
@@ -2570,7 +2572,44 @@ export class AdminController {
         return;
       }
 
-      const allocation = allocateCups(ranked, config);
+      let allocation: ReturnType<typeof allocateCups>;
+      const rawManual = raw.manual_pools;
+      if (rawManual != null) {
+        if (typeof rawManual !== "object" || Array.isArray(rawManual)) {
+          res.status(400).json({
+            success: false,
+            message: "Некорректное ручное распределение (manual_pools)",
+          });
+          return;
+        }
+        const manualObj = rawManual as Record<string, unknown>;
+        const toIds = (key: string): number[] | undefined => {
+          const value = manualObj[key];
+          if (value === undefined || value === null) {
+            return undefined;
+          }
+          if (!Array.isArray(value)) {
+            return undefined;
+          }
+          return value.map((id) => Number(id));
+        };
+        const manual: ManualCupPoolsInput = {
+          AB: toIds("AB"),
+          A: toIds("A"),
+          B: toIds("B"),
+          C: toIds("C"),
+          D: toIds("D"),
+        };
+        const resolved = resolveManualCupAllocation(ranked, config, manual);
+        if (!resolved.ok) {
+          res.status(400).json({ success: false, message: resolved.error });
+          return;
+        }
+        allocation = resolved.allocation;
+      } else {
+        allocation = allocateCups(ranked, config);
+      }
+
       const fixtures = buildAllCupFixtures(allocation, config);
       await TournamentCupMatchModel.insertFixtures(tournamentId, fixtures);
 

@@ -7,6 +7,7 @@ import {
   rankTeamsFromGroups,
   rankTeamsFromSwiss,
   resolveCupThirdPlace,
+  resolveManualCupAllocation,
   standardBracketSeedOrder,
   type CupStageConfig,
   type QualifiedTeam,
@@ -267,6 +268,51 @@ describe("resolveCupThirdPlace", () => {
     };
     expect(resolveCupThirdPlace(off, "A")).toBe(false);
     expect(resolveCupThirdPlace(off, "B")).toBe(false);
+  });
+});
+
+describe("resolveManualCupAllocation", () => {
+  const ranked = Array.from({ length: 12 }, (_, i) =>
+    team(i + 1, (i % 4) + 1, Math.floor(i / 4) + 1),
+  );
+  const config: CupStageConfig = {
+    a: 8,
+    b: 4,
+    c: 0,
+    d: 0,
+    ab_playoff: false,
+  };
+
+  it("принимает ручной порядок посева в кубках", () => {
+    const resolved = resolveManualCupAllocation(ranked, config, {
+      A: [8, 7, 6, 5, 4, 3, 2, 1],
+      B: [12, 11, 10, 9],
+    });
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) {
+      return;
+    }
+    expect(resolved.allocation.A.map((t) => t.team_id)).toEqual([
+      8, 7, 6, 5, 4, 3, 2, 1,
+    ]);
+    expect(resolved.allocation.B.map((t) => t.team_id)).toEqual([
+      12, 11, 10, 9,
+    ]);
+  });
+
+  it("отклоняет дубликаты и неверный размер", () => {
+    expect(
+      resolveManualCupAllocation(ranked, config, {
+        A: [1, 2, 3, 4, 5, 6, 7, 1],
+        B: [9, 10, 11, 12],
+      }).ok,
+    ).toBe(false);
+    expect(
+      resolveManualCupAllocation(ranked, config, {
+        A: [1, 2, 3, 4, 5, 6, 7],
+        B: [9, 10, 11, 12],
+      }).ok,
+    ).toBe(false);
   });
 });
 

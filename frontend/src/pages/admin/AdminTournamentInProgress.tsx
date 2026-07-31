@@ -567,6 +567,34 @@ const AdminTournamentInProgress: React.FC = () => {
                 0
               ) ?? 0
         }
+        allowManual={tournament.play_format === TournamentPlayFormat.GROUPS}
+        candidates={
+          tournament.play_format === TournamentPlayFormat.GROUPS
+            ? (data.groups ?? []).flatMap((g) =>
+                g.teams
+                  .filter((t) => t.place > 0)
+                  .map((t) => ({
+                    team_id: t.team_id,
+                    players: t.players,
+                    group_number: g.group_number,
+                    place: t.place,
+                    wins: t.wins,
+                    point_diff: t.point_diff,
+                    points_for: t.points_for ?? 0,
+                  }))
+              )
+            : (data.swiss?.standings ?? [])
+                .filter((s) => !isSwissFreeTeamId(s.team_id) && s.place > 0)
+                .map((s) => ({
+                  team_id: s.team_id,
+                  players: s.players,
+                  group_number: 0,
+                  place: s.place,
+                  wins: s.wins,
+                  point_diff: s.point_diff,
+                  points_for: s.points_for,
+                }))
+        }
         onSuccess={() => {
           void queryClient.invalidateQueries([
             "tournamentInProgress",

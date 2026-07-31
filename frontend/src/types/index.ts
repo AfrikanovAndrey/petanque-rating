@@ -198,6 +198,7 @@ export interface TournamentGroupTeamStanding {
   players: string[];
   wins: number;
   point_diff: number;
+  points_for?: number;
   place: number;
   played: number;
 }

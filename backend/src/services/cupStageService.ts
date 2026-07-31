@@ -231,16 +231,22 @@ export function rankTeamsFromSwiss(
     }));
 }
 
-export function allocateCups(
-  ranked: QualifiedTeam[],
-  config: CupStageConfig,
-): {
+export type CupAllocation = {
   ab: QualifiedTeam[];
   A: QualifiedTeam[];
   B: QualifiedTeam[];
   C: QualifiedTeam[];
   D: QualifiedTeam[];
-} {
+};
+
+export type ManualCupPoolsInput = Partial<
+  Record<"AB" | "A" | "B" | "C" | "D", number[]>
+>;
+
+export function allocateCups(
+  ranked: QualifiedTeam[],
+  config: CupStageConfig,
+): CupAllocation {
   let offset = 0;
   const take = (n: number) => {
     const slice = ranked.slice(offset, offset + n);
@@ -264,6 +270,124 @@ export function allocateCups(
     B: take(config.b),
     C: take(config.c),
     D: take(config.d),
+  };
+}
+
+/**
+ * Ручное распределение по кубкам: массивы team_id в порядке посева (сид 1…N).
+ * Команды должны входить в квалификацию (`ranked`).
+ */
+export function resolveManualCupAllocation(
+  ranked: QualifiedTeam[],
+  config: CupStageConfig,
+  manual: ManualCupPoolsInput,
+): { ok: true; allocation: CupAllocation } | { ok: false; error: string } {
+  const byId = new Map(ranked.map((t) => [t.team_id, t]));
+  const seen = new Set<number>();
+
+  const resolvePool = (
+    ids: number[] | undefined,
+    expected: number,
+    label: string,
+  ): { teams: QualifiedTeam[] } | { error: string } => {
+    const list = ids ?? [];
+    if (expected === 0) {
+      if (list.length > 0) {
+        return {
+          error: `${label}: для выбранного конфига слотов быть не должно`,
+        };
+      }
+      return { teams: [] };
+    }
+    if (list.length !== expected) {
+      return {
+        error: `${label}: нужно ${expected} команд, указано ${list.length}`,
+      };
+    }
+    const teams: QualifiedTeam[] = [];
+    for (const rawId of list) {
+      const id = Number(rawId);
+      if (!Number.isInteger(id) || id <= 0) {
+        return { error: `${label}: некорректный id команды` };
+      }
+      if (seen.has(id)) {
+        return { error: `Команда #${id} указана в нескольких слотах` };
+      }
+      const team = byId.get(id);
+      if (!team) {
+        return {
+          error: `Команда #${id} не входит в квалификацию группового/швейцарского этапа`,
+        };
+      }
+      seen.add(id);
+      teams.push(team);
+    }
+    return { teams };
+  };
+
+  if (config.ab_playoff) {
+    const ab = resolvePool(manual.AB, 16, "Стык AB");
+    if ("error" in ab) {
+      return { ok: false, error: ab.error };
+    }
+    const A = resolvePool(manual.A, 0, "Кубок A");
+    if ("error" in A) {
+      return { ok: false, error: A.error };
+    }
+    const B = resolvePool(manual.B, 0, "Кубок B");
+    if ("error" in B) {
+      return { ok: false, error: B.error };
+    }
+    const C = resolvePool(manual.C, config.c, "Кубок C");
+    if ("error" in C) {
+      return { ok: false, error: C.error };
+    }
+    const D = resolvePool(manual.D, config.d, "Кубок D");
+    if ("error" in D) {
+      return { ok: false, error: D.error };
+    }
+    return {
+      ok: true,
+      allocation: {
+        ab: ab.teams,
+        A: [],
+        B: [],
+        C: C.teams,
+        D: D.teams,
+      },
+    };
+  }
+
+  const A = resolvePool(manual.A, config.a, "Кубок A");
+  if ("error" in A) {
+    return { ok: false, error: A.error };
+  }
+  const B = resolvePool(manual.B, config.b, "Кубок B");
+  if ("error" in B) {
+    return { ok: false, error: B.error };
+  }
+  const C = resolvePool(manual.C, config.c, "Кубок C");
+  if ("error" in C) {
+    return { ok: false, error: C.error };
+  }
+  const D = resolvePool(manual.D, config.d, "Кубок D");
+  if ("error" in D) {
+    return { ok: false, error: D.error };
+  }
+  const ab = resolvePool(manual.AB, 0, "Стык AB");
+  if ("error" in ab) {
+    return { ok: false, error: ab.error };
+  }
+
+  return {
+    ok: true,
+    allocation: {
+      ab: [],
+      A: A.teams,
+      B: B.teams,
+      C: C.teams,
+      D: D.teams,
+    },
   };
 }
 

@@ -358,6 +358,10 @@ export const adminApi = {
       third_place?:
         | boolean
         | Partial<Record<"A" | "B" | "C" | "D", boolean>>;
+      /** Ручное распределение: team_id в порядке посева */
+      manual_pools?: Partial<
+        Record<"AB" | "A" | "B" | "C" | "D", number[]>
+      >;
     }
   ): Promise<
     AxiosResponse<
