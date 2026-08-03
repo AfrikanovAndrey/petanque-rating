@@ -377,6 +377,14 @@ export const adminApi = {
   ): Promise<AxiosResponse<ApiResponse<{ cups: TournamentCupStageView[] }>>> =>
     api.delete(`/admin/tournaments/${tournamentId}/cup-stage`),
 
+  finishTournamentFromCupStage: (
+    tournamentId: number
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{ tournament_id: number; results_count: number }>
+    >
+  > => api.post(`/admin/tournaments/${tournamentId}/cup-stage/finish`),
+
   updateTournamentCupMatch: (
     tournamentId: number,
     matchId: number,

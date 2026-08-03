@@ -1,4 +1,4 @@
-import { CheckIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon } from "@heroicons/react/24/outline";
 import React, { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useMutation, useQueryClient } from "react-query";
@@ -15,6 +15,8 @@ type Props = {
   groups: TournamentGroupStageView[];
   /** Только просмотр (публичная страница) */
   readOnly?: boolean;
+  /** Свернуть блок по умолчанию */
+  defaultCollapsed?: boolean;
 };
 
 function formatDiff(diff: number): string {
@@ -575,6 +577,7 @@ export const TournamentGroupStageResults: React.FC<Props> = ({
   tournamentId,
   groups,
   readOnly = false,
+  defaultCollapsed = false,
 }) => {
   const sortedGroups = useMemo(
     () =>
@@ -582,6 +585,7 @@ export const TournamentGroupStageResults: React.FC<Props> = ({
     [groups]
   );
 
+  const [sectionOpen, setSectionOpen] = useState(!defaultCollapsed);
   const [activeGroupNumber, setActiveGroupNumber] = useState<number | null>(
     null
   );
@@ -601,50 +605,64 @@ export const TournamentGroupStageResults: React.FC<Props> = ({
   }
 
   return (
-    <div className="card p-6 space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">Групповой этап</h2>
-        {readOnly && tournamentId != null && (
-          <p className="mt-1 text-sm text-gray-500">
-            Финал уже начат — результаты групп только для просмотра
-          </p>
-        )}
-      </div>
-
-      <div
-        className="flex flex-wrap gap-1 border-b border-gray-200"
-        role="tablist"
-        aria-label="Группы"
+    <div className="card overflow-hidden">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left hover:bg-gray-50"
+        aria-expanded={sectionOpen}
+        onClick={() => setSectionOpen((open) => !open)}
       >
-        {sortedGroups.map((group) => {
-          const letter = getGroupLetter(group.group_number);
-          const isActive = group.group_number === selectedGroupNumber;
-          return (
-            <button
-              key={group.group_number}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                isActive
-                  ? "border-primary-600 text-primary-700"
-                  : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
-              }`}
-              onClick={() => setActiveGroupNumber(group.group_number)}
-            >
-              Группа {letter}
-            </button>
-          );
-        })}
-      </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Групповой этап</h2>
+          {readOnly && (
+            <p className="mt-1 text-sm text-gray-500">Только просмотр</p>
+          )}
+        </div>
+        {sectionOpen ? (
+          <ChevronUpIcon className="h-5 w-5 shrink-0 text-gray-500" />
+        ) : (
+          <ChevronDownIcon className="h-5 w-5 shrink-0 text-gray-500" />
+        )}
+      </button>
 
-      {activeGroup && (
-        <div role="tabpanel" className="pt-2">
-          <GroupResultsPanel
-            tournamentId={tournamentId}
-            group={activeGroup}
-            readOnly={readOnly}
-          />
+      {sectionOpen && (
+        <div className="space-y-4 border-t border-gray-200 px-6 py-4">
+          <div
+            className="flex flex-wrap gap-1 border-b border-gray-200"
+            role="tablist"
+            aria-label="Группы"
+          >
+            {sortedGroups.map((group) => {
+              const letter = getGroupLetter(group.group_number);
+              const isActive = group.group_number === selectedGroupNumber;
+              return (
+                <button
+                  key={group.group_number}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    isActive
+                      ? "border-primary-600 text-primary-700"
+                      : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                  }`}
+                  onClick={() => setActiveGroupNumber(group.group_number)}
+                >
+                  Группа {letter}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeGroup && (
+            <div role="tabpanel" className="pt-2">
+              <GroupResultsPanel
+                tournamentId={tournamentId}
+                group={activeGroup}
+                readOnly={readOnly}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

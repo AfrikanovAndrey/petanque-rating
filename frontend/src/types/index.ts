@@ -181,6 +181,10 @@ export interface TournamentFinishedPageData {
   tournament: Tournament;
   teams: TournamentRegisteredTeam[];
   results: TournamentResult[];
+  /** Есть только если турнир проводился в системе (не ручная загрузка файла) */
+  groups?: TournamentGroupStageView[];
+  swiss?: TournamentSwissStageView | null;
+  cups?: TournamentCupStageView[];
 }
 
 export interface TournamentGroupMatchView {

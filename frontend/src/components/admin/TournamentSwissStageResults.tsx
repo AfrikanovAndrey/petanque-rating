@@ -42,6 +42,12 @@ function teamLabel(players: string[]): string {
   return players.join(", ") || "Команда";
 }
 
+/** В турах — только первый игрок (ФИО капитана/заявки). */
+function teamRoundLabel(players: string[]): string {
+  const first = players[0]?.trim();
+  return first || "Команда";
+}
+
 function formatDiff(diff: number): string {
   if (diff > 0) {
     return `+${diff}`;
@@ -606,7 +612,7 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
   const nameById = useMemo(() => {
     const map = new Map<number, string>();
     for (const row of swiss.standings) {
-      map.set(row.team_id, teamLabel(row.players));
+      map.set(row.team_id, teamRoundLabel(row.players));
     }
     return map;
   }, [swiss.standings]);

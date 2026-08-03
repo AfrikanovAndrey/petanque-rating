@@ -273,6 +273,21 @@ router.delete(
   AdminController.resetCupStage,
 );
 
+// POST /api/admin/tournaments/:tournamentId/cup-stage/finish
+router.post(
+  "/tournaments/:tournamentId/cup-stage/finish",
+  requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
+  auditLog({
+    action: "FINISH_TOURNAMENT_FROM_CUPS",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Завершение турнира ID ${req.params.tournamentId} по итогам кубков`,
+  }),
+  AdminController.finishTournamentFromCupStage,
+);
+
 // PUT /api/admin/tournaments/:tournamentId/cup-matches/:matchId
 router.put(
   "/tournaments/:tournamentId/cup-matches/:matchId",

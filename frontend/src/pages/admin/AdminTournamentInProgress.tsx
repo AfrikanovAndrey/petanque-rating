@@ -115,6 +115,60 @@ const AdminTournamentInProgress: React.FC = () => {
     [fullRating]
   );
 
+  const cupsComplete = useMemo(() => {
+    if (!data?.cups || data.cups.length === 0) {
+      return false;
+    }
+    const allMatches = data.cups.flatMap((c) => c.matches);
+    if (allMatches.length === 0) {
+      return false;
+    }
+    const allScored = allMatches.every(
+      (m) =>
+        m.team_a_id != null &&
+        m.team_b_id != null &&
+        m.score_a != null &&
+        m.score_b != null
+    );
+    if (!allScored) {
+      return false;
+    }
+    const hasAb = data.cups.some((c) => c.cup === "AB");
+    if (hasAb) {
+      const hasA = data.cups.some((c) => c.cup === "A");
+      const hasB = data.cups.some((c) => c.cup === "B");
+      if (!hasA || !hasB) {
+        return false;
+      }
+    }
+    return true;
+  }, [data?.cups]);
+
+  const finishFromCupsMutation = useMutation(
+    () => adminApi.finishTournamentFromCupStage(tournamentId),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success(
+            res.data.message ||
+              "Турнир завершён. Очки ждут признания в админке."
+          );
+          void queryClient.invalidateQueries("tournaments");
+          void queryClient.removeQueries([
+            "tournamentInProgress",
+            tournamentId,
+          ]);
+          navigate(`/admin/tournaments/${tournamentId}/finished`);
+        } else {
+          toast.error(res.data.message || "Не удалось завершить турнир");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
   if (!Number.isFinite(tournamentId) || tournamentId <= 0) {
     return (
       <div className="space-y-4">
@@ -515,32 +569,55 @@ const AdminTournamentInProgress: React.FC = () => {
                 Начать финальную часть
               </button>
             ) : (
-              <button
-                type="button"
-                className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Сбросить финальную часть? Все счета кубков будут удалены."
-                    )
-                  ) {
-                    return;
-                  }
-                  void adminApi.resetCupStage(tournamentId).then((res) => {
-                    if (res.data.success) {
-                      toast.success("Финал сброшен");
-                      void queryClient.invalidateQueries([
-                        "tournamentInProgress",
-                        tournamentId,
-                      ]);
-                    } else {
-                      toast.error(res.data.message || "Не удалось сбросить");
+              <>
+                <button
+                  type="button"
+                  className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Сбросить финальную часть? Все счета кубков будут удалены."
+                      )
+                    ) {
+                      return;
                     }
-                  });
-                }}
-              >
-                Сбросить финал
-              </button>
+                    void adminApi.resetCupStage(tournamentId).then((res) => {
+                      if (res.data.success) {
+                        toast.success("Финал сброшен");
+                        void queryClient.invalidateQueries([
+                          "tournamentInProgress",
+                          tournamentId,
+                        ]);
+                      } else {
+                        toast.error(res.data.message || "Не удалось сбросить");
+                      }
+                    });
+                  }}
+                >
+                  Сбросить финал
+                </button>
+                {cupsComplete && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                    disabled={finishFromCupsMutation.isLoading}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          "Завершить турнир? Будут рассчитаны очки по итогам кубков. Для попадания в рейтинг результаты нужно будет признать в админке."
+                        )
+                      ) {
+                        return;
+                      }
+                      finishFromCupsMutation.mutate();
+                    }}
+                  >
+                    {finishFromCupsMutation.isLoading
+                      ? "Завершение…"
+                      : "Завершить турнир"}
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

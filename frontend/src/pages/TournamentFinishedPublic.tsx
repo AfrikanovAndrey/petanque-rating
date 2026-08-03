@@ -9,6 +9,9 @@ import { useQuery } from "react-query";
 import { Link, useParams } from "react-router-dom";
 import RegulationsMarkdown from "../components/RegulationsMarkdown";
 import TournamentFinishedCupResults from "../components/TournamentFinishedCupResults";
+import TournamentGroupStageResults from "../components/admin/TournamentGroupStageResults";
+import TournamentCupStageResults from "../components/admin/TournamentCupStageResults";
+import TournamentSwissStageResults from "../components/admin/TournamentSwissStageResults";
 import { getPublicTournamentFinished, ratingApi } from "../services/api";
 import { TournamentStatus, TournamentType } from "../types";
 import {
@@ -112,7 +115,7 @@ const TournamentFinishedPublic: React.FC = () => {
     return null;
   }
 
-  const { tournament, teams, results } = data;
+  const { tournament, teams, results, groups, swiss, cups } = data;
 
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
@@ -298,6 +301,32 @@ const TournamentFinishedPublic: React.FC = () => {
             </div>
           ))}
       </div>
+
+      {groups && groups.length > 0 && (
+        <TournamentGroupStageResults
+          groups={groups}
+          readOnly
+          defaultCollapsed
+        />
+      )}
+
+      {swiss && (
+        <TournamentSwissStageResults
+          swiss={swiss}
+          readOnly
+          defaultCollapsed
+          tournamentName={tournament.name}
+        />
+      )}
+
+      {cups && cups.length > 0 && (
+        <TournamentCupStageResults
+          cups={cups}
+          readOnly
+          defaultCollapsed
+          tournamentName={tournament.name}
+        />
+      )}
 
       <div className="bg-white rounded-lg shadow p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">

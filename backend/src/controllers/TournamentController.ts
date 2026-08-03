@@ -26,6 +26,7 @@ import { TournamentRegistrationModel } from "../models/TournamentRegistrationMod
 import { GoogleSheetsService } from "../services/GoogleSheetsService";
 import { buildGroupStageViews } from "../services/groupStageService";
 import { buildSwissStageView } from "../services/swissStageService";
+import { loadPlayStageSnapshot } from "../services/tournamentStageViews";
 import {
   Cup,
   CupPosition,
@@ -413,12 +414,20 @@ export class TournamentController {
       const results =
         await TournamentController.getSortedCupResults(tournamentId);
 
+      const { groups, swiss, cups } = await loadPlayStageSnapshot(
+        tournament,
+        teams,
+      );
+
       res.json({
         success: true,
         data: {
           tournament,
           teams,
           results,
+          groups,
+          swiss,
+          cups,
         },
       });
     } catch (error) {

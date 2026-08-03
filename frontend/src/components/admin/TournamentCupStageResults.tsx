@@ -1,4 +1,4 @@
-import { CheckIcon, PencilIcon, PrinterIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon, PrinterIcon } from "@heroicons/react/24/outline";
 import React, { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useMutation, useQueryClient } from "react-query";
@@ -18,6 +18,8 @@ type Props = {
   showPrint?: boolean;
   /** Название турнира для шапки печати */
   tournamentName?: string;
+  /** Свернуть блок по умолчанию */
+  defaultCollapsed?: boolean;
 };
 
 const MATCH_H = 56;
@@ -30,7 +32,8 @@ function teamLabel(players: string[]): string {
   if (!players.length) {
     return "Будет определен";
   }
-  return players.join(", ");
+  const first = players[0]?.trim();
+  return first || "Будет определен";
 }
 
 function matchWinnerPlayers(
@@ -1000,6 +1003,7 @@ export const TournamentCupStageResults: React.FC<Props> = ({
   readOnly = false,
   showPrint = false,
   tournamentName,
+  defaultCollapsed = false,
 }) => {
   const sorted = useMemo(() => {
     const order: CupBracketCode[] = ["AB", "A", "B", "C", "D"];
@@ -1008,6 +1012,7 @@ export const TournamentCupStageResults: React.FC<Props> = ({
     );
   }, [cups]);
 
+  const [sectionOpen, setSectionOpen] = useState(!defaultCollapsed);
   const [activeCup, setActiveCup] = useState<CupBracketCode | null>(null);
   const selected =
     activeCup && sorted.some((c) => c.cup === activeCup)
@@ -1034,51 +1039,68 @@ export const TournamentCupStageResults: React.FC<Props> = ({
   }
 
   return (
-    <div className="card space-y-4 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-gray-900">Финал</h2>
-        {showPrint && active && (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            onClick={printActiveCup}
-          >
-            <PrinterIcon className="h-4 w-4" aria-hidden />
-            Печать
-          </button>
-        )}
-      </div>
-      <div
-        className="flex flex-wrap gap-1 border-b border-gray-200"
-        role="tablist"
+    <div className="card overflow-hidden">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left hover:bg-gray-50"
+        aria-expanded={sectionOpen}
+        onClick={() => setSectionOpen((open) => !open)}
       >
-        {sorted.map((c) => {
-          const isActive = c.cup === selected;
-          return (
-            <button
-              key={c.cup}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "border-primary-600 text-primary-700"
-                  : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
-              }`}
-              onClick={() => setActiveCup(c.cup)}
-            >
-              {cupTabLabel(c.cup)}
-            </button>
-          );
-        })}
-      </div>
-      {active && (
-        <div role="tabpanel" className="pt-2">
-          <CupBracketPanel
-            tournamentId={tournamentId}
-            cupView={active}
-            readOnly={readOnly}
-          />
+        <h2 className="text-lg font-semibold text-gray-900">Финал</h2>
+        {sectionOpen ? (
+          <ChevronUpIcon className="h-5 w-5 shrink-0 text-gray-500" />
+        ) : (
+          <ChevronDownIcon className="h-5 w-5 shrink-0 text-gray-500" />
+        )}
+      </button>
+
+      {sectionOpen && (
+        <div className="space-y-4 border-t border-gray-200 px-6 py-4">
+          {showPrint && active && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={printActiveCup}
+              >
+                <PrinterIcon className="h-4 w-4" aria-hidden />
+                Печать
+              </button>
+            </div>
+          )}
+          <div
+            className="flex flex-wrap gap-1 border-b border-gray-200"
+            role="tablist"
+          >
+            {sorted.map((c) => {
+              const isActive = c.cup === selected;
+              return (
+                <button
+                  key={c.cup}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "border-primary-600 text-primary-700"
+                      : "border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900"
+                  }`}
+                  onClick={() => setActiveCup(c.cup)}
+                >
+                  {cupTabLabel(c.cup)}
+                </button>
+              );
+            })}
+          </div>
+          {active && (
+            <div role="tabpanel" className="pt-2">
+              <CupBracketPanel
+                tournamentId={tournamentId}
+                cupView={active}
+                readOnly={readOnly}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

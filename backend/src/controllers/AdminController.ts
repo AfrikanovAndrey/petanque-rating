@@ -21,6 +21,7 @@ import {
   appendSwissFreeSeedIfOdd,
   buildSwissStageView,
   isRoundComplete,
+  isSwissFreeTeamId,
   nextCourtStart,
   pairNextRoundByScoreGroups,
   pairRound1HalfMethod,
@@ -30,6 +31,7 @@ import {
   type SwissSeedEntry,
 } from "../services/swissStageService";
 import { computeTeamRatingsForSwiss } from "../services/swissTeamRating";
+import { getPoints } from "../config/cupPoints";
 import {
   allocateCups,
   buildAbResultQualified,
@@ -46,12 +48,21 @@ import {
   type QualifiedTeam,
 } from "../services/cupStageService";
 import {
+  areCupMatchesComplete,
+  cupSizeForTeam,
+  cupWinsLosesModifiers,
+  deriveCupPlacements,
+} from "../services/cupFinishService";
+import { loadPlayStageSnapshot } from "../services/tournamentStageViews";
+import {
   performGroupDraw,
   validateManualGroupDraw,
   validatePlaySettings,
   type TournamentPlaySettingsInput,
 } from "../services/tournamentPlaySettings";
 import {
+  Cup,
+  CupPosition,
   CupStageConfig,
   LicensedPlayerUploadData,
   TiebreakerCriterion,
@@ -1459,12 +1470,20 @@ export class AdminController {
         return aPriority - bPriority;
       });
 
+      const { groups, swiss, cups } = await loadPlayStageSnapshot(
+        tournament,
+        teams,
+      );
+
       res.json({
         success: true,
         data: {
           tournament,
           teams,
           results: sortedResults,
+          groups,
+          swiss,
+          cups,
         },
       });
     } catch (error) {
@@ -2672,6 +2691,267 @@ export class AdminController {
         success: false,
         message: "Внутренняя ошибка сервера",
       });
+    }
+  }
+
+  /**
+   * Завершить турнир по итогам кубков: места → очки (как при загрузке Excel),
+   * статус FINISHED, признание очков — отдельно в админке.
+   */
+  static async finishTournamentFromCupStage(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const connection = await pool.getConnection();
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      if (isNaN(tournamentId)) {
+        res.status(400).json({ success: false, message: "Неверный ID турнира" });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({ success: false, message: "Турнир не найден" });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Завершение доступно только в статусе «В процессе»",
+        });
+        return;
+      }
+
+      const cupMatches =
+        await TournamentCupMatchModel.listByTournament(tournamentId);
+      if (!areCupMatchesComplete(cupMatches)) {
+        res.status(400).json({
+          success: false,
+          message: "Сначала введите результаты всех матчей финальной части",
+        });
+        return;
+      }
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+
+      type QualRow = {
+        team_id: number;
+        wins: number;
+        loses: number;
+        player_count: number;
+      };
+      const qualifying = new Map<number, QualRow>();
+
+      if (tournament.play_format === TournamentPlayFormat.GROUPS) {
+        if (!tournament.group_draw?.length) {
+          res.status(400).json({
+            success: false,
+            message: "Нет жеребьёвки групп",
+          });
+          return;
+        }
+        const groupMatches =
+          await TournamentGroupMatchModel.listByTournament(tournamentId);
+        const groups = buildGroupStageViews(
+          tournament.group_draw,
+          teams,
+          groupMatches,
+        );
+        for (const g of groups) {
+          for (const t of g.teams) {
+            if (t.place <= 0) {
+              continue;
+            }
+            const loses = Math.max(0, t.played - t.wins);
+            qualifying.set(t.team_id, {
+              team_id: t.team_id,
+              wins: t.wins,
+              loses,
+              player_count:
+                teams.find((r) => r.team_id === t.team_id)?.player_ids
+                  ?.length ?? 0,
+            });
+          }
+        }
+      } else if (tournament.play_format === TournamentPlayFormat.SWISS) {
+        if (!tournament.swiss_seed?.length || !tournament.swiss_rounds) {
+          res.status(400).json({
+            success: false,
+            message: "Швейцарка не сформирована",
+          });
+          return;
+        }
+        const swissMatches =
+          await TournamentSwissMatchModel.listByTournament(tournamentId);
+        const swiss = buildSwissStageView(
+          tournament.swiss_seed,
+          teams,
+          AdminController.swissRowsToViews(swissMatches),
+          tournament.swiss_rounds,
+          tournament.tiebreaker_order,
+        );
+        for (const s of swiss.standings) {
+          if (isSwissFreeTeamId(s.team_id) || s.place <= 0) {
+            continue;
+          }
+          qualifying.set(s.team_id, {
+            team_id: s.team_id,
+            wins: s.wins,
+            loses: Math.max(0, s.played - s.wins),
+            player_count:
+              teams.find((r) => r.team_id === s.team_id)?.player_ids?.length ??
+              0,
+          });
+        }
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "Неизвестный формат квалификации",
+        });
+        return;
+      }
+
+      if (qualifying.size === 0) {
+        res.status(400).json({
+          success: false,
+          message: "Нет команд квалификации для записи результатов",
+        });
+        return;
+      }
+
+      const placements = deriveCupPlacements(cupMatches);
+      const categoryEnum =
+        String(tournament.category).toUpperCase() === "REGIONAL" ||
+        String(tournament.category) === "2"
+          ? TournamentCategoryEnum.REGIONAL
+          : TournamentCategoryEnum.FEDERAL;
+      const tournamentType = tournament.type as TournamentType;
+
+      const rawDate = tournament.date as unknown;
+      const dateStr =
+        rawDate instanceof Date
+          ? `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, "0")}-${String(rawDate.getDate()).padStart(2, "0")}`
+          : String(rawDate).slice(0, 10);
+
+      await connection.beginTransaction();
+
+      await connection.execute(
+        "DELETE FROM tournament_results WHERE tournament_id = ?",
+        [tournamentId],
+      );
+      await TournamentModel.clearResultsValidation(tournamentId, connection);
+
+      const effectiveTeams =
+        await TournamentModel.getEffectiveTeamsCount(
+          tournamentId,
+          dateStr,
+          tournamentType,
+        );
+
+      for (const q of qualifying.values()) {
+        const placement = placements.get(q.team_id);
+        let cup: Cup | undefined;
+        let cupPosition: CupPosition | undefined;
+        let wins = q.wins;
+        let loses = q.loses;
+
+        if (placement) {
+          cup = placement.cup;
+          cupPosition = placement.position;
+          const size = cupSizeForTeam(cupMatches, cup);
+          const { winsModifier, losesModifier } = cupWinsLosesModifiers(
+            size,
+            cupPosition,
+          );
+          wins = q.wins + winsModifier;
+          loses = q.loses + losesModifier;
+        }
+
+        const playerCount =
+          q.player_count ||
+          teams.find((t) => t.team_id === q.team_id)?.player_ids?.length ||
+          0;
+
+        const points = getPoints(
+          tournamentType,
+          categoryEnum,
+          cup,
+          cupPosition,
+          Math.max(effectiveTeams, qualifying.size),
+          q.wins,
+          playerCount,
+        );
+
+        await TournamentModel.addTournamentResult(
+          tournamentId,
+          q.team_id,
+          wins,
+          loses,
+          cupPosition,
+          cup,
+          q.wins,
+          points,
+          connection,
+        );
+      }
+
+      await connection.execute(
+        "UPDATE tournaments SET status = ?, manual = 0 WHERE id = ?",
+        [TournamentStatus.FINISHED, tournamentId],
+      );
+
+      await connection.commit();
+
+      // Парный турнир в тот же день — пересчёт очков
+      const isDoublette =
+        tournamentType === TournamentType.DOUBLETTE_MALE ||
+        tournamentType === TournamentType.DOUBLETTE_FEMALE;
+      const isTetATet =
+        tournamentType === TournamentType.TET_A_TET_MALE ||
+        tournamentType === TournamentType.TET_A_TET_FEMALE;
+      if (isDoublette || isTetATet) {
+        const pairType = isDoublette
+          ? tournamentType === TournamentType.DOUBLETTE_MALE
+            ? TournamentType.DOUBLETTE_FEMALE
+            : TournamentType.DOUBLETTE_MALE
+          : tournamentType === TournamentType.TET_A_TET_MALE
+            ? TournamentType.TET_A_TET_FEMALE
+            : TournamentType.TET_A_TET_MALE;
+        const [pairRows] = await pool.execute<RowDataPacket[]>(
+          `SELECT id FROM tournaments WHERE date = ? AND type = ? AND id != ?`,
+          [dateStr, pairType, tournamentId],
+        );
+        if (pairRows.length > 0) {
+          await TournamentModel.recalculateTournamentPoints(
+            Number(pairRows[0].id),
+          );
+        }
+      }
+
+      res.json({
+        success: true,
+        message:
+          "Турнир завершён. Очки рассчитаны; для рейтинга нужно признание результатов в админке.",
+        data: {
+          tournament_id: tournamentId,
+          results_count: qualifying.size,
+        },
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error("Ошибка завершения турнира по кубкам:", error);
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Внутренняя ошибка сервера",
+      });
+    } finally {
+      connection.release();
     }
   }
 
