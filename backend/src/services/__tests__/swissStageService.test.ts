@@ -156,7 +156,7 @@ describe("pairNextRoundByScoreGroups", () => {
     expect(pairs).toEqual(["1-5", "2-6", "3-7", "4-8"]);
   });
 
-  it("при нечётной score-группе floater вниз; Direct + «Свободен»", () => {
+  it("нечётная score-группа: floater ↔ лучший нижней; Direct + «Свободен»", () => {
     const seeds = seedsFromIds([1, 2, 3, 4, 5]);
     // Тур 1 (с «Свободен»): 1–4, 2–5, 3–Свободен → wins: 1,2,3=1; 4,5,FREE=0
     const round1: SwissMatchScores[] = [
@@ -185,19 +185,96 @@ describe("pairNextRoundByScoreGroups", () => {
         is_bye: true,
       },
     ];
-    // пул wins=1: 1,2,3 → floater 3 вниз
-    // wins=1: 1–2; wins=0: [3,4,5,FREE] Direct → 3–5, 4–Свободен
+    // wins=1: 1,2,3 → floater 3 ↔ лучший wins=0 (4)
+    // wins=1 Direct: 1–2; wins=0: [5,FREE] → 5–Свободен
     const round2 = pairNextRoundByScoreGroups(seeds, round1, 2);
     const real = round2
       .filter((f) => !f.is_bye)
       .map((f) => [f.team_a_id, f.team_b_id!].sort((a, b) => a - b).join("-"))
       .sort();
     const free = round2.filter((f) => f.is_bye);
-    expect(real).toEqual(["1-2", "3-5"]);
+    expect(real).toEqual(["1-2", "3-4"]);
     expect(free).toHaveLength(1);
-    expect(free[0].team_a_id).toBe(4);
+    expect(free[0].team_a_id).toBe(5);
     expect(free[0].score_a).toBe(13);
     expect(free[0].score_b).toBe(7);
+  });
+
+  it("floater не вливается в нижнюю группу: 3↔4, Direct 1–2 и 5–6", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4, 5, 6]);
+    const round1: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 5,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 3,
+        team_b_id: 6,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+    ];
+    // wins=1: 1,2,3 (нечёт) → floater 3 ↔ 4; Direct 1–2
+    // wins=0: 5,6 → Direct 5–6
+    // (старая логика давала бы 3 внизу и пары вроде 3–5)
+    const round2 = pairNextRoundByScoreGroups(seeds, round1, 2);
+    const pairs = round2
+      .filter((f) => !f.is_bye)
+      .map((f) => [f.team_a_id, f.team_b_id!].sort((a, b) => a - b).join("-"))
+      .sort();
+    expect(pairs).toEqual(["1-2", "3-4", "5-6"]);
+  });
+
+  it("если floater уже играл с лучшим нижней — берёт следующего", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4, 5, 6]);
+    const round1: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 5,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 6,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 3,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+    ];
+    // wins=1: 1,2,3; wins=0: 4,5,6
+    // floater 3 уже играл с 4 → пара 3–5; Direct 1–2 и 4–6
+    const round2 = pairNextRoundByScoreGroups(seeds, round1, 2);
+    const pairs = round2
+      .filter((f) => !f.is_bye)
+      .map((f) => [f.team_a_id, f.team_b_id!].sort((a, b) => a - b).join("-"))
+      .sort();
+    expect(pairs).toEqual(["1-2", "3-5", "4-6"]);
   });
 });
 
