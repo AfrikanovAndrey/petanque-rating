@@ -25,7 +25,9 @@ import {
   nextCourtStart,
   pairNextRoundByScoreGroups,
   pairRound1HalfMethod,
+  seedTeamsByExplicitOrder,
   seedTeamsByRating,
+  validateSwissSeedOrder,
   type SwissMatchScores,
   type SwissMatchView,
   type SwissSeedEntry,
@@ -1652,7 +1654,12 @@ export class AdminController {
     tournamentId: number,
     teams: Array<{ team_id: number; player_ids: number[] }>,
     tournamentType: TournamentType,
+    options: {
+      useRating?: boolean;
+      seedOrder?: number[];
+    } = {},
   ): Promise<SwissSeedEntry[]> {
+    const useRating = options.useRating !== false;
     const ratings = await computeTeamRatingsForSwiss(
       teams.map((t) => ({
         team_id: t.team_id,
@@ -1660,14 +1667,27 @@ export class AdminController {
       })),
       tournamentType,
     );
-    const seeds = appendSwissFreeSeedIfOdd(
-      seedTeamsByRating(
-        teams.map((t) => ({
-          team_id: t.team_id,
-          rating: ratings.get(t.team_id) ?? 0,
-        })),
-      ),
-    );
+    const teamsWithRating = teams.map((t) => ({
+      team_id: t.team_id,
+      rating: ratings.get(t.team_id) ?? 0,
+    }));
+
+    let baseSeeds: SwissSeedEntry[];
+    if (useRating) {
+      baseSeeds = seedTeamsByRating(teamsWithRating);
+    } else {
+      const order = options.seedOrder ?? [];
+      const orderError = validateSwissSeedOrder(
+        order,
+        teams.map((t) => t.team_id),
+      );
+      if (orderError) {
+        throw new Error(orderError);
+      }
+      baseSeeds = seedTeamsByExplicitOrder(teamsWithRating, order);
+    }
+
+    const seeds = appendSwissFreeSeedIfOdd(baseSeeds);
     await TournamentModel.saveSwissSeed(tournamentId, seeds);
     await TournamentSwissMatchModel.deleteByTournament(tournamentId);
     const fixtures = pairRound1HalfMethod(seeds);
@@ -4172,11 +4192,54 @@ export class AdminController {
       }
 
       if (tournament.play_format === TournamentPlayFormat.SWISS) {
-        await AdminController.ensureSwissRound1(
-          tournamentId,
-          confirmedTeams,
-          tournament.type as TournamentType,
-        );
+        const body = req.body ?? {};
+        const useRating =
+          body.swiss_use_rating === undefined ||
+          body.swiss_use_rating === null ||
+          body.swiss_use_rating === true ||
+          body.swiss_use_rating === "true" ||
+          body.swiss_use_rating === 1;
+
+        if (!useRating) {
+          const seedOrder = Array.isArray(body.swiss_seed_order)
+            ? body.swiss_seed_order.map((id: unknown) => Number(id))
+            : [];
+          const orderError = validateSwissSeedOrder(
+            seedOrder,
+            confirmedTeams.map((t) => t.team_id),
+          );
+          if (orderError) {
+            res.status(400).json({
+              success: false,
+              message: orderError,
+            });
+            return;
+          }
+          try {
+            await AdminController.ensureSwissRound1(
+              tournamentId,
+              confirmedTeams,
+              tournament.type as TournamentType,
+              { useRating: false, seedOrder },
+            );
+          } catch (seedError) {
+            res.status(400).json({
+              success: false,
+              message:
+                seedError instanceof Error
+                  ? seedError.message
+                  : "Не удалось задать сиды швейцарки",
+            });
+            return;
+          }
+        } else {
+          await AdminController.ensureSwissRound1(
+            tournamentId,
+            confirmedTeams,
+            tournament.type as TournamentType,
+            { useRating: true },
+          );
+        }
       }
 
       const success = await TournamentModel.updateTournament(

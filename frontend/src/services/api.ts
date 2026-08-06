@@ -582,9 +582,15 @@ export const adminApi = {
 
   /** От финальной регистрации к проведению (IN_PROGRESS) */
   beginTournamentPlay: (
-    tournamentId: number
+    tournamentId: number,
+    data?: {
+      /** Швейцарка: сиды по рейтингу (по умолчанию true) */
+      swiss_use_rating?: boolean;
+      /** Швейцарка: явный порядок team_id при swiss_use_rating=false */
+      swiss_seed_order?: number[];
+    }
   ): Promise<AxiosResponse<ApiResponse>> =>
-    api.post(`/admin/tournaments/${tournamentId}/begin-play`),
+    api.post(`/admin/tournaments/${tournamentId}/begin-play`, data ?? {}),
 
   // Удалить турнир
   deleteTournament: (

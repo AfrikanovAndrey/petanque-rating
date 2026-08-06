@@ -178,6 +178,59 @@ export function seedTeamsByRating(
   }));
 }
 
+/**
+ * Явный порядок сидов (без сортировки по рейтингу).
+ * Рейтинг сохраняется для отображения; random_tie = 0.
+ */
+export function seedTeamsByExplicitOrder(
+  teams: Array<{ team_id: number; rating: number }>,
+  orderedTeamIds: number[],
+): SwissSeedEntry[] {
+  const byId = new Map(teams.map((t) => [t.team_id, t]));
+  return orderedTeamIds.map((teamId, index) => {
+    const team = byId.get(teamId);
+    return {
+      team_id: teamId,
+      seed: index + 1,
+      rating: team?.rating ?? 0,
+      random_tie: 0,
+    };
+  });
+}
+
+/** Проверка явного порядка сидов: все команды ровно один раз. */
+export function validateSwissSeedOrder(
+  orderedTeamIds: number[],
+  confirmedTeamIds: number[],
+): string | null {
+  if (!Array.isArray(orderedTeamIds) || orderedTeamIds.length === 0) {
+    return "Укажите порядок сидов команд";
+  }
+  if (orderedTeamIds.length !== confirmedTeamIds.length) {
+    return `Ожидается ${confirmedTeamIds.length} команд(ы) в порядке сидов`;
+  }
+  const confirmedSet = new Set(confirmedTeamIds);
+  const seen = new Set<number>();
+  for (const id of orderedTeamIds) {
+    if (!Number.isInteger(id) || id <= 0) {
+      return "Некорректный идентификатор команды в порядке сидов";
+    }
+    if (!confirmedSet.has(id)) {
+      return `Команда #${id} не среди подтверждённых заявок`;
+    }
+    if (seen.has(id)) {
+      return `Команда #${id} указана в сидах более одного раза`;
+    }
+    seen.add(id);
+  }
+  for (const id of confirmedTeamIds) {
+    if (!seen.has(id)) {
+      return "Не все подтверждённые команды включены в порядок сидов";
+    }
+  }
+  return null;
+}
+
 function clampRandomTie(n: number): number {
   if (!Number.isFinite(n)) {
     return 0;
@@ -467,36 +520,9 @@ function pairWithinPoolBacktrack(
   return solve() ? pairs : null;
 }
 
-function pushPairedFixture(
-  fixtures: SwissMatchFixture[],
-  played: Set<string>,
-  roundNumber: number,
-  a: PairCandidate,
-  b: PairCandidate,
-  courtRef: { court: number },
-): void {
-  if (isSwissFreeTeamId(a.team_id) || isSwissFreeTeamId(b.team_id)) {
-    const real = isSwissFreeTeamId(a.team_id) ? b : a;
-    fixtures.push(freeMatchFixture(roundNumber, real.team_id));
-    played.add(pairKey(real.team_id, SWISS_FREE_TEAM_ID));
-    return;
-  }
-  const higher = a.seed <= b.seed ? a : b;
-  const lower = a.seed <= b.seed ? b : a;
-  fixtures.push({
-    round_number: roundNumber,
-    team_a_id: higher.team_id,
-    team_b_id: lower.team_id,
-    is_bye: false,
-    court: courtRef.court++,
-  });
-  played.add(pairKey(a.team_id, b.team_id));
-}
-
 /**
  * Туры 2+: группы по победам, внутри — Direct pairing по сиду.
- * Нечётная группа — худший по сиду («floater») играет с лучшим
- * нижестоящей группы отдельной парой (не вливается в её Direct).
+ * Нечётная группа — слабейший (floater) к лучшему нижестоящей.
  * Пара со «Свободен» — автопобеда 13:7.
  */
 export function pairNextRoundByScoreGroups(
@@ -526,37 +552,15 @@ export function pairNextRoundByScoreGroups(
   );
 
   let freeOpponent: PairCandidate | null = null;
-  const floatPairs: Array<[PairCandidate, PairCandidate]> = [];
 
-  // Нечётный пул: худший из лучших ↔ лучший из худших (отдельная пара)
+  // Floaters: нечётный пул → слабейший к лучшему нижестоящего
   for (let i = 0; i < pools.length; i++) {
     if (pools[i].length % 2 === 0) {
       continue;
     }
     if (i + 1 < pools.length) {
-      const floater = pools[i][pools[i].length - 1];
-      const lower = pools[i + 1];
-      let partnerIndex = -1;
-      for (let j = 0; j < lower.length; j++) {
-        if (canPair(floater, lower[j], played)) {
-          partnerIndex = j;
-          break;
-        }
-      }
-      if (partnerIndex < 0) {
-        throw new Error(
-          `Не удалось найти соперника для floater (team ${floater.team_id}) в нижестоящей группе тура ${roundNumber}`,
-        );
-      }
-      pools[i].pop();
-      const partner = lower.splice(partnerIndex, 1)[0];
-      floatPairs.push([floater, partner]);
-      if (isSwissFreeTeamId(floater.team_id) || isSwissFreeTeamId(partner.team_id)) {
-        const real = isSwissFreeTeamId(floater.team_id) ? partner : floater;
-        played.add(pairKey(real.team_id, SWISS_FREE_TEAM_ID));
-      } else {
-        played.add(pairKey(floater.team_id, partner.team_id));
-      }
+      const floater = pools[i].pop()!;
+      pools[i + 1].unshift(floater);
       continue;
     }
     // Последний пул нечётный — соперник «Свободен» (не сам «Свободен»)
@@ -575,11 +579,7 @@ export function pairNextRoundByScoreGroups(
   }
 
   const fixtures: SwissMatchFixture[] = [];
-  const courtRef = { court: courtStart };
-
-  for (const [a, b] of floatPairs) {
-    pushPairedFixture(fixtures, played, roundNumber, a, b, courtRef);
-  }
+  let court = courtStart;
 
   for (const pool of pools) {
     if (pool.length === 0) {
@@ -592,7 +592,22 @@ export function pairNextRoundByScoreGroups(
       );
     }
     for (const [a, b] of pairs) {
-      pushPairedFixture(fixtures, played, roundNumber, a, b, courtRef);
+      if (isSwissFreeTeamId(a.team_id) || isSwissFreeTeamId(b.team_id)) {
+        const real = isSwissFreeTeamId(a.team_id) ? b : a;
+        fixtures.push(freeMatchFixture(roundNumber, real.team_id));
+        played.add(pairKey(real.team_id, SWISS_FREE_TEAM_ID));
+        continue;
+      }
+      const higher = a.seed <= b.seed ? a : b;
+      const lower = a.seed <= b.seed ? b : a;
+      fixtures.push({
+        round_number: roundNumber,
+        team_a_id: higher.team_id,
+        team_b_id: lower.team_id,
+        is_bye: false,
+        court: court++,
+      });
+      played.add(pairKey(a.team_id, b.team_id));
     }
   }
 
