@@ -418,7 +418,7 @@ const TournamentStartWizardModal: React.FC<Props> = ({
         toast.error("Сначала проведите жеребьёвку");
         return;
       }
-      await beginPlayMutation.mutateAsync();
+      await beginPlayMutation.mutateAsync(undefined);
     } catch {
       // toast already shown
     }
