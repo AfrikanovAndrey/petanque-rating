@@ -426,8 +426,9 @@ function canPair(
 /**
  * Direct pairing внутри группы с одинаковым числом побед:
  * участники упорядочены по сиду, верхняя половина играет с нижней по порядку
- * (1↔k+1, 2↔k+2, …). При уже сыгранных парах — сдвиг нижней половины;
- * если не удалось — backtracking с предпочтением соперников из нижней половины.
+ * (1↔k+1, 2↔k+2, …). При rematch сначала backtracking с предпочтением
+ * идеальных соперников Direct (чтобы сохранить остальные идеальные пары),
+ * затем сдвиг нижней половины; если не удалось — полный перебор offset.
  */
 function pairDirectWithinPool(
   pool: PairCandidate[],
@@ -443,7 +444,31 @@ function pairDirectWithinPool(
   const ordered = [...pool].sort((a, b) => a.seed - b.seed);
   const half = ordered.length / 2;
 
-  for (let offset = 0; offset < half; offset++) {
+  // Чистый Direct (offset 0)
+  {
+    const pairs: Array<[PairCandidate, PairCandidate]> = [];
+    let ok = true;
+    for (let i = 0; i < half; i++) {
+      const a = ordered[i];
+      const b = ordered[half + i];
+      if (!canPair(a, b, played)) {
+        ok = false;
+        break;
+      }
+      pairs.push([a, b]);
+    }
+    if (ok) {
+      return pairs;
+    }
+  }
+
+  // Сохраняем максимум идеальных пар Direct
+  const backtrack = pairWithinPoolBacktrack(ordered, played);
+  if (backtrack) {
+    return backtrack;
+  }
+
+  for (let offset = 1; offset < half; offset++) {
     const pairs: Array<[PairCandidate, PairCandidate]> = [];
     let ok = true;
     for (let i = 0; i < half; i++) {
@@ -460,12 +485,12 @@ function pairDirectWithinPool(
     }
   }
 
-  return pairWithinPoolBacktrack(ordered, played);
+  return null;
 }
 
 /**
- * Backtracking: для каждого сверху предпочитаем соперника из нижней половины
- * (ближе к Direct), затем остальных.
+ * Backtracking: идеальный Direct-партнёр, затем остальные из «своей» половины
+ * (ближайшие по сиду к идеалу), затем противоположная половина.
  */
 function pairWithinPoolBacktrack(
   ordered: PairCandidate[],
@@ -474,20 +499,36 @@ function pairWithinPoolBacktrack(
   const remaining = [...ordered];
   const pairs: Array<[PairCandidate, PairCandidate]> = [];
   const half = ordered.length / 2;
+  const topHalfIds = new Set(ordered.slice(0, half).map((t) => t.team_id));
+  const bottomHalfIds = new Set(ordered.slice(half).map((t) => t.team_id));
 
   function partnerOrder(a: PairCandidate, rest: PairCandidate[]): PairCandidate[] {
     const idealIndex = ordered.findIndex((t) => t.team_id === a.team_id);
+    const inTop = idealIndex >= 0 && idealIndex < half;
     const idealPartner =
       idealIndex >= 0 && idealIndex < half
         ? ordered[idealIndex + half]
         : idealIndex >= half
           ? ordered[idealIndex - half]
           : null;
+    const preferredHalf = inTop ? bottomHalfIds : topHalfIds;
     return [...rest].sort((x, y) => {
       const ix = idealPartner && x.team_id === idealPartner.team_id ? 0 : 1;
       const iy = idealPartner && y.team_id === idealPartner.team_id ? 0 : 1;
       if (ix !== iy) {
         return ix - iy;
+      }
+      const hx = preferredHalf.has(x.team_id) ? 0 : 1;
+      const hy = preferredHalf.has(y.team_id) ? 0 : 1;
+      if (hx !== hy) {
+        return hx - hy;
+      }
+      if (idealPartner) {
+        const dx = Math.abs(x.seed - idealPartner.seed);
+        const dy = Math.abs(y.seed - idealPartner.seed);
+        if (dx !== dy) {
+          return dx - dy;
+        }
       }
       return x.seed - y.seed;
     });
@@ -522,7 +563,13 @@ function pairWithinPoolBacktrack(
 
 /**
  * Туры 2+: группы по победам, внутри — Direct pairing по сиду.
- * Нечётная группа — слабейший (floater) к лучшему нижестоящей.
+ * Нечётная группа — слабейший (floater) играет с лучшим нижестоящей отдельной парой
+ * (не вливается в Direct нижнего пула);
+ * одна и та же команда не флоатится (и не получает bye-float) более одного раза
+ * за турнир, если в пуле есть другой кандидат;
+ * команда, уже принимавшая floater’а в прошлом туре, не берётся снова как
+ * соперник floater’а (берётся следующий по сиду), если есть альтернатива.
+ * Порядок пар в туре: Wk Direct → float Wk→W(k−1) → … → W0 → bye.
  * Пара со «Свободен» — автопобеда 13:7.
  */
 export function pairNextRoundByScoreGroups(
@@ -541,73 +588,68 @@ export function pairNextRoundByScoreGroups(
     wins: stats.get(s.team_id)?.wins ?? 0,
   }));
 
-  const winsLevels = [
-    ...new Set(candidates.map((c) => c.wins)),
-  ].sort((a, b) => b - a);
-
-  const pools: PairCandidate[][] = winsLevels.map((w) =>
-    candidates
-      .filter((c) => c.wins === w)
-      .sort((a, b) => a.seed - b.seed),
+  const pools = buildWinsPools(candidates);
+  const prevFloat = collectFloatInfoForRound(
+    seeds,
+    matchesSoFar,
+    roundNumber - 1,
   );
 
+  const floatFromPool: Array<[PairCandidate, PairCandidate] | null> =
+    pools.map(() => null);
   let freeOpponent: PairCandidate | null = null;
 
-  // Floaters: нечётный пул → слабейший к лучшему нижестоящего
+  // Floaters: нечётный пул → слабейший ↔ лучший нижестоящего (отдельная пара)
   for (let i = 0; i < pools.length; i++) {
     if (pools[i].length % 2 === 0) {
       continue;
     }
     if (i + 1 < pools.length) {
-      const floater = pools[i].pop()!;
-      pools[i + 1].unshift(floater);
+      const floater = pickDownfloater(pools[i], prevFloat.floaters);
+      const opponent = pickFloatOpponent(
+        pools[i + 1],
+        floater,
+        played,
+        prevFloat.recipients,
+      );
+      floatFromPool[i] = [floater, opponent];
+      played.add(pairKey(floater.team_id, opponent.team_id));
       continue;
     }
     // Последний пул нечётный — соперник «Свободен» (не сам «Свободен»)
-    const byeCandidates = [...pools[i]]
-      .filter((t) => !isSwissFreeTeamId(t.team_id))
-      .sort((a, b) => b.seed - a.seed);
-    freeOpponent =
-      byeCandidates.find(
-        (t) => !played.has(pairKey(t.team_id, SWISS_FREE_TEAM_ID)),
-      ) ??
-      byeCandidates[0] ??
-      null;
+    freeOpponent = pickByeOpponent(pools[i], played, prevFloat.floaters);
     if (freeOpponent) {
       pools[i] = pools[i].filter((t) => t.team_id !== freeOpponent!.team_id);
     }
   }
 
+  // Порядок в туре: Wk Direct → float Wk→W(k-1) → … → W0 Direct → bye
   const fixtures: SwissMatchFixture[] = [];
-  let court = courtStart;
+  const courtRef = { court: courtStart };
 
-  for (const pool of pools) {
-    if (pool.length === 0) {
-      continue;
-    }
-    const pairs = pairDirectWithinPool(pool, played);
-    if (!pairs) {
-      throw new Error(
-        `Не удалось составить пары тура ${roundNumber} без повторов`,
-      );
-    }
-    for (const [a, b] of pairs) {
-      if (isSwissFreeTeamId(a.team_id) || isSwissFreeTeamId(b.team_id)) {
-        const real = isSwissFreeTeamId(a.team_id) ? b : a;
-        fixtures.push(freeMatchFixture(roundNumber, real.team_id));
-        played.add(pairKey(real.team_id, SWISS_FREE_TEAM_ID));
-        continue;
+  for (let i = 0; i < pools.length; i++) {
+    const pool = pools[i];
+    if (pool.length > 0) {
+      const pairs = pairDirectWithinPool(pool, played);
+      if (!pairs) {
+        throw new Error(
+          `Не удалось составить пары тура ${roundNumber} без повторов`,
+        );
       }
-      const higher = a.seed <= b.seed ? a : b;
-      const lower = a.seed <= b.seed ? b : a;
-      fixtures.push({
-        round_number: roundNumber,
-        team_a_id: higher.team_id,
-        team_b_id: lower.team_id,
-        is_bye: false,
-        court: court++,
-      });
-      played.add(pairKey(a.team_id, b.team_id));
+      for (const [a, b] of pairs) {
+        pushPairedFixture(fixtures, played, roundNumber, a, b, courtRef);
+      }
+    }
+    const floated = floatFromPool[i];
+    if (floated) {
+      pushPairedFixture(
+        fixtures,
+        played,
+        roundNumber,
+        floated[0],
+        floated[1],
+        courtRef,
+      );
     }
   }
 
@@ -617,6 +659,234 @@ export function pairNextRoundByScoreGroups(
   }
 
   return fixtures;
+}
+
+function pushPairedFixture(
+  fixtures: SwissMatchFixture[],
+  played: Set<string>,
+  roundNumber: number,
+  a: PairCandidate,
+  b: PairCandidate,
+  courtRef: { court: number },
+): void {
+  if (isSwissFreeTeamId(a.team_id) || isSwissFreeTeamId(b.team_id)) {
+    const real = isSwissFreeTeamId(a.team_id) ? b : a;
+    fixtures.push(freeMatchFixture(roundNumber, real.team_id));
+    played.add(pairKey(real.team_id, SWISS_FREE_TEAM_ID));
+    return;
+  }
+  const higher = a.seed <= b.seed ? a : b;
+  const lower = a.seed <= b.seed ? b : a;
+  fixtures.push({
+    round_number: roundNumber,
+    team_a_id: higher.team_id,
+    team_b_id: lower.team_id,
+    is_bye: false,
+    court: courtRef.court++,
+  });
+  played.add(pairKey(a.team_id, b.team_id));
+}
+
+function buildWinsPools(candidates: PairCandidate[]): PairCandidate[][] {
+  const winsLevels = [
+    ...new Set(candidates.map((c) => c.wins)),
+  ].sort((a, b) => b - a);
+  return winsLevels.map((w) =>
+    candidates
+      .filter((c) => c.wins === w)
+      .sort((a, b) => a.seed - b.seed),
+  );
+}
+
+/**
+ * Худший по сиду из нечётного пула, по возможности не из avoidTeamIds.
+ * Удаляет выбранного из pool (мутация).
+ */
+export function pickDownfloater(
+  pool: PairCandidate[],
+  avoidTeamIds: Set<number>,
+): PairCandidate {
+  for (let i = pool.length - 1; i >= 0; i--) {
+    const t = pool[i];
+    if (isSwissFreeTeamId(t.team_id)) {
+      continue;
+    }
+    if (!avoidTeamIds.has(t.team_id)) {
+      pool.splice(i, 1);
+      return t;
+    }
+  }
+  for (let i = pool.length - 1; i >= 0; i--) {
+    if (!isSwissFreeTeamId(pool[i].team_id)) {
+      const [floater] = pool.splice(i, 1);
+      return floater;
+    }
+  }
+  return pool.pop()!;
+}
+
+/**
+ * Лучший по сиду из нижестоящего пула для пары с floater’ом
+ * (без rematch; без повторного приёма floater’а, если есть альтернатива;
+ * «Свободен» — только если некого больше).
+ * Удаляет выбранного из pool (мутация).
+ */
+export function pickFloatOpponent(
+  pool: PairCandidate[],
+  floater: PairCandidate,
+  played: Set<string>,
+  avoidRecipientIds: Set<number> = new Set(),
+): PairCandidate {
+  const ordered = [...pool].sort((a, b) => a.seed - b.seed);
+
+  const tryPick = (
+    preferAvoid: boolean,
+    allowFree: boolean,
+    requireCanPair: boolean,
+  ): number => {
+    for (let i = 0; i < ordered.length; i++) {
+      const t = ordered[i];
+      if (!allowFree && isSwissFreeTeamId(t.team_id)) {
+        continue;
+      }
+      if (preferAvoid && avoidRecipientIds.has(t.team_id)) {
+        continue;
+      }
+      if (requireCanPair && !canPair(floater, t, played)) {
+        continue;
+      }
+      return pool.findIndex((p) => p.team_id === t.team_id);
+    }
+    return -1;
+  };
+
+  let idx = tryPick(true, false, true);
+  if (idx < 0) {
+    idx = tryPick(true, true, true);
+  }
+  if (idx < 0) {
+    idx = tryPick(false, false, true);
+  }
+  if (idx < 0) {
+    idx = tryPick(false, true, true);
+  }
+  if (idx < 0) {
+    idx = tryPick(true, false, false);
+  }
+  if (idx < 0) {
+    idx = tryPick(true, true, false);
+  }
+  if (idx < 0) {
+    idx = tryPick(false, false, false);
+  }
+  if (idx < 0) {
+    idx = tryPick(false, true, false);
+  }
+  if (idx < 0) {
+    throw new Error("Не удалось выбрать соперника для floater");
+  }
+  const [opponent] = pool.splice(idx, 1);
+  return opponent;
+}
+
+function pickByeOpponent(
+  pool: PairCandidate[],
+  played: Set<string>,
+  avoidTeamIds: Set<number>,
+): PairCandidate | null {
+  const byeCandidates = [...pool]
+    .filter((t) => !isSwissFreeTeamId(t.team_id))
+    .sort((a, b) => b.seed - a.seed);
+
+  const pick = (preferAvoid: boolean): PairCandidate | null =>
+    byeCandidates.find((t) => {
+      if (played.has(pairKey(t.team_id, SWISS_FREE_TEAM_ID))) {
+        return false;
+      }
+      if (preferAvoid && avoidTeamIds.has(t.team_id)) {
+        return false;
+      }
+      return true;
+    }) ?? null;
+
+  return pick(true) ?? pick(false) ?? byeCandidates[0] ?? null;
+}
+
+export type SwissFloatRoundInfo = {
+  /** Команды, ушедшие downfloat / bye-float (накопительно) */
+  floaters: Set<number>;
+  /** Команды нижестоящей группы, принявшие floater’а в последнем учтённом туре */
+  recipients: Set<number>;
+};
+
+/**
+ * Floater’ы (накопительно за туры 2…targetRound) и recipients последнего тура.
+ * Floater — не более одного раза за турнир; recipient — не два тура подряд.
+ */
+export function collectFloatInfoForRound(
+  seeds: SwissSeedEntry[],
+  matchesSoFar: SwissMatchScores[],
+  targetRound: number,
+): SwissFloatRoundInfo {
+  if (targetRound < 2) {
+    return { floaters: new Set(), recipients: new Set() };
+  }
+
+  const allFloaters = new Set<number>();
+  let lastRecipients = new Set<number>();
+
+  for (let round = 2; round <= targetRound; round++) {
+    const matchesBefore = matchesSoFar.filter((m) => m.round_number < round);
+    const allSeeds = appendSwissFreeSeedIfOdd(seeds);
+    const stats = computeWinsByTeam(allSeeds, matchesBefore);
+    const played = collectPlayedPairs(matchesBefore);
+    const candidates: PairCandidate[] = allSeeds.map((s) => ({
+      team_id: s.team_id,
+      seed: s.seed,
+      wins: stats.get(s.team_id)?.wins ?? 0,
+    }));
+    const pools = buildWinsPools(candidates);
+    const roundRecipients = new Set<number>();
+
+    for (let i = 0; i < pools.length; i++) {
+      if (pools[i].length % 2 === 0) {
+        continue;
+      }
+      if (i + 1 < pools.length) {
+        const floater = pickDownfloater(pools[i], allFloaters);
+        const opponent = pickFloatOpponent(
+          pools[i + 1],
+          floater,
+          played,
+          lastRecipients,
+        );
+        allFloaters.add(floater.team_id);
+        if (!isSwissFreeTeamId(opponent.team_id)) {
+          roundRecipients.add(opponent.team_id);
+        }
+        played.add(pairKey(floater.team_id, opponent.team_id));
+        continue;
+      }
+      const bye = pickByeOpponent(pools[i], played, allFloaters);
+      if (bye) {
+        allFloaters.add(bye.team_id);
+        pools[i] = pools[i].filter((t) => t.team_id !== bye.team_id);
+      }
+    }
+    lastRecipients = roundRecipients;
+  }
+  return { floaters: allFloaters, recipients: lastRecipients };
+}
+
+/**
+ * Команды, ушедшие downfloat / bye-float в турах 2…targetRound (накопительно).
+ */
+export function collectDownfloatersForRound(
+  seeds: SwissSeedEntry[],
+  matchesSoFar: SwissMatchScores[],
+  targetRound: number,
+): Set<number> {
+  return collectFloatInfoForRound(seeds, matchesSoFar, targetRound).floaters;
 }
 
 export function isRoundComplete(
@@ -891,6 +1161,94 @@ export function countCompletedRounds(
   return completed;
 }
 
+/**
+ * Порядок пар в туре для отображения:
+ * Wk Direct → float Wk→W(k−1) → … → W0 Direct → bye.
+ * Победы — на момент начала тура (матчи с round_number < roundNumber).
+ */
+export function orderSwissRoundMatches<
+  T extends {
+    team_a_id: number;
+    team_b_id: number | null;
+    is_bye: boolean;
+    court?: number | null;
+    id?: number;
+  },
+>(
+  roundMatches: T[],
+  winsByTeam: Map<number, { wins: number } | number>,
+): T[] {
+  const winsOf = (teamId: number): number => {
+    const v = winsByTeam.get(teamId);
+    if (v == null) {
+      return 0;
+    }
+    return typeof v === "number" ? v : v.wins;
+  };
+
+  const sortKey = (m: T): [number, number, number, number] => {
+    const wa = winsOf(m.team_a_id);
+    if (m.is_bye || m.team_b_id == null) {
+      // bye после Direct своей группы
+      return [-wa, 1, m.court ?? 1e9, m.id ?? 0];
+    }
+    const wb = winsOf(m.team_b_id);
+    if (wa === wb) {
+      return [-wa, 0, m.court ?? 1e9, m.id ?? 0];
+    }
+    const hi = Math.max(wa, wb);
+    return [-hi, 1, m.court ?? 1e9, m.id ?? 0];
+  };
+
+  return [...roundMatches].sort((a, b) => {
+    const ka = sortKey(a);
+    const kb = sortKey(b);
+    for (let i = 0; i < ka.length; i++) {
+      if (ka[i] !== kb[i]) {
+        return ka[i] - kb[i];
+      }
+    }
+    return 0;
+  });
+}
+
+/**
+ * Сортирует все матчи швейцарки: по туру, внутри тура — по score-группам/float.
+ */
+export function orderSwissMatchesForDisplay(
+  seeds: SwissSeedEntry[],
+  matches: SwissMatchView[],
+): SwissMatchView[] {
+  const allSeeds = appendSwissFreeSeedIfOdd(seeds);
+  const byRound = new Map<number, SwissMatchView[]>();
+  for (const m of matches) {
+    if (!byRound.has(m.round_number)) {
+      byRound.set(m.round_number, []);
+    }
+    byRound.get(m.round_number)!.push(m);
+  }
+
+  const scoreRows: SwissMatchScores[] = matches.map((m) => ({
+    team_a_id: m.team_a_id,
+    team_b_id: m.team_b_id,
+    score_a: m.is_bye ? SWISS_FREE_SCORE_FOR : m.score_a,
+    score_b: m.is_bye ? SWISS_FREE_SCORE_AGAINST : m.score_b,
+    is_bye: m.is_bye,
+    round_number: m.round_number,
+  }));
+
+  const ordered: SwissMatchView[] = [];
+  const rounds = [...byRound.keys()].sort((a, b) => a - b);
+  for (const roundNumber of rounds) {
+    const before = scoreRows.filter((m) => m.round_number < roundNumber);
+    const stats = computeWinsByTeam(allSeeds, before);
+    ordered.push(
+      ...orderSwissRoundMatches(byRound.get(roundNumber)!, stats),
+    );
+  }
+  return ordered;
+}
+
 export function buildSwissStageView(
   seeds: SwissSeedEntry[],
   teams: Array<{ team_id: number; players: string[] }>,
@@ -923,6 +1281,8 @@ export function buildSwissStageView(
   );
   const standings = computeSwissStandings(allSeeds, scoredForStandings, order);
 
+  const displayMatches = orderSwissMatchesForDisplay(seeds, matches);
+
   return {
     swiss_rounds: swissRounds,
     completed_rounds,
@@ -941,7 +1301,7 @@ export function buildSwissStageView(
       tiebreakers: s.tiebreakers,
     })),
     // В ответе для is_bye всегда отдаём 13:7 (старые 13:0 нормализуем).
-    matches: matches.map((m) =>
+    matches: displayMatches.map((m) =>
       m.is_bye
         ? {
             ...m,

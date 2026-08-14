@@ -1,9 +1,14 @@
 import {
   buildSwissStageView,
+  collectDownfloatersForRound,
+  collectFloatInfoForRound,
   collectPlayedPairs,
   computeSwissStandings,
+  orderSwissRoundMatches,
   pairNextRoundByScoreGroups,
   pairRound1HalfMethod,
+  pickDownfloater,
+  pickFloatOpponent,
   seedTeamsByExplicitOrder,
   seedTeamsByRating,
   validateSwissSeedOrder,
@@ -186,7 +191,7 @@ describe("pairNextRoundByScoreGroups", () => {
     expect(pairs).toEqual(["1-5", "2-6", "3-7", "4-8"]);
   });
 
-  it("при нечётной score-группе floater вниз; Direct + «Свободен»", () => {
+  it("нечётная score-группа: floater ↔ лучший нижней; Direct + «Свободен»", () => {
     const seeds = seedsFromIds([1, 2, 3, 4, 5]);
     // Тур 1 (с «Свободен»): 1–4, 2–5, 3–Свободен → wins: 1,2,3=1; 4,5,FREE=0
     const round1: SwissMatchScores[] = [
@@ -215,19 +220,154 @@ describe("pairNextRoundByScoreGroups", () => {
         is_bye: true,
       },
     ];
-    // пул wins=1: 1,2,3 → floater 3 вниз
-    // wins=1: 1–2; wins=0: [3,4,5,FREE] Direct → 3–5, 4–Свободен
+    // wins=1: 1,2,3 → floater 3 ↔ лучший wins=0 (4)
+    // wins=1 Direct: 1–2; wins=0: [5,FREE] → 5–Свободен
     const round2 = pairNextRoundByScoreGroups(seeds, round1, 2);
     const real = round2
       .filter((f) => !f.is_bye)
       .map((f) => [f.team_a_id, f.team_b_id!].sort((a, b) => a - b).join("-"))
       .sort();
     const free = round2.filter((f) => f.is_bye);
-    expect(real).toEqual(["1-2", "3-5"]);
+    expect(real).toEqual(["1-2", "3-4"]);
     expect(free).toHaveLength(1);
-    expect(free[0].team_a_id).toBe(4);
+    expect(free[0].team_a_id).toBe(5);
     expect(free[0].score_a).toBe(13);
     expect(free[0].score_b).toBe(7);
+  });
+
+  it("порядок пар в туре: Direct группы → float → нижестоящая", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4, 5, 6]);
+    // После R1: wins 1 = {1,2,3}, wins 0 = {4,5,6} — оба нечётные? 3 и 3.
+    const round1: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 5,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 3,
+        team_b_id: 6,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+    ];
+    // W1 odd → float 3↔4; W1 Direct 1–2; W0 Direct 5–6
+    // Порядок: 1–2, 3–4, 5–6
+    const round2 = pairNextRoundByScoreGroups(seeds, round1, 2);
+    const order = round2.map((f) =>
+      [f.team_a_id, f.team_b_id!].sort((a, b) => a - b).join("-"),
+    );
+    expect(order).toEqual(["1-2", "3-4", "5-6"]);
+  });
+
+  it("orderSwissRoundMatches: W2 Direct → float → W0", () => {
+    const wins = new Map<number, number>([
+      [1, 2],
+      [2, 2],
+      [3, 2],
+      [4, 1],
+      [5, 0],
+      [6, 0],
+    ]);
+    const scrambled = [
+      { id: 30, team_a_id: 5, team_b_id: 6, is_bye: false, court: 3 },
+      { id: 10, team_a_id: 3, team_b_id: 4, is_bye: false, court: 2 },
+      { id: 20, team_a_id: 1, team_b_id: 2, is_bye: false, court: 1 },
+    ];
+    const ordered = orderSwissRoundMatches(scrambled, wins);
+    expect(ordered.map((m) => m.id)).toEqual([20, 10, 30]);
+  });
+
+  it("pickDownfloater пропускает avoid и берёт следующего с конца", () => {
+    const pool = [
+      { team_id: 1, seed: 1, wins: 1 },
+      { team_id: 2, seed: 2, wins: 1 },
+      { team_id: 3, seed: 3, wins: 1 },
+    ];
+    const floater = pickDownfloater(pool, new Set([3]));
+    expect(floater.team_id).toBe(2);
+    expect(pool.map((t) => t.team_id)).toEqual([1, 3]);
+  });
+
+  it("не флоатит одну команду повторно за турнир", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4, 5]);
+    const round1: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 5,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 3,
+        team_b_id: null,
+        score_a: 13,
+        score_b: 7,
+        is_bye: true,
+      },
+    ];
+    // R2: floater 3 ↔ 4 (recipient)
+    const r2info = collectFloatInfoForRound(seeds, round1, 2);
+    expect([...r2info.floaters]).toEqual([3]);
+    expect([...r2info.recipients]).toEqual([4]);
+
+    // roundNumber=3 → avoid floater={3}, avoid recipient={4}
+    // float 2; лучший wins=0 без 4 — это 5, но 2–5 rematch → 2–Свободен
+    // wins=1: 1–3; wins=0: 4–5
+    const round3 = pairNextRoundByScoreGroups(seeds, round1, 3);
+    expect([...collectDownfloatersForRound(seeds, round1, 3)].sort()).toEqual([
+      2, 3,
+    ]);
+
+    const real = round3
+      .filter((f) => !f.is_bye)
+      .map((f) => [f.team_a_id, f.team_b_id!].sort((a, b) => a - b).join("-"))
+      .sort();
+    const free = round3.filter((f) => f.is_bye);
+    expect(real).toEqual(["1-3", "4-5"]);
+    expect(free).toHaveLength(1);
+    expect(free[0].team_a_id).toBe(2);
+  });
+
+  it("pickFloatOpponent пропускает прошлого recipient’а", () => {
+    const pool = [
+      { team_id: 10, seed: 1, wins: 0 },
+      { team_id: 20, seed: 2, wins: 0 },
+      { team_id: 30, seed: 3, wins: 0 },
+    ];
+    const floater = { team_id: 99, seed: 9, wins: 1 };
+    const opponent = pickFloatOpponent(
+      pool,
+      floater,
+      new Set(),
+      new Set([10]),
+    );
+    expect(opponent.team_id).toBe(20);
+    expect(pool.map((t) => t.team_id)).toEqual([10, 30]);
   });
 });
 
