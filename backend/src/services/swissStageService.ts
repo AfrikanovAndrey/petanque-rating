@@ -426,9 +426,8 @@ function canPair(
 /**
  * Direct pairing внутри группы с одинаковым числом побед:
  * участники упорядочены по сиду, верхняя половина играет с нижней по порядку
- * (1↔k+1, 2↔k+2, …). При rematch сначала backtracking с предпочтением
- * идеальных соперников Direct (чтобы сохранить остальные идеальные пары),
- * затем сдвиг нижней половины; если не удалось — полный перебор offset.
+ * (1↔k+1, 2↔k+2, …). При rematch — обмен соперниками с соседней парой Direct,
+ * затем backtracking, затем сдвиг нижней половины (offset).
  */
 function pairDirectWithinPool(
   pool: PairCandidate[],
@@ -444,48 +443,99 @@ function pairDirectWithinPool(
   const ordered = [...pool].sort((a, b) => a.seed - b.seed);
   const half = ordered.length / 2;
 
-  // Чистый Direct (offset 0)
-  {
+  const tryOffset = (offset: number): Array<[PairCandidate, PairCandidate]> | null => {
     const pairs: Array<[PairCandidate, PairCandidate]> = [];
-    let ok = true;
     for (let i = 0; i < half; i++) {
       const a = ordered[i];
-      const b = ordered[half + i];
+      const b = ordered[half + ((i + offset) % half)];
       if (!canPair(a, b, played)) {
-        ok = false;
-        break;
+        return null;
       }
       pairs.push([a, b]);
     }
-    if (ok) {
-      return pairs;
-    }
+    return pairs;
+  };
+
+  const pure = tryOffset(0);
+  if (pure) {
+    return pure;
   }
 
-  // Сохраняем максимум идеальных пар Direct
+  // Rematch в идеальном Direct: меняем соперников с соседней парой
+  // (типичный transpose: i↔j rematch → i с партнёром i+1, i+1 с бывшим партнёром i).
+  const swapped = pairDirectWithAdjacentSwaps(ordered, played);
+  if (swapped) {
+    return swapped;
+  }
+
   const backtrack = pairWithinPoolBacktrack(ordered, played);
   if (backtrack) {
     return backtrack;
   }
 
   for (let offset = 1; offset < half; offset++) {
-    const pairs: Array<[PairCandidate, PairCandidate]> = [];
-    let ok = true;
-    for (let i = 0; i < half; i++) {
-      const a = ordered[i];
-      const b = ordered[half + ((i + offset) % half)];
-      if (!canPair(a, b, played)) {
-        ok = false;
-        break;
-      }
-      pairs.push([a, b]);
-    }
-    if (ok) {
+    const pairs = tryOffset(offset);
+    if (pairs) {
       return pairs;
     }
   }
 
   return null;
+}
+
+/**
+ * Идеальный Direct + устранение rematch обменом нижних соперников у соседних
+ * верхних (сначала i+1, затем i−1). Несколько проходов, пока есть rematch.
+ */
+function pairDirectWithAdjacentSwaps(
+  ordered: PairCandidate[],
+  played: Set<string>,
+): Array<[PairCandidate, PairCandidate]> | null {
+  const half = ordered.length / 2;
+  const top = ordered.slice(0, half);
+  const bottom = ordered.slice(half);
+  /** partnerIdx[i] — индекс в bottom для top[i] */
+  const partnerIdx = bottom.map((_, i) => i);
+
+  const pairsFrom = (): Array<[PairCandidate, PairCandidate]> =>
+    top.map((a, i) => [a, bottom[partnerIdx[i]]]);
+
+  const rematchIndex = (): number => {
+    const pairs = pairsFrom();
+    for (let i = 0; i < pairs.length; i++) {
+      if (!canPair(pairs[i][0], pairs[i][1], played)) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  for (let iter = 0; iter < half * half; iter++) {
+    const ri = rematchIndex();
+    if (ri < 0) {
+      return pairsFrom();
+    }
+    let resolved = false;
+    for (const adj of [ri + 1, ri - 1]) {
+      if (adj < 0 || adj >= half) {
+        continue;
+      }
+      const tmp = partnerIdx[ri];
+      partnerIdx[ri] = partnerIdx[adj];
+      partnerIdx[adj] = tmp;
+      if (canPair(top[ri], bottom[partnerIdx[ri]], played)) {
+        resolved = true;
+        break;
+      }
+      // откат, если rematch у ri не снят
+      partnerIdx[adj] = partnerIdx[ri];
+      partnerIdx[ri] = tmp;
+    }
+    if (!resolved) {
+      return null;
+    }
+  }
+  return rematchIndex() < 0 ? pairsFrom() : null;
 }
 
 /**

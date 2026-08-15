@@ -191,6 +191,83 @@ describe("pairNextRoundByScoreGroups", () => {
     expect(pairs).toEqual(["1-5", "2-6", "3-7", "4-8"]);
   });
 
+  it("Direct rematch: обмен соперниками с соседней парой", () => {
+    // Все с 1 победой; сыгран 2–6. Идеал 1–5, 2–6, 3–7, 4–8 → без 2–6
+    const seeds = seedsFromIds([1, 2, 3, 4, 5, 6, 7, 8]);
+    const prior: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 6,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 3,
+        team_b_id: 8,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 5,
+        team_b_id: 7,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 2,
+        team_a_id: 6,
+        team_b_id: 3,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 2,
+        team_a_id: 4,
+        team_b_id: 5,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 2,
+        team_a_id: 8,
+        team_b_id: 1,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 2,
+        team_a_id: 7,
+        team_b_id: 2,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+    ];
+    const round3 = pairNextRoundByScoreGroups(seeds, prior, 3);
+    const pairs = round3
+      .filter((f) => !f.is_bye)
+      .map((f) => [f.team_a_id, f.team_b_id!].sort((a, b) => a - b).join("-"));
+    expect(pairs).not.toContain("2-6");
+    expect(pairs).toHaveLength(4);
+  });
+
   it("нечётная score-группа: floater ↔ лучший нижней; Direct + «Свободен»", () => {
     const seeds = seedsFromIds([1, 2, 3, 4, 5]);
     // Тур 1 (с «Свободен»): 1–4, 2–5, 3–Свободен → wins: 1,2,3=1; 4,5,FREE=0
