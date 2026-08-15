@@ -89,16 +89,16 @@ describe("pairRound1HalfMethod", () => {
     });
   });
 
-  it("для 5 команд: добавляет «Свободен», пары 1–4, 2–5, 3–Свободен 13:7", () => {
+  it("для 5 команд: слабейшая со «Свободен», half 1–3, 2–4", () => {
     const seeds = seedsFromIds([11, 22, 33, 44, 55]);
     const fixtures = pairRound1HalfMethod(seeds);
     const pairs = fixtures.filter((f) => !f.is_bye);
     const free = fixtures.filter((f) => f.is_bye);
     expect(pairs).toHaveLength(2);
-    expect(pairs[0]).toMatchObject({ team_a_id: 11, team_b_id: 44 });
-    expect(pairs[1]).toMatchObject({ team_a_id: 22, team_b_id: 55 });
+    expect(pairs[0]).toMatchObject({ team_a_id: 11, team_b_id: 33 });
+    expect(pairs[1]).toMatchObject({ team_a_id: 22, team_b_id: 44 });
     expect(free).toHaveLength(1);
-    expect(free[0].team_a_id).toBe(33);
+    expect(free[0].team_a_id).toBe(55);
     expect(free[0].team_b_id).toBeNull();
     expect(free[0].score_a).toBe(13);
     expect(free[0].score_b).toBe(7);

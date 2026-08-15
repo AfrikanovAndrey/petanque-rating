@@ -286,38 +286,39 @@ function freeMatchFixture(
 }
 
 /**
- * Тур 1 — half-метод: i ↔ i+half.
- * При нечётном N сначала добавляется «Свободен» (последний сид);
- * пара с ним — автопобеда 13:7.
+ * Тур 1 — half-метод: i ↔ i+half среди реальных команд.
+ * При нечётном N слабейшая (худший сид) играет со «Свободен» (автопобеда 13:7),
+ * остальные — half-метод.
  */
 export function pairRound1HalfMethod(
   seeds: SwissSeedEntry[],
   courtStart: number = 1,
 ): SwissMatchFixture[] {
-  const ordered = appendSwissFreeSeedIfOdd(
-    [...seeds].sort((a, b) => a.seed - b.seed),
-  );
-  const n = ordered.length;
-  if (n < 2) {
-    if (n === 1) {
-      return [freeMatchFixture(1, ordered[0].team_id)];
-    }
+  const real = [...seeds]
+    .filter((s) => !isSwissFreeTeamId(s.team_id))
+    .sort((a, b) => a.seed - b.seed);
+
+  if (real.length === 0) {
     return [];
+  }
+  if (real.length === 1) {
+    return [freeMatchFixture(1, real[0].team_id)];
+  }
+
+  let byeTeam: SwissSeedEntry | null = null;
+  let pool = real;
+  if (pool.length % 2 === 1) {
+    byeTeam = pool[pool.length - 1]!;
+    pool = pool.slice(0, -1);
   }
 
   const fixtures: SwissMatchFixture[] = [];
   let court = courtStart;
-  const pairCount = Math.floor(n / 2);
-  const half = pairCount;
+  const half = pool.length / 2;
 
-  for (let i = 0; i < pairCount; i++) {
-    const a = ordered[i];
-    const b = ordered[i + half];
-    if (isSwissFreeTeamId(a.team_id) || isSwissFreeTeamId(b.team_id)) {
-      const real = isSwissFreeTeamId(a.team_id) ? b : a;
-      fixtures.push(freeMatchFixture(1, real.team_id));
-      continue;
-    }
+  for (let i = 0; i < half; i++) {
+    const a = pool[i]!;
+    const b = pool[i + half]!;
     fixtures.push({
       round_number: 1,
       team_a_id: a.team_id,
@@ -325,6 +326,10 @@ export function pairRound1HalfMethod(
       is_bye: false,
       court: court++,
     });
+  }
+
+  if (byeTeam) {
+    fixtures.push(freeMatchFixture(1, byeTeam.team_id));
   }
 
   return fixtures;
