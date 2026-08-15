@@ -565,10 +565,8 @@ function pairWithinPoolBacktrack(
  * Туры 2+: группы по победам, внутри — Direct pairing по сиду.
  * Нечётная группа — слабейший (floater) играет с лучшим нижестоящей отдельной парой
  * (не вливается в Direct нижнего пула);
- * одна и та же команда не флоатится (и не получает bye-float) более одного раза
- * за турнир, если в пуле есть другой кандидат;
- * команда, уже принимавшая floater’а в прошлом туре, не берётся снова как
- * соперник floater’а (берётся следующий по сиду), если есть альтернатива.
+ * один и тот же float в ту же сторону: downfloat не повторять, если команда
+ * флоатилась в одном из двух предыдущих туров; upfloat — не два тура подряд;
  * Порядок пар в туре: Wk Direct → float Wk→W(k−1) → … → W0 → bye.
  * Пара со «Свободен» — автопобеда 13:7.
  */
@@ -700,29 +698,52 @@ function buildWinsPools(candidates: PairCandidate[]): PairCandidate[][] {
 
 /**
  * Худший по сиду из нечётного пула, по возможности не из avoidTeamIds.
+ * Если из‑за avoid пришлось бы спустить команду из «сильной» половины группы
+ * (сид лучше середины min…max сидов пула), снова берём абсолютного слабейшего
+ * (повторный downfloat слабейшего предпочтительнее float сильного).
  * Удаляет выбранного из pool (мутация).
  */
 export function pickDownfloater(
   pool: PairCandidate[],
   avoidTeamIds: Set<number>,
 ): PairCandidate {
+  const real = pool.filter((t) => !isSwissFreeTeamId(t.team_id));
+  if (real.length === 0) {
+    return pool.pop()!;
+  }
+
+  const absoluteWeakest = real.reduce((a, b) => (a.seed >= b.seed ? a : b));
+  const midSeed =
+    (Math.min(...real.map((t) => t.seed)) +
+      Math.max(...real.map((t) => t.seed))) /
+    2;
+
+  const take = (teamId: number): PairCandidate => {
+    const idx = pool.findIndex((t) => t.team_id === teamId);
+    const [floater] = pool.splice(idx, 1);
+    return floater;
+  };
+
   for (let i = pool.length - 1; i >= 0; i--) {
     const t = pool[i];
     if (isSwissFreeTeamId(t.team_id)) {
       continue;
     }
     if (!avoidTeamIds.has(t.team_id)) {
-      pool.splice(i, 1);
-      return t;
+      // Слишком сильный кандидат при наличии более слабого (в avoid) —
+      // лучше повторно спустить слабейшего.
+      if (
+        t.team_id !== absoluteWeakest.team_id &&
+        t.seed < midSeed &&
+        avoidTeamIds.has(absoluteWeakest.team_id)
+      ) {
+        return take(absoluteWeakest.team_id);
+      }
+      return take(t.team_id);
     }
   }
-  for (let i = pool.length - 1; i >= 0; i--) {
-    if (!isSwissFreeTeamId(pool[i].team_id)) {
-      const [floater] = pool.splice(i, 1);
-      return floater;
-    }
-  }
-  return pool.pop()!;
+
+  return take(absoluteWeakest.team_id);
 }
 
 /**
@@ -813,15 +834,34 @@ function pickByeOpponent(
 }
 
 export type SwissFloatRoundInfo = {
-  /** Команды, ушедшие downfloat / bye-float (накопительно) */
+  /**
+   * Downfloat’ы за targetRound и targetRound−1 (запрет повторного downfloat
+   * при сборке следующего тура).
+   */
   floaters: Set<number>;
-  /** Команды нижестоящей группы, принявшие floater’а в последнем учтённом туре */
+  /** Upfloat’ы (приняли floater’а) в targetRound */
   recipients: Set<number>;
 };
 
+/** Floater’ы из туров fromRound…toRound включительно. */
+function floatersFromRounds(
+  byRound: Map<number, Set<number>>,
+  fromRound: number,
+  toRound: number,
+): Set<number> {
+  const out = new Set<number>();
+  for (let r = fromRound; r <= toRound; r++) {
+    for (const id of byRound.get(r) ?? []) {
+      out.add(id);
+    }
+  }
+  return out;
+}
+
 /**
- * Floater’ы (накопительно за туры 2…targetRound) и recipients последнего тура.
- * Floater — не более одного раза за турнир; recipient — не два тура подряд.
+ * Floater’ы за (targetRound−1…targetRound) и recipients targetRound.
+ * Downfloat — не в одном из двух предыдущих туров;
+ * upfloat — не два тура подряд.
  */
 export function collectFloatInfoForRound(
   seeds: SwissSeedEntry[],
@@ -832,7 +872,7 @@ export function collectFloatInfoForRound(
     return { floaters: new Set(), recipients: new Set() };
   }
 
-  const allFloaters = new Set<number>();
+  const floatersByRound = new Map<number, Set<number>>();
   let lastRecipients = new Set<number>();
 
   for (let round = 2; round <= targetRound; round++) {
@@ -847,39 +887,51 @@ export function collectFloatInfoForRound(
     }));
     const pools = buildWinsPools(candidates);
     const roundRecipients = new Set<number>();
+    const roundFloaters = new Set<number>();
+    // Downfloat: не повторять, если флоатились в двух предыдущих турах.
+    const avoidFloaters = floatersFromRounds(
+      floatersByRound,
+      round - 2,
+      round - 1,
+    );
 
     for (let i = 0; i < pools.length; i++) {
       if (pools[i].length % 2 === 0) {
         continue;
       }
       if (i + 1 < pools.length) {
-        const floater = pickDownfloater(pools[i], allFloaters);
+        const floater = pickDownfloater(pools[i], avoidFloaters);
         const opponent = pickFloatOpponent(
           pools[i + 1],
           floater,
           played,
           lastRecipients,
         );
-        allFloaters.add(floater.team_id);
+        roundFloaters.add(floater.team_id);
         if (!isSwissFreeTeamId(opponent.team_id)) {
           roundRecipients.add(opponent.team_id);
         }
         played.add(pairKey(floater.team_id, opponent.team_id));
         continue;
       }
-      const bye = pickByeOpponent(pools[i], played, allFloaters);
+      const bye = pickByeOpponent(pools[i], played, avoidFloaters);
       if (bye) {
-        allFloaters.add(bye.team_id);
+        roundFloaters.add(bye.team_id);
         pools[i] = pools[i].filter((t) => t.team_id !== bye.team_id);
       }
     }
+    floatersByRound.set(round, roundFloaters);
     lastRecipients = roundRecipients;
   }
-  return { floaters: allFloaters, recipients: lastRecipients };
+
+  return {
+    floaters: floatersFromRounds(floatersByRound, targetRound - 1, targetRound),
+    recipients: lastRecipients,
+  };
 }
 
 /**
- * Команды, ушедшие downfloat / bye-float в турах 2…targetRound (накопительно).
+ * Downfloat’ы за targetRound и предыдущий тур (окно запрета повторного float).
  */
 export function collectDownfloatersForRound(
   seeds: SwissSeedEntry[],

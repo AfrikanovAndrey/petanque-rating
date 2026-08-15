@@ -302,7 +302,25 @@ describe("pairNextRoundByScoreGroups", () => {
     expect(pool.map((t) => t.team_id)).toEqual([1, 3]);
   });
 
-  it("не флоатит одну команду повторно за турнир", () => {
+  it("pickDownfloater: не спускает сильного из верхней половины, если слабейший только в avoid", () => {
+    // Пул как W4: слабейшая 45 в avoid; следующая 20 — выше середины (3+45)/2=24
+    const pool = [
+      { team_id: 3, seed: 3, wins: 4 },
+      { team_id: 4, seed: 4, wins: 4 },
+      { team_id: 9, seed: 9, wins: 4 },
+      { team_id: 11, seed: 11, wins: 4 },
+      { team_id: 13, seed: 13, wins: 4 },
+      { team_id: 14, seed: 14, wins: 4 },
+      { team_id: 15, seed: 15, wins: 4 },
+      { team_id: 20, seed: 20, wins: 4 },
+      { team_id: 45, seed: 45, wins: 4 },
+    ];
+    const floater = pickDownfloater(pool, new Set([45]));
+    expect(floater.team_id).toBe(45);
+    expect(pool.some((t) => t.team_id === 20)).toBe(true);
+  });
+
+  it("downfloat: не повторяет float, если флоатились в одном из двух предыдущих туров", () => {
     const seeds = seedsFromIds([1, 2, 3, 4, 5]);
     const round1: SwissMatchScores[] = [
       {
@@ -330,12 +348,12 @@ describe("pairNextRoundByScoreGroups", () => {
         is_bye: true,
       },
     ];
-    // R2: floater 3 ↔ 4 (recipient)
+    // R2: downfloat 3 ↔ upfloat 4
     const r2info = collectFloatInfoForRound(seeds, round1, 2);
     expect([...r2info.floaters]).toEqual([3]);
     expect([...r2info.recipients]).toEqual([4]);
 
-    // roundNumber=3 → avoid floater={3}, avoid recipient={4}
+    // roundNumber=3 → avoid downfloat={3}, avoid upfloat={4}
     // float 2; лучший wins=0 без 4 — это 5, но 2–5 rematch → 2–Свободен
     // wins=1: 1–3; wins=0: 4–5
     const round3 = pairNextRoundByScoreGroups(seeds, round1, 3);
