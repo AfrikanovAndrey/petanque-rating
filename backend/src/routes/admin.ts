@@ -243,6 +243,36 @@ router.post(
   AdminController.advanceSwissRound,
 );
 
+// POST /api/admin/tournaments/:tournamentId/swiss/teams/:teamId/withdraw
+router.post(
+  "/tournaments/:tournamentId/swiss/teams/:teamId/withdraw",
+  requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
+  auditLog({
+    action: "WITHDRAW_TOURNAMENT_SWISS_TEAM",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Снятие команды ${req.params.teamId} со швейцарки турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.withdrawSwissTeam,
+);
+
+// DELETE /api/admin/tournaments/:tournamentId/swiss/teams/:teamId/withdraw
+router.delete(
+  "/tournaments/:tournamentId/swiss/teams/:teamId/withdraw",
+  requireTournamentStaff,
+  requireTournamentOrganizerOrAdmin,
+  auditLog({
+    action: "REINSTATE_TOURNAMENT_SWISS_TEAM",
+    entityType: "tournament",
+    getEntityId: (req) => parseInt(req.params.tournamentId, 10),
+    getDescription: (req) =>
+      `Возврат команды ${req.params.teamId} в швейцарку турнира ID ${req.params.tournamentId}`,
+  }),
+  AdminController.reinstateSwissTeam,
+);
+
 // POST /api/admin/tournaments/:tournamentId/cup-stage/start
 router.post(
   "/tournaments/:tournamentId/cup-stage/start",

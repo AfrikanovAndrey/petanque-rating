@@ -2,6 +2,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  NoSymbolIcon,
   PencilIcon,
   PrinterIcon,
 } from "@heroicons/react/24/outline";
@@ -178,7 +179,11 @@ function buildStandingsPrintHtml(options: {
     .map((row) => {
       const cells = [
         `<td class="num">${completedRounds > 0 ? row.place : "—"}</td>`,
-        `<td class="team">${escapeHtml(teamLabel(row.players))}</td>`,
+        `<td class="team">${escapeHtml(teamLabel(row.players))}${
+          row.withdrawn_from_round != null
+            ? ` <span style="color:#92400e">(снялась с ${row.withdrawn_from_round} тура)</span>`
+            : ""
+        }</td>`,
         `<td class="num">${row.wins}</td>`,
         ...tiebreakerOrder.map((criterion) => {
           const value = row.tiebreakers?.[criterion];
@@ -750,6 +755,76 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
     }
   );
 
+  const withdrawMutation = useMutation(
+    async (teamId: number) => {
+      if (tournamentId == null) {
+        throw new Error("Не указан турнир");
+      }
+      const response = await adminApi.withdrawSwissTeam(tournamentId, teamId);
+      if (!response.data.success || !response.data.data?.swiss) {
+        throw new Error(
+          response.data.message || "Не удалось снять команду"
+        );
+      }
+      return { swiss: response.data.data.swiss, teamId };
+    },
+    {
+      onSuccess: ({ swiss: nextSwiss, teamId }) => {
+        const from =
+          nextSwiss.standings.find((s) => s.team_id === teamId)
+            ?.withdrawn_from_round ?? null;
+        applySwissUpdate(nextSwiss, {
+          successMessage:
+            from != null
+              ? `Команда снята с ${from} тура`
+              : "Команда снята со швейцарки",
+        });
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const reinstateMutation = useMutation(
+    async (teamId: number) => {
+      if (tournamentId == null) {
+        throw new Error("Не указан турнир");
+      }
+      const response = await adminApi.reinstateSwissTeam(tournamentId, teamId);
+      if (!response.data.success || !response.data.data?.swiss) {
+        throw new Error(
+          response.data.message || "Не удалось вернуть команду"
+        );
+      }
+      return response.data.data.swiss;
+    },
+    {
+      onSuccess: (nextSwiss) => {
+        applySwissUpdate(nextSwiss, {
+          successMessage: "Команда снова участвует в швейцарке",
+        });
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
+  const maxExistingRound = useMemo(
+    () =>
+      swiss.matches.reduce((max, m) => Math.max(max, m.round_number), 0),
+    [swiss.matches]
+  );
+
+  /** Можно снимать/возвращать, пока есть ещё не сформированные туры. */
+  const canManageWithdrawals =
+    !readOnly &&
+    tournamentId != null &&
+    maxExistingRound < swiss.swiss_rounds;
+
+  const nextWithdrawRound = Math.max(swiss.completed_rounds, maxExistingRound) + 1;
+
   const canRollbackRound =
     !readOnly &&
     tournamentId != null &&
@@ -767,6 +842,11 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
   const nextRoundExists =
     typeof selectedTab === "number" &&
     rounds.some((r) => r.round_number === selectedTab + 1);
+
+  /** После перехода к следующему туру счета предыдущих только для чтения. */
+  const roundScoresLocked =
+    typeof selectedTab === "number" &&
+    rounds.some((r) => r.round_number > selectedTab);
 
   // Кнопка «К следующему туру»: туры 1 … N−1, когда тур сыгран, а следующего ещё нет
   // (в т.ч. после отката к предыдущему).
@@ -926,18 +1006,32 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                       >
                         Сид
                       </th>
+                      {canManageWithdrawals && (
+                        <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-500">
+                          Участие
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {sortedStandings.map((row) => {
                       const name = teamLabel(row.players);
+                      const withdrawnFrom = row.withdrawn_from_round ?? null;
+                      const withdrawalBusy =
+                        withdrawMutation.isLoading ||
+                        reinstateMutation.isLoading;
                       return (
                         <tr key={row.team_id} className="bg-white">
                           <td className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center font-semibold text-gray-900">
                             {swiss.completed_rounds > 0 ? row.place : "—"}
                           </td>
-                          <td className="whitespace-nowrap border border-gray-200 px-2 py-1 font-medium text-gray-900">
-                            {name}
+                          <td className="border border-gray-200 px-2 py-1 font-medium text-gray-900">
+                            <div className="whitespace-nowrap">{name}</div>
+                            {withdrawnFrom != null && (
+                              <div className="mt-0.5 text-xs font-normal text-amber-800">
+                                Команда снялась с {withdrawnFrom} тура
+                              </div>
+                            )}
                           </td>
                           <td className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center font-semibold text-gray-900">
                             {row.wins}
@@ -965,6 +1059,48 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                           >
                             {row.seed}
                           </td>
+                          {canManageWithdrawals && (
+                            <td className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center">
+                              {withdrawnFrom != null ? (
+                                <button
+                                  type="button"
+                                  className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                  disabled={withdrawalBusy}
+                                  title="Вернуть в формирование пар"
+                                  onClick={() => {
+                                    reinstateMutation.mutate(row.team_id);
+                                  }}
+                                >
+                                  Вернуть
+                                </button>
+                              ) : nextWithdrawRound <= swiss.swiss_rounds ? (
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                                  disabled={withdrawalBusy}
+                                  title={`Не включать в пары с тура ${nextWithdrawRound}`}
+                                  onClick={() => {
+                                    if (
+                                      !window.confirm(
+                                        `Снять команду «${name}» с ${nextWithdrawRound} тура и далее? В следующих турах она не будет попадать в пары.`
+                                      )
+                                    ) {
+                                      return;
+                                    }
+                                    withdrawMutation.mutate(row.team_id);
+                                  }}
+                                >
+                                  <NoSymbolIcon
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden
+                                  />
+                                  Исключить
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-400">—</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -986,12 +1122,16 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                   </button>
                 </div>
               )}
-              {(canRollbackRound || canAdvanceRound) && (
+              {(canRollbackRound || canAdvanceRound || roundScoresLocked) && (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-gray-500">
                     {canAdvanceRound
                       ? `Тур ${selectedTab} завершён. Сформируйте следующий, чтобы продолжить.`
-                      : `Чтобы исправить счета тура ${selectedTab - 1}, удалите текущий тур и все последующие.`}
+                      : canRollbackRound
+                        ? `Чтобы исправить счета тура ${selectedTab - 1}, удалите текущий тур и все последующие.`
+                        : `Счета тура ${selectedTab} зафиксированы. Чтобы их изменить, откройте тур ${
+                            (selectedTab as number) + 1
+                          } и нажмите «Вернуться к туру ${selectedTab}».`}
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     {canRollbackRound && (
@@ -1061,7 +1201,7 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                         match={m}
                         teamAName={aName}
                         teamBName={bName}
-                        readOnly={readOnly}
+                        readOnly={readOnly || roundScoresLocked}
                       />
                     </li>
                   );

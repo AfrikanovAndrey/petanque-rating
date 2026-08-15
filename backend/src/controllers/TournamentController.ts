@@ -560,22 +560,23 @@ export class TournamentController {
       ) {
         const swissMatches =
           await TournamentSwissMatchModel.listByTournament(tournamentId);
-        swiss = buildSwissStageView(
-          tournament.swiss_seed,
-          teams,
-          swissMatches.map((m) => ({
-            id: m.id,
-            round_number: m.round_number,
-            team_a_id: m.team_a_id,
-            team_b_id: m.team_b_id,
-            score_a: m.score_a,
-            score_b: m.score_b,
-            is_bye: m.is_bye,
-            court: m.court,
-          })),
-          tournament.swiss_rounds,
-          tournament.tiebreaker_order,
-        );
+      swiss = buildSwissStageView(
+        tournament.swiss_seed,
+        teams,
+        swissMatches.map((m) => ({
+          id: m.id,
+          round_number: m.round_number,
+          team_a_id: m.team_a_id,
+          team_b_id: m.team_b_id,
+          score_a: m.score_a,
+          score_b: m.score_b,
+          is_bye: m.is_bye,
+          court: m.court,
+        })),
+        tournament.swiss_rounds,
+        tournament.tiebreaker_order,
+        tournament.swiss_withdrawals,
+      );
       }
 
       let cups: Array<{

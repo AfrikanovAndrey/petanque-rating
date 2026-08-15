@@ -347,6 +347,30 @@ export const adminApi = {
       `/admin/tournaments/${tournamentId}/swiss/rounds/${roundNumber}/advance`
     ),
 
+  /** Снять команду со швейцарки (с следующего / указанного тура). */
+  withdrawSwissTeam: (
+    tournamentId: number,
+    teamId: number,
+    data?: { from_round?: number }
+  ): Promise<
+    AxiosResponse<ApiResponse<{ swiss: TournamentSwissStageView }>>
+  > =>
+    api.post(
+      `/admin/tournaments/${tournamentId}/swiss/teams/${teamId}/withdraw`,
+      data ?? {}
+    ),
+
+  /** Вернуть снятую команду в швейцарку. */
+  reinstateSwissTeam: (
+    tournamentId: number,
+    teamId: number
+  ): Promise<
+    AxiosResponse<ApiResponse<{ swiss: TournamentSwissStageView }>>
+  > =>
+    api.delete(
+      `/admin/tournaments/${tournamentId}/swiss/teams/${teamId}/withdraw`
+    ),
+
   startCupStage: (
     tournamentId: number,
     data: {

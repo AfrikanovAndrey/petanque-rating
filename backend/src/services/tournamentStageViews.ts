@@ -127,6 +127,7 @@ export async function loadPlayStageSnapshot(
         swissRowsToViews(swissMatches),
         tournament.swiss_rounds,
         tournament.tiebreaker_order,
+        tournament.swiss_withdrawals,
       );
     }
   }

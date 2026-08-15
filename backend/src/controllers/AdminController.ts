@@ -20,6 +20,7 @@ import {
 import {
   appendSwissFreeSeedIfOdd,
   buildSwissStageView,
+  countCompletedRounds,
   isRoundComplete,
   isSwissFreeTeamId,
   nextCourtStart,
@@ -31,6 +32,7 @@ import {
   type SwissMatchScores,
   type SwissMatchView,
   type SwissSeedEntry,
+  type SwissWithdrawal,
 } from "../services/swissStageService";
 import { computeTeamRatingsForSwiss } from "../services/swissTeamRating";
 import { getPoints } from "../config/cupPoints";
@@ -1364,6 +1366,7 @@ export class AdminController {
           tournament.swiss_rounds ?? 0,
           teams,
           tournament.tiebreaker_order ?? [],
+          tournament.swiss_withdrawals ?? [],
         );
       }
 
@@ -1689,6 +1692,7 @@ export class AdminController {
 
     const seeds = appendSwissFreeSeedIfOdd(baseSeeds);
     await TournamentModel.saveSwissSeed(tournamentId, seeds);
+    await TournamentModel.saveSwissWithdrawals(tournamentId, null);
     await TournamentSwissMatchModel.deleteByTournament(tournamentId);
     const fixtures = pairRound1HalfMethod(seeds);
     await TournamentSwissMatchModel.insertFixtures(tournamentId, fixtures);
@@ -1729,6 +1733,7 @@ export class AdminController {
     swissRounds: number,
     teams: RegisteredTeamRow[],
     tiebreakerOrder: TiebreakerCriterion[] | null | undefined = [],
+    withdrawals: SwissWithdrawal[] | null | undefined = [],
   ) {
     if (!swissSeed?.length || swissRounds < 1) {
       return null;
@@ -1740,12 +1745,14 @@ export class AdminController {
       AdminController.swissRowsToViews(rows),
       swissRounds,
       tiebreakerOrder,
+      withdrawals,
     );
   }
 
   /**
    * Обновить счёт матча швейцарки.
    * После последнего результата тура автоматически формирует пары следующего.
+   * Счёт тура нельзя менять, если уже сформирован следующий — сначала откат.
    */
   static async updateTournamentSwissMatch(
     req: Request,
@@ -1840,11 +1847,13 @@ export class AdminController {
           (m) => m.round_number > match.round_number,
         );
         if (laterExists) {
-          // Каскад: удалить последующие туры при правке счёта
-          await TournamentSwissMatchModel.deleteRoundsFrom(
-            tournamentId,
-            match.round_number + 1,
-          );
+          res.status(400).json({
+            success: false,
+            message:
+              `Счёт тура ${match.round_number} нельзя менять: уже сформирован следующий тур. ` +
+              `Сначала удалите тур ${match.round_number + 1} и последующие (кнопка «Вернуться к туру»).`,
+          });
+          return;
         }
       }
 
@@ -1922,6 +1931,7 @@ export class AdminController {
               scoreRows,
               nextRound,
               nextCourtStart(rows),
+              tournament.swiss_withdrawals,
             );
             await TournamentSwissMatchModel.insertFixtures(
               tournamentId,
@@ -1954,6 +1964,7 @@ export class AdminController {
         AdminController.swissRowsToViews(rows),
         swissRounds,
         tournament.tiebreaker_order,
+        tournament.swiss_withdrawals,
       );
 
       res.json({
@@ -2066,6 +2077,7 @@ export class AdminController {
         AdminController.swissRowsToViews(rows),
         tournament.swiss_rounds,
         tournament.tiebreaker_order,
+        tournament.swiss_withdrawals,
       );
 
       res.json({
@@ -2182,6 +2194,7 @@ export class AdminController {
           scoreRows,
           nextRound,
           nextCourtStart(rows),
+          tournament.swiss_withdrawals,
         );
         await TournamentSwissMatchModel.insertFixtures(
           tournamentId,
@@ -2211,6 +2224,7 @@ export class AdminController {
         AdminController.swissRowsToViews(rows),
         tournament.swiss_rounds,
         tournament.tiebreaker_order,
+        tournament.swiss_withdrawals,
       );
 
       res.json({
@@ -2220,6 +2234,272 @@ export class AdminController {
       });
     } catch (error) {
       console.error("Ошибка перехода к следующему туру швейцарки:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /**
+   * Снять команду со швейцарки начиная с указанного (или следующего) тура.
+   * В паринге туров >= from_round команда не участвует.
+   */
+  static async withdrawSwissTeam(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const teamId = parseInt(req.params.teamId, 10);
+      if (isNaN(tournamentId) || isNaN(teamId) || teamId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира или команды",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Снятие доступно только в статусе «В процессе»",
+        });
+        return;
+      }
+      if (tournament.play_format !== TournamentPlayFormat.SWISS) {
+        res.status(400).json({
+          success: false,
+          message: "Снятие доступно только для швейцарки",
+        });
+        return;
+      }
+      if (!tournament.swiss_seed?.length || !tournament.swiss_rounds) {
+        res.status(400).json({
+          success: false,
+          message: "Сиды швейцарки не сформированы",
+        });
+        return;
+      }
+      if (
+        !tournament.swiss_seed.some(
+          (s) => s.team_id === teamId && !isSwissFreeTeamId(s.team_id),
+        )
+      ) {
+        res.status(400).json({
+          success: false,
+          message: "Команда не участвует в швейцарке",
+        });
+        return;
+      }
+
+      const cupCount =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (cupCount > 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "После начала финала швейцарку нельзя изменять. Сбросьте финал.",
+        });
+        return;
+      }
+
+      const rows =
+        await TournamentSwissMatchModel.listByTournament(tournamentId);
+      const scoreRows = AdminController.swissRowsToScores(rows);
+      const completed = countCompletedRounds(
+        scoreRows,
+        tournament.swiss_rounds,
+      );
+      const maxRound = rows.reduce(
+        (max, m) => Math.max(max, m.round_number),
+        0,
+      );
+
+      const body = req.body as { from_round?: unknown };
+      let fromRound: number;
+      if (body.from_round !== undefined && body.from_round !== null) {
+        fromRound =
+          typeof body.from_round === "number"
+            ? body.from_round
+            : parseInt(String(body.from_round), 10);
+      } else {
+        // Следующий ещё не сформированный тур (после сыгранных / текущего).
+        fromRound = Math.max(completed, maxRound) + 1;
+      }
+      if (
+        !Number.isInteger(fromRound) ||
+        fromRound < 2 ||
+        fromRound > tournament.swiss_rounds
+      ) {
+        res.status(400).json({
+          success: false,
+          message:
+            fromRound > tournament.swiss_rounds
+              ? "Все запланированные туры уже сыграны — снимать некого"
+              : "Укажите тур снятия от 2 до последнего запланированного",
+        });
+        return;
+      }
+
+      const laterOrSameExists = rows.some((m) => m.round_number >= fromRound);
+      if (laterOrSameExists) {
+        res.status(400).json({
+          success: false,
+          message:
+            `Тур ${fromRound} уже сформирован. Сначала удалите его` +
+            (rows.some((m) => m.round_number > fromRound)
+              ? " и последующие"
+              : "") +
+            ` (кнопка «Вернуться к туру»), затем снимите команду.`,
+        });
+        return;
+      }
+
+      const existing = [...(tournament.swiss_withdrawals ?? [])].filter(
+        (w) => w.team_id !== teamId,
+      );
+      existing.push({ team_id: teamId, from_round: fromRound });
+      existing.sort((a, b) => a.team_id - b.team_id);
+      await TournamentModel.saveSwissWithdrawals(tournamentId, existing);
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const swiss = buildSwissStageView(
+        tournament.swiss_seed,
+        teams,
+        AdminController.swissRowsToViews(rows),
+        tournament.swiss_rounds,
+        tournament.tiebreaker_order,
+        existing,
+      );
+
+      res.json({
+        success: true,
+        message: `Команда снята с ${fromRound} тура`,
+        data: { swiss },
+      });
+    } catch (error) {
+      console.error("Ошибка снятия команды со швейцарки:", error);
+      res.status(500).json({
+        success: false,
+        message: "Внутренняя ошибка сервера",
+      });
+    }
+  }
+
+  /**
+   * Вернуть команду в швейцарку (отменить снятие), если туры снятия ещё не сыграны.
+   */
+  static async reinstateSwissTeam(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const tournamentId = parseInt(req.params.tournamentId, 10);
+      const teamId = parseInt(req.params.teamId, 10);
+      if (isNaN(tournamentId) || isNaN(teamId) || teamId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Неверный ID турнира или команды",
+        });
+        return;
+      }
+
+      const tournament = await TournamentModel.getTournamentById(tournamentId);
+      if (!tournament) {
+        res.status(404).json({
+          success: false,
+          message: "Турнир не найден",
+        });
+        return;
+      }
+      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+        res.status(400).json({
+          success: false,
+          message: "Доступно только в статусе «В процессе»",
+        });
+        return;
+      }
+      if (tournament.play_format !== TournamentPlayFormat.SWISS) {
+        res.status(400).json({
+          success: false,
+          message: "Доступно только для швейцарки",
+        });
+        return;
+      }
+
+      const cupCount =
+        await TournamentCupMatchModel.countByTournament(tournamentId);
+      if (cupCount > 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "После начала финала швейцарку нельзя изменять. Сбросьте финал.",
+        });
+        return;
+      }
+
+      const current = tournament.swiss_withdrawals ?? [];
+      const entry = current.find((w) => w.team_id === teamId);
+      if (!entry) {
+        res.status(400).json({
+          success: false,
+          message: "Команда не снята со швейцарки",
+        });
+        return;
+      }
+
+      const rows =
+        await TournamentSwissMatchModel.listByTournament(tournamentId);
+      if (rows.some((m) => m.round_number >= entry.from_round)) {
+        res.status(400).json({
+          success: false,
+          message:
+            `Тур ${entry.from_round} уже сформирован без этой команды. ` +
+            `Сначала удалите его (и последующие), затем верните команду.`,
+        });
+        return;
+      }
+
+      const next = current.filter((w) => w.team_id !== teamId);
+      await TournamentModel.saveSwissWithdrawals(
+        tournamentId,
+        next.length > 0 ? next : null,
+      );
+
+      const teams =
+        await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
+          tournamentId,
+          tournament.type as TournamentType,
+        );
+      const swiss = buildSwissStageView(
+        tournament.swiss_seed!,
+        teams,
+        AdminController.swissRowsToViews(rows),
+        tournament.swiss_rounds!,
+        tournament.tiebreaker_order,
+        next,
+      );
+
+      res.json({
+        success: true,
+        message: "Команда снова участвует в швейцарке",
+        data: { swiss },
+      });
+    } catch (error) {
+      console.error("Ошибка возврата команды в швейцарку:", error);
       res.status(500).json({
         success: false,
         message: "Внутренняя ошибка сервера",
@@ -2583,12 +2863,13 @@ export class AdminController {
         const swissMatches =
           await TournamentSwissMatchModel.listByTournament(tournamentId);
         const swiss = buildSwissStageView(
-          tournament.swiss_seed,
-          teams,
-          AdminController.swissRowsToViews(swissMatches),
-          tournament.swiss_rounds,
-          tournament.tiebreaker_order,
-        );
+        tournament.swiss_seed,
+        teams,
+        AdminController.swissRowsToViews(swissMatches),
+        tournament.swiss_rounds,
+        tournament.tiebreaker_order,
+        tournament.swiss_withdrawals,
+      );
         if (swiss.completed_rounds < tournament.swiss_rounds) {
           res.status(400).json({
             success: false,
@@ -2809,12 +3090,13 @@ export class AdminController {
         const swissMatches =
           await TournamentSwissMatchModel.listByTournament(tournamentId);
         const swiss = buildSwissStageView(
-          tournament.swiss_seed,
-          teams,
-          AdminController.swissRowsToViews(swissMatches),
-          tournament.swiss_rounds,
-          tournament.tiebreaker_order,
-        );
+        tournament.swiss_seed,
+        teams,
+        AdminController.swissRowsToViews(swissMatches),
+        tournament.swiss_rounds,
+        tournament.tiebreaker_order,
+        tournament.swiss_withdrawals,
+      );
         for (const s of swiss.standings) {
           if (isSwissFreeTeamId(s.team_id) || s.place <= 0) {
             continue;
@@ -3750,6 +4032,7 @@ export class AdminController {
       if (settingsInput.play_format === TournamentPlayFormat.GROUPS) {
         await TournamentSwissMatchModel.deleteByTournament(tournamentId);
         await TournamentModel.saveSwissSeed(tournamentId, null);
+        await TournamentModel.saveSwissWithdrawals(tournamentId, null);
       } else {
         await TournamentGroupMatchModel.deleteByTournament(tournamentId);
       }
@@ -4367,6 +4650,7 @@ export class AdminController {
           await TournamentSwissMatchModel.deleteByTournament(tournamentId);
           await TournamentModel.saveCupStageConfig(tournamentId, null);
           await TournamentModel.saveSwissSeed(tournamentId, null);
+          await TournamentModel.saveSwissWithdrawals(tournamentId, null);
         }
         res.json({
           success: true,

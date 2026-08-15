@@ -52,6 +52,12 @@ export type SwissSeedEntry = {
   random_tie: number;
 };
 
+/** Снятие команды со швейцарки начиная с тура from_round */
+export type SwissWithdrawal = {
+  team_id: number;
+  from_round: number;
+};
+
 export type CupThirdPlaceByCup = Partial<
   Record<"A" | "B" | "C" | "D", boolean>
 >;
@@ -96,6 +102,8 @@ export interface Tournament {
   tiebreaker_order?: TiebreakerCriterion[] | null;
   /** Сиды швейцарки после старта проведения */
   swiss_seed?: SwissSeedEntry[] | null;
+  /** Снятия со швейцарки: не участвуют в паринге с from_round */
+  swiss_withdrawals?: SwissWithdrawal[] | null;
   group_draw?: TournamentGroupDrawGroup[] | null;
   /** Конфиг финальных кубков (после старта финала) */
   cup_stage_config?: CupStageConfig | null;

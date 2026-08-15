@@ -18,6 +18,12 @@ export type SwissSeedEntry = {
   random_tie: number;
 };
 
+/** Команда снята со швейцарки начиная с тура from_round (в паринге не участвует). */
+export type SwissWithdrawal = {
+  team_id: number;
+  from_round: number;
+};
+
 export type SwissMatchFixture = {
   round_number: number;
   team_a_id: number;
@@ -78,6 +84,8 @@ export type SwissStageTeamView = {
   played: number;
   place: number;
   tiebreakers: SwissTiebreakerValues;
+  /** Снята начиная с этого тура; null — играет */
+  withdrawn_from_round: number | null;
 };
 
 export type SwissStageView = {
@@ -86,6 +94,7 @@ export type SwissStageView = {
   tiebreaker_order: TiebreakerCriterion[];
   standings: SwissStageTeamView[];
   matches: SwissMatchView[];
+  withdrawals: SwissWithdrawal[];
 };
 
 export function parseSwissSeed(raw: unknown): SwissSeedEntry[] | null {
@@ -133,6 +142,70 @@ export function parseSwissSeed(raw: unknown): SwissSeedEntry[] | null {
     });
   }
   return entries.sort((a, b) => a.seed - b.seed);
+}
+
+export function parseSwissWithdrawals(raw: unknown): SwissWithdrawal[] {
+  if (raw == null) {
+    return [];
+  }
+  let value = raw;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const entries: SwissWithdrawal[] = [];
+  const seen = new Set<number>();
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const row = item as Record<string, unknown>;
+    const teamId = Number(row.team_id);
+    const fromRound = Number(row.from_round);
+    if (
+      !Number.isInteger(teamId) ||
+      teamId <= 0 ||
+      isSwissFreeTeamId(teamId) ||
+      !Number.isInteger(fromRound) ||
+      fromRound < 1 ||
+      seen.has(teamId)
+    ) {
+      continue;
+    }
+    seen.add(teamId);
+    entries.push({ team_id: teamId, from_round: fromRound });
+  }
+  return entries.sort((a, b) => a.team_id - b.team_id);
+}
+
+/** Сиды команд, ещё участвующих в паринге тура roundNumber. */
+export function seedsActiveForRound(
+  seeds: SwissSeedEntry[],
+  withdrawals: SwissWithdrawal[] | null | undefined,
+  roundNumber: number,
+): SwissSeedEntry[] {
+  if (!withdrawals?.length) {
+    return seeds;
+  }
+  const fromByTeam = new Map(
+    withdrawals.map((w) => [w.team_id, w.from_round]),
+  );
+  return seeds.filter((s) => {
+    const from = fromByTeam.get(s.team_id);
+    return from == null || from > roundNumber;
+  });
+}
+
+export function withdrawalFromRoundByTeam(
+  withdrawals: SwissWithdrawal[] | null | undefined,
+): Map<number, number> {
+  return new Map((withdrawals ?? []).map((w) => [w.team_id, w.from_round]));
 }
 
 /** Сумма рейтингов игроков (как на странице регистрации). */
@@ -630,8 +703,10 @@ export function pairNextRoundByScoreGroups(
   matchesSoFar: SwissMatchScores[],
   roundNumber: number,
   courtStart: number = 1,
+  withdrawals: SwissWithdrawal[] | null | undefined = null,
 ): SwissMatchFixture[] {
-  const allSeeds = appendSwissFreeSeedIfOdd(seeds);
+  const activeSeeds = seedsActiveForRound(seeds, withdrawals, roundNumber);
+  const allSeeds = appendSwissFreeSeedIfOdd(activeSeeds);
   const stats = computeWinsByTeam(allSeeds, matchesSoFar);
   const played = collectPlayedPairs(matchesSoFar);
 
@@ -643,7 +718,7 @@ export function pairNextRoundByScoreGroups(
 
   const pools = buildWinsPools(candidates);
   const prevFloat = collectFloatInfoForRound(
-    seeds,
+    activeSeeds,
     matchesSoFar,
     roundNumber - 1,
   );
@@ -1362,8 +1437,11 @@ export function buildSwissStageView(
   matches: SwissMatchView[],
   swissRounds: number,
   tiebreakerOrder: TiebreakerCriterion[] | null | undefined = [],
+  withdrawals: SwissWithdrawal[] | null | undefined = [],
 ): SwissStageView {
   const order = tiebreakerOrder ?? [];
+  const withdrawalList = parseSwissWithdrawals(withdrawals ?? []);
+  const withdrawnFrom = withdrawalFromRoundByTeam(withdrawalList);
   const allSeeds = appendSwissFreeSeedIfOdd(seeds);
   const teamById = new Map(teams.map((t) => [t.team_id, t]));
   if (allSeeds.some((s) => isSwissFreeTeamId(s.team_id))) {
@@ -1394,6 +1472,7 @@ export function buildSwissStageView(
     swiss_rounds: swissRounds,
     completed_rounds,
     tiebreaker_order: order,
+    withdrawals: withdrawalList,
     standings: standings.map((s) => ({
       team_id: s.team_id,
       players: teamById.get(s.team_id)?.players ?? [],
@@ -1406,6 +1485,7 @@ export function buildSwissStageView(
       played: s.played,
       place: s.place,
       tiebreakers: s.tiebreakers,
+      withdrawn_from_round: withdrawnFrom.get(s.team_id) ?? null,
     })),
     // В ответе для is_bye всегда отдаём 13:7 (старые 13:0 нормализуем).
     matches: displayMatches.map((m) =>

@@ -236,6 +236,13 @@ export interface TournamentSwissStanding {
   played: number;
   place: number;
   tiebreakers: Partial<Record<TiebreakerCriterion, number>>;
+  /** Снята начиная с этого тура; null/undefined — играет */
+  withdrawn_from_round?: number | null;
+}
+
+export interface TournamentSwissWithdrawal {
+  team_id: number;
+  from_round: number;
 }
 
 export interface TournamentSwissStageView {
@@ -244,6 +251,7 @@ export interface TournamentSwissStageView {
   tiebreaker_order: TiebreakerCriterion[];
   standings: TournamentSwissStanding[];
   matches: TournamentSwissMatchView[];
+  withdrawals?: TournamentSwissWithdrawal[];
 }
 
 /** Ответ GET /rating/players/search (автодополнение) */

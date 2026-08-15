@@ -7,12 +7,16 @@ import {
   parseTiebreakerOrder,
 } from "../services/tournamentPlaySettings";
 import { parseCupStageConfig } from "../services/cupStageService";
-import { parseSwissSeed } from "../services/swissStageService";
+import {
+  parseSwissSeed,
+  parseSwissWithdrawals,
+} from "../services/swissStageService";
 import {
   Cup,
   CupPosition,
   CupStageConfig,
   SwissSeedEntry,
+  SwissWithdrawal,
   Tournament,
   TournamentCategoryEnum,
   TournamentGroupDrawGroup,
@@ -40,6 +44,7 @@ export class TournamentModel {
       tiebreaker_order: parseTiebreakerOrder(row.tiebreaker_order),
       group_draw: parseGroupDraw(row.group_draw),
       swiss_seed: parseSwissSeed(row.swiss_seed),
+      swiss_withdrawals: parseSwissWithdrawals(row.swiss_withdrawals),
       cup_stage_config: parseCupStageConfig(row.cup_stage_config),
     };
 
@@ -259,7 +264,8 @@ export class TournamentModel {
            swiss_rounds = ?,
            tiebreaker_order = ?,
            group_draw = NULL,
-           swiss_seed = NULL
+           swiss_seed = NULL,
+           swiss_withdrawals = NULL
        WHERE id = ?`,
       [
         playFormat,
@@ -301,6 +307,22 @@ export class TournamentModel {
     const [result] = await pool.execute<ResultSetHeader>(
       `UPDATE tournaments SET swiss_seed = ? WHERE id = ?`,
       [seed ? JSON.stringify(seed) : null, id],
+    );
+    return result.affectedRows > 0;
+  }
+
+  static async saveSwissWithdrawals(
+    id: number,
+    withdrawals: SwissWithdrawal[] | null,
+  ): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE tournaments SET swiss_withdrawals = ? WHERE id = ?`,
+      [
+        withdrawals && withdrawals.length > 0
+          ? JSON.stringify(withdrawals)
+          : null,
+        id,
+      ],
     );
     return result.affectedRows > 0;
   }

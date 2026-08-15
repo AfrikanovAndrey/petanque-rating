@@ -381,10 +381,17 @@ const TournamentStartWizardModal: React.FC<Props> = ({
 
   const optionsForSwissSeedSlot = (slotIndex: number) => {
     const current = swissManualSeeds[slotIndex] ?? 0;
-    return confirmedTeams.filter(
-      (team) =>
-        team.team_id === current || !assignedSwissSeedIds.has(team.team_id)
-    );
+    return confirmedTeams
+      .filter(
+        (team) =>
+          team.team_id === current || !assignedSwissSeedIds.has(team.team_id)
+      )
+      .slice()
+      .sort((a, b) =>
+        a.players
+          .join(", ")
+          .localeCompare(b.players.join(", "), "ru", { sensitivity: "base" })
+      );
   };
 
   const handleNextFromStep2 = async () => {

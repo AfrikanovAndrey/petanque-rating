@@ -143,6 +143,46 @@ describe("pairNextRoundByScoreGroups", () => {
     expect(played.size).toBe(4);
   });
 
+  it("исключает снятую команду из паринга следующего тура", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4]);
+    const round1: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 3,
+        score_a: 13,
+        score_b: 5,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 7,
+        is_bye: false,
+      },
+    ];
+    // Команда 4 снята со 2 тура → в паринге 1,2,3 (+ «Свободен» при нечёте)
+    const round2 = pairNextRoundByScoreGroups(
+      seeds,
+      round1,
+      2,
+      1,
+      [{ team_id: 4, from_round: 2 }],
+    );
+    const teamIds = new Set<number>();
+    for (const f of round2) {
+      teamIds.add(f.team_a_id);
+      if (f.team_b_id != null) {
+        teamIds.add(f.team_b_id);
+      }
+    }
+    expect(teamIds.has(4)).toBe(false);
+    expect(round2.some((f) => f.is_bye)).toBe(true);
+    expect(round2.filter((f) => !f.is_bye)).toHaveLength(1);
+  });
+
   it("Direct pairing: верхняя половина группы против нижней по сиду", () => {
     const seeds = seedsFromIds([1, 2, 3, 4, 5, 6, 7, 8]);
     // Все 8 «победили» (условно один тур с разными соперниками) —
@@ -833,5 +873,47 @@ describe("buildSwissStageView", () => {
     expect(byId.get(2)!.wins).toBe(1);
     expect(byId.get(3)!.wins).toBe(0);
     expect(byId.get(4)!.wins).toBe(0);
+  });
+
+  it("проставляет withdrawn_from_round в итогах", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4]);
+    const teams = seeds.map((s) => ({
+      team_id: s.team_id,
+      players: [`T${s.team_id}`],
+    }));
+    const matches: SwissMatchView[] = [
+      {
+        id: 1,
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 3,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+        court: 1,
+      },
+      {
+        id: 2,
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+        court: 2,
+      },
+    ];
+    const view = buildSwissStageView(
+      seeds,
+      teams,
+      matches,
+      3,
+      [],
+      [{ team_id: 3, from_round: 2 }],
+    );
+    expect(view.withdrawals).toEqual([{ team_id: 3, from_round: 2 }]);
+    const byId = new Map(view.standings.map((s) => [s.team_id, s]));
+    expect(byId.get(3)!.withdrawn_from_round).toBe(2);
+    expect(byId.get(1)!.withdrawn_from_round).toBeNull();
   });
 });
