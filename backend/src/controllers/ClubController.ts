@@ -14,25 +14,26 @@ import {
 const UPLOADS_ROOT = path.join(process.cwd(), "uploads", "clubs");
 
 function ensureUploadsDir(): void {
-  if (!fs.existsSync(UPLOADS_ROOT)) {
-    fs.mkdirSync(UPLOADS_ROOT, { recursive: true });
-  }
+  fs.mkdirSync(UPLOADS_ROOT, { recursive: true });
 }
 
-const logoStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    ensureUploadsDir();
-    cb(null, UPLOADS_ROOT);
-  },
-  filename: (req, file, cb) => {
-    const clubId = req.params.id || "new";
-    const ext = path.extname(file.originalname).toLowerCase() || ".png";
-    cb(null, `${clubId}-${Date.now()}${ext}`);
-  },
-});
+function saveLogoFile(
+  clubId: number,
+  file: Express.Multer.File
+): { fileName: string; relativePath: string } {
+  ensureUploadsDir();
+  const ext = path.extname(file.originalname).toLowerCase() || ".png";
+  const fileName = `${clubId}-${Date.now()}${ext}`;
+  const absolutePath = path.join(UPLOADS_ROOT, fileName);
+  fs.writeFileSync(absolutePath, file.buffer);
+  return {
+    fileName,
+    relativePath: `/uploads/clubs/${fileName}`,
+  };
+}
 
 export const clubLogoUploadMiddleware = multer({
-  storage: logoStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -352,12 +353,11 @@ export class ClubController {
 
       const existing = await ClubModel.getClubById(id);
       if (!existing) {
-        removeLogoFile(path.join("uploads", "clubs", req.file.filename));
         res.status(404).json({ success: false, message: "Клуб не найден" });
         return;
       }
 
-      const relativePath = `/uploads/clubs/${req.file.filename}`;
+      const { fileName, relativePath } = saveLogoFile(id, req.file);
       removeLogoFile(existing.logo_path);
       await ClubModel.updateLogoPath(id, relativePath);
       const club = await ClubModel.getClubById(id);
