@@ -49,6 +49,10 @@ function userRoles(req: AuthRequest): UserRole[] {
   return req.userRole ? [req.userRole] : [];
 }
 
+function isAdmin(req: AuthRequest): boolean {
+  return userRoles(req).includes(UserRole.ADMIN);
+}
+
 function isClubAdmin(req: AuthRequest): boolean {
   const roles = userRoles(req);
   return (
@@ -155,6 +159,7 @@ export class ClubController {
             player_id: m.player_id,
             player_name: m.player_name,
             city: m.city ?? null,
+            joined_at: m.joined_at,
             created_at: m.created_at,
           })),
         },
@@ -226,11 +231,15 @@ export class ClubController {
         });
         return;
       }
-      const club = await ClubModel.createClub({
-        name: body.name,
-        owner_user_ids: body.owner_user_ids ?? [],
-        member_player_ids: body.member_player_ids ?? [],
-      });
+      const club = await ClubModel.createClub(
+        {
+          name: body.name,
+          owner_user_ids: body.owner_user_ids ?? [],
+          member_player_ids: body.member_player_ids,
+          members: body.members,
+        },
+        { allowJoinedAtUpdate: isAdmin(req) }
+      );
       res.status(201).json({
         success: true,
         message: "Клуб создан",
@@ -283,8 +292,12 @@ export class ClubController {
           name: body.name,
           owner_user_ids: admin ? body.owner_user_ids : undefined,
           member_player_ids: body.member_player_ids,
+          members: body.members,
         },
-        { allowOwnersUpdate: admin }
+        {
+          allowOwnersUpdate: admin,
+          allowJoinedAtUpdate: isAdmin(req),
+        }
       );
 
       if (!club) {

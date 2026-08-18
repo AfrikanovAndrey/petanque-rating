@@ -102,7 +102,7 @@ const ClubDetail: React.FC = () => {
                   Город
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Дата добавления
+                  Дата вступления
                 </th>
               </tr>
             </thead>
@@ -126,7 +126,11 @@ const ClubDetail: React.FC = () => {
                       {m.city || "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {m.created_at ? formatDate(m.created_at) : "—"}
+                      {m.joined_at
+                        ? formatDate(m.joined_at)
+                        : m.created_at
+                          ? formatDate(m.created_at)
+                          : "—"}
                     </td>
                   </tr>
                 ))

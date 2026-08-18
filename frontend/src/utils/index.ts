@@ -38,6 +38,14 @@ export function cn(...inputs: ClassValue[]) {
 // Форматирование даты
 export function formatDate(dateString: string): string {
   try {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split("-").map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString("ru-RU", {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+      });
+    }
     const date = new Date(dateString);
     return date.toLocaleDateString("ru-RU", {
       year: "numeric",

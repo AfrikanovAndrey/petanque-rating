@@ -16,7 +16,7 @@ import {
   User,
   UserRole,
 } from "../../types";
-import { handleApiError, hasAnyUserRole, formatDate } from "../../utils";
+import { handleApiError, hasAnyUserRole, formatDate, todayDateStr } from "../../utils";
 import { PlayerAutocompleteField } from "../../components/PlayerAutocompleteField";
 
 const AdminClubs: React.FC = () => {
@@ -54,6 +54,7 @@ const AdminClubs: React.FC = () => {
     UserRole.ADMIN,
     UserRole.PRESIDIUM_MEMBER,
   ]);
+  const isAdmin = hasAnyUserRole(currentUser, [UserRole.ADMIN]);
 
   const isOwnClub = (club: Club): boolean =>
     (club.owners ?? []).some((o) => o.user_id === currentUser?.id);
@@ -134,6 +135,7 @@ const AdminClubs: React.FC = () => {
       {
         player_id: player.id,
         player_name: player.name,
+        joined_at: todayDateStr(),
         created_at: new Date().toISOString(),
       },
     ]);
@@ -150,6 +152,21 @@ const AdminClubs: React.FC = () => {
     removeMember(memberToRemove.player_id);
   };
 
+  const setMemberJoinedAt = (playerId: number, joinedAt: string) => {
+    setMembers((prev) =>
+      prev.map((m) =>
+        m.player_id === playerId ? { ...m, joined_at: joinedAt } : m
+      )
+    );
+  };
+
+  const memberJoinDateValue = (member: ClubMemberSummary): string => {
+    if (member.joined_at && /^\d{4}-\d{2}-\d{2}/.test(member.joined_at)) {
+      return member.joined_at.slice(0, 10);
+    }
+    return member.created_at ? member.created_at.slice(0, 10) : "";
+  };
+
   const toggleOwner = (userId: number) => {
     setOwnerIds((prev) =>
       prev.includes(userId)
@@ -164,17 +181,24 @@ const AdminClubs: React.FC = () => {
       toast.error("Укажите название клуба");
       return;
     }
+    if (isAdmin && members.some((m) => !memberJoinDateValue(m))) {
+      toast.error("Укажите дату вступления для всех игроков");
+      return;
+    }
     setSaving(true);
     try {
       let clubId = editingClub?.id;
       if (editingClub) {
         const payload: {
           name: string;
-          member_player_ids: number[];
+          members: { player_id: number; joined_at?: string }[];
           owner_user_ids?: number[];
         } = {
           name: name.trim(),
-          member_player_ids: members.map((m) => m.player_id),
+          members: members.map((m) => ({
+            player_id: m.player_id,
+            joined_at: isAdmin ? memberJoinDateValue(m) || undefined : undefined,
+          })),
         };
         if (isClubAdmin) {
           payload.owner_user_ids = ownerIds;
@@ -185,7 +209,10 @@ const AdminClubs: React.FC = () => {
         const res = await adminApi.createClub({
           name: name.trim(),
           owner_user_ids: ownerIds,
-          member_player_ids: members.map((m) => m.player_id),
+          members: members.map((m) => ({
+            player_id: m.player_id,
+            joined_at: isAdmin ? memberJoinDateValue(m) || undefined : undefined,
+          })),
         });
         clubId = res.data.data?.id;
         toast.success("Клуб создан");
@@ -441,7 +468,7 @@ const AdminClubs: React.FC = () => {
                             ФИО
                           </th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Дата добавления
+                            Дата вступления
                           </th>
                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                             {" "}
@@ -461,7 +488,24 @@ const AdminClubs: React.FC = () => {
                               ) : null}
                             </td>
                             <td className="px-3 py-2 text-gray-600">
-                              {m.created_at ? formatDate(m.created_at) : "—"}
+                              {isAdmin ? (
+                                <input
+                                  type="date"
+                                  className="input-field py-1 text-sm max-w-[11rem]"
+                                  value={memberJoinDateValue(m)}
+                                  onChange={(e) =>
+                                    setMemberJoinedAt(
+                                      m.player_id,
+                                      e.target.value
+                                    )
+                                  }
+                                  required
+                                />
+                              ) : memberJoinDateValue(m) ? (
+                                formatDate(memberJoinDateValue(m))
+                              ) : (
+                                "—"
+                              )}
                             </td>
                             <td className="px-3 py-2 text-right">
                               <button
@@ -477,6 +521,12 @@ const AdminClubs: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+                )}
+                {isAdmin && members.length > 0 && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Дата вступления отображается на публичной странице клуба.
+                    Для уже состоящих в клубе игроков её можно исправить.
+                  </p>
                 )}
               </div>
 

@@ -121,8 +121,16 @@ export interface ClubMemberSummary {
   player_name: string;
   city?: string | null;
   license_number?: string | null;
-  /** Дата добавления в состав клуба */
+  /** Дата вступления в клуб (YYYY-MM-DD) */
+  joined_at: string;
+  /** Когда запись о членстве создана в системе */
   created_at: Date | string;
+}
+
+export interface ClubMemberInput {
+  player_id: number;
+  /** Дата вступления в клуб (YYYY-MM-DD); только ADMIN */
+  joined_at?: string;
 }
 
 export interface ClubWithDetails extends Club {
@@ -135,12 +143,14 @@ export interface CreateClubRequest {
   name: string;
   owner_user_ids?: number[];
   member_player_ids?: number[];
+  members?: ClubMemberInput[];
 }
 
 export interface UpdateClubRequest {
   name?: string;
   owner_user_ids?: number[];
   member_player_ids?: number[];
+  members?: ClubMemberInput[];
 }
 
 export interface User {

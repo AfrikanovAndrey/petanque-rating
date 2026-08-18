@@ -1,6 +1,7 @@
 import { pool } from "../config/database";
 import {
   Club,
+  ClubMemberInput,
   ClubMemberSummary,
   ClubOwnerSummary,
   ClubWithDetails,
@@ -38,6 +39,7 @@ export class ClubModel {
     const db = conn ?? pool;
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT p.id AS player_id, p.name AS player_name, p.city, p.license_number,
+              DATE_FORMAT(cm.joined_at, '%Y-%m-%d') AS joined_at,
               cm.created_at
        FROM club_members cm
        JOIN players p ON p.id = cm.player_id
@@ -205,21 +207,121 @@ export class ClubModel {
     }
   }
 
+  static parseJoinedAt(value: unknown): string | undefined {
+    if (value == null || value === "") return undefined;
+    if (typeof value !== "string") {
+      throw Object.assign(
+        new Error("Дата вступления должна быть строкой в формате ГГГГ-ММ-ДД"),
+        { statusCode: 400 }
+      );
+    }
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+    if (!match) {
+      throw Object.assign(
+        new Error("Дата вступления должна быть в формате ГГГГ-ММ-ДД"),
+        { statusCode: 400 }
+      );
+    }
+    const iso = `${match[1]}-${match[2]}-${match[3]}`;
+    const date = new Date(`${iso}T00:00:00Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso) {
+      throw Object.assign(new Error("Некорректная дата вступления"), {
+        statusCode: 400,
+      });
+    }
+    return iso;
+  }
+
+  static resolveMembersFromRequest(
+    data: CreateClubRequest | UpdateClubRequest
+  ): ClubMemberInput[] | undefined {
+    if (data.members !== undefined) {
+      if (!Array.isArray(data.members)) {
+        throw Object.assign(new Error("Список состава должен быть массивом"), {
+          statusCode: 400,
+        });
+      }
+      const seen = new Set<number>();
+      const result: ClubMemberInput[] = [];
+      for (const item of data.members) {
+        const playerId = Number(item?.player_id);
+        if (!Number.isInteger(playerId) || playerId <= 0) {
+          throw Object.assign(new Error("Некорректный идентификатор игрока"), {
+            statusCode: 400,
+          });
+        }
+        if (seen.has(playerId)) continue;
+        seen.add(playerId);
+        result.push({
+          player_id: playerId,
+          joined_at: ClubModel.parseJoinedAt(item?.joined_at),
+        });
+      }
+      return result;
+    }
+    if (data.member_player_ids !== undefined) {
+      return [...new Set(data.member_player_ids)].map((player_id) => ({
+        player_id,
+      }));
+    }
+    return undefined;
+  }
+
+  /**
+   * Синхронизирует состав: удаляет исключённых, добавляет новых,
+   * сохраняет дату вступления у оставшихся (если её не меняют).
+   */
   private static async replaceMembers(
     clubId: number,
-    memberPlayerIds: number[],
-    conn: PoolConnection
+    members: ClubMemberInput[],
+    conn: PoolConnection,
+    options: { allowJoinedAtUpdate: boolean }
   ): Promise<void> {
-    await conn.execute("DELETE FROM club_members WHERE club_id = ?", [clubId]);
-    for (const playerId of memberPlayerIds) {
-      await conn.execute(
-        "INSERT INTO club_members (club_id, player_id) VALUES (?, ?)",
-        [clubId, playerId]
-      );
+    const [existing] = await conn.execute<RowDataPacket[]>(
+      `SELECT player_id, DATE_FORMAT(joined_at, '%Y-%m-%d') AS joined_at
+       FROM club_members WHERE club_id = ?`,
+      [clubId]
+    );
+    const existingByPlayer = new Map<number, string>(
+      existing.map((row) => [row.player_id as number, String(row.joined_at)])
+    );
+    const nextIds = new Set(members.map((m) => m.player_id));
+
+    for (const row of existing) {
+      const playerId = row.player_id as number;
+      if (!nextIds.has(playerId)) {
+        await conn.execute(
+          "DELETE FROM club_members WHERE club_id = ? AND player_id = ?",
+          [clubId, playerId]
+        );
+      }
+    }
+
+    for (const member of members) {
+      const previous = existingByPlayer.get(member.player_id);
+      const nextJoinedAt =
+        options.allowJoinedAtUpdate && member.joined_at
+          ? member.joined_at
+          : undefined;
+
+      if (previous === undefined) {
+        await conn.execute(
+          "INSERT INTO club_members (club_id, player_id, joined_at) VALUES (?, ?, COALESCE(?, CURRENT_DATE))",
+          [clubId, member.player_id, nextJoinedAt ?? null]
+        );
+      } else if (nextJoinedAt && nextJoinedAt !== previous) {
+        await conn.execute(
+          "UPDATE club_members SET joined_at = ? WHERE club_id = ? AND player_id = ?",
+          [nextJoinedAt, clubId, member.player_id]
+        );
+      }
     }
   }
 
-  static async createClub(data: CreateClubRequest): Promise<ClubWithDetails> {
+  static async createClub(
+    data: CreateClubRequest,
+    options: { allowJoinedAtUpdate: boolean } = { allowJoinedAtUpdate: false }
+  ): Promise<ClubWithDetails> {
     const name = data.name.trim();
     if (!name) {
       throw Object.assign(new Error("Название клуба обязательно"), {
@@ -228,7 +330,8 @@ export class ClubModel {
     }
 
     const ownerUserIds = [...new Set(data.owner_user_ids ?? [])];
-    const memberPlayerIds = [...new Set(data.member_player_ids ?? [])];
+    const members = ClubModel.resolveMembersFromRequest(data) ?? [];
+    const memberPlayerIds = members.map((m) => m.player_id);
 
     const conn = await pool.getConnection();
     try {
@@ -243,7 +346,9 @@ export class ClubModel {
       const clubId = result.insertId;
 
       await ClubModel.replaceOwners(clubId, ownerUserIds, conn);
-      await ClubModel.replaceMembers(clubId, memberPlayerIds, conn);
+      await ClubModel.replaceMembers(clubId, members, conn, {
+        allowJoinedAtUpdate: options.allowJoinedAtUpdate,
+      });
 
       await conn.commit();
       const club = await ClubModel.getClubById(clubId);
@@ -262,7 +367,7 @@ export class ClubModel {
   static async updateClub(
     id: number,
     data: UpdateClubRequest,
-    options: { allowOwnersUpdate: boolean }
+    options: { allowOwnersUpdate: boolean; allowJoinedAtUpdate: boolean }
   ): Promise<ClubWithDetails | null> {
     const existing = await ClubModel.getClubById(id);
     if (!existing) return null;
@@ -290,10 +395,13 @@ export class ClubModel {
         await ClubModel.replaceOwners(id, ownerUserIds, conn);
       }
 
-      if (data.member_player_ids !== undefined) {
-        const memberPlayerIds = [...new Set(data.member_player_ids)];
+      const members = ClubModel.resolveMembersFromRequest(data);
+      if (members !== undefined) {
+        const memberPlayerIds = members.map((m) => m.player_id);
         await ClubModel.assertMembersAvailable(memberPlayerIds, id, conn);
-        await ClubModel.replaceMembers(id, memberPlayerIds, conn);
+        await ClubModel.replaceMembers(id, members, conn, {
+          allowJoinedAtUpdate: options.allowJoinedAtUpdate,
+        });
       }
 
       await conn.commit();
