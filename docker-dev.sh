@@ -29,7 +29,7 @@ prod() {
     log "Запуск приложения в production режиме..."
     
     # Создаем директории если их нет
-    mkdir -p uploads mysql/data
+    mkdir -p uploads/clubs mysql/data
 
     # Остановка production режима
     docker-compose --profile production down
@@ -57,7 +57,7 @@ dev() {
     log "Запуск приложения в dev режиме с hot reload..."
     
     # Создаем директории если их нет
-    mkdir -p uploads mysql/data
+    mkdir -p uploads/clubs mysql/data
     
     # Запускаем контейнеры с dev файлом для hot reload
     if command -v docker-compose &> /dev/null; then

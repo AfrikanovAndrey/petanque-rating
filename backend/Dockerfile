@@ -39,15 +39,14 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodejs -u 1001
 
-# Создаем директорию для загрузок и назначаем права
-RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app/uploads
-RUN chown -R nodejs:nodejs /app
+RUN apk add --no-cache su-exec \
+    && mkdir -p /app/uploads/clubs \
+    && chown -R nodejs:nodejs /app /app/uploads
 
-# Переключаемся на пользователя nodejs
-USER nodejs
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
-# Открываем порт
 EXPOSE 3001
 
-# Команда запуска
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["npm", "start"]
