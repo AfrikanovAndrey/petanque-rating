@@ -70,12 +70,7 @@ const Clubs: React.FC = () => {
               </h2>
               {typeof club.members_count === "number" && (
                 <p className="mt-1 text-sm text-gray-500">
-                  {club.members_count}{" "}
-                  {club.members_count === 1
-                    ? "игрок"
-                    : club.members_count < 5
-                      ? "игрока"
-                      : "игроков"}
+                  {"Игроков:" + club.members_count}
                 </p>
               )}
             </Link>

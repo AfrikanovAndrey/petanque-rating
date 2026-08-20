@@ -79,13 +79,8 @@ const ClubDetail: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             {club.name}
           </h1>
-          <p className="mt-2 text-gray-600">
-            Состав клуба: {club.members.length}{" "}
-            {club.members.length === 1
-              ? "игрок"
-              : club.members.length < 5
-                ? "игрока"
-                : "игроков"}
+          <p className="mt-2 text-gray-600">            
+            Игроков: {club.members.length}
           </p>
         </div>
       </div>
