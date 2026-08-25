@@ -1135,7 +1135,9 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                   </button>
                 </div>
               )}
-              {(canRollbackRound || canAdvanceRound || roundScoresLocked) && (
+              {(canRollbackRound ||
+                canAdvanceRound ||
+                (!readOnly && tournamentId != null && roundScoresLocked)) && (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-gray-500">
                     {canAdvanceRound
