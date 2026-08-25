@@ -1,7 +1,15 @@
 import { pool } from "../config/database";
 import { RowDataPacket } from "mysql2/promise";
 import { TournamentType } from "../types";
-import { computeTeamRatingFromPlayerPoints } from "./swissStageService";
+import {
+  computeTeamRatingFromPlayerPoints,
+  playerRatingsForSwissSeed,
+} from "./swissStageService";
+
+export type SwissTeamRatingDetails = {
+  rating: number;
+  player_ratings: number[];
+};
 
 function todayDateStr(): string {
   const now = new Date();
@@ -113,18 +121,18 @@ export async function loadPlayerTotalPointsMap(
 export async function computeTeamRatingsForSwiss(
   teams: Array<{ team_id: number; player_ids: number[] }>,
   tournamentType: TournamentType,
-): Promise<Map<number, number>> {
+): Promise<Map<number, SwissTeamRatingDetails>> {
   const allPlayerIds = teams.flatMap((t) => t.player_ids);
   const pointsByPlayer = await loadPlayerTotalPointsMap(allPlayerIds);
-  const ratings = new Map<number, number>();
+  const ratings = new Map<number, SwissTeamRatingDetails>();
   for (const team of teams) {
     const playerPoints = team.player_ids.map(
       (id) => pointsByPlayer.get(id) ?? 0,
     );
-    ratings.set(
-      team.team_id,
-      computeTeamRatingFromPlayerPoints(playerPoints, tournamentType),
-    );
+    ratings.set(team.team_id, {
+      rating: computeTeamRatingFromPlayerPoints(playerPoints, tournamentType),
+      player_ratings: playerRatingsForSwissSeed(playerPoints, tournamentType),
+    });
   }
   return ratings;
 }

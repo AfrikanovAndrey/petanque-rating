@@ -208,35 +208,85 @@ export function withdrawalFromRoundByTeam(
   return new Map((withdrawals ?? []).map((w) => [w.team_id, w.from_round]));
 }
 
+/**
+ * Личные рейтинги игроков команды для сида: DESC.
+ * В триплете в сумму/сравнение входят не более трёх лучших.
+ */
+export function playerRatingsForSwissSeed(
+  playerPoints: number[],
+  tournamentType: TournamentType,
+): number[] {
+  const sorted = [...playerPoints].sort((a, b) => b - a);
+  if (tournamentType === TournamentType.TRIPLETTE && sorted.length > 3) {
+    return sorted.slice(0, 3);
+  }
+  return sorted;
+}
+
 /** Сумма рейтингов игроков (как на странице регистрации). */
 export function computeTeamRatingFromPlayerPoints(
   playerPoints: number[],
   tournamentType: TournamentType,
 ): number {
-  const sorted = [...playerPoints].sort((a, b) => b - a);
-  const values =
-    tournamentType === TournamentType.TRIPLETTE && sorted.length > 3
-      ? sorted.slice(0, 3)
-      : sorted;
-  return values.reduce((sum, v) => sum + v, 0);
+  return playerRatingsForSwissSeed(playerPoints, tournamentType).reduce(
+    (sum, v) => sum + v,
+    0,
+  );
 }
 
 /**
- * Сид: rating DESC, при равенстве — random_tie DESC (больше «выигрывает» жребий).
+ * Сравнение личных рейтингов при равной сумме: первый игрок DESC,
+ * затем второй и т.д. Короткий состав дополняется нулями.
+ */
+export function comparePlayerRatingsForSeed(
+  a: number[] | undefined,
+  b: number[] | undefined,
+): number {
+  const sa = [...(a ?? [])].sort((x, y) => y - x);
+  const sb = [...(b ?? [])].sort((x, y) => y - x);
+  const n = Math.max(sa.length, sb.length);
+  for (let i = 0; i < n; i++) {
+    const va = sa[i] ?? 0;
+    const vb = sb[i] ?? 0;
+    if (va !== vb) {
+      return vb - va;
+    }
+  }
+  return 0;
+}
+
+export type SwissTeamRatingSeedInput = {
+  team_id: number;
+  rating: number;
+  /** Личные рейтинги (любой порядок; для сравнения сортируются DESC). */
+  player_ratings?: number[];
+};
+
+/**
+ * Сид: сумма рейтинга DESC → личные рейтинги игроков DESC (1-й, 2-й, …)
+ * → random_tie DESC (жребий, в т.ч. при рейтинге 0).
  * random ∈ [0, 99]; передаётся снаружи для тестов.
  */
 export function seedTeamsByRating(
-  teams: Array<{ team_id: number; rating: number }>,
+  teams: SwissTeamRatingSeedInput[],
   randomFn: () => number = () => Math.floor(Math.random() * 100),
 ): SwissSeedEntry[] {
   const withRandom = teams.map((t) => ({
     team_id: t.team_id,
     rating: t.rating,
+    player_ratings: t.player_ratings ?? [],
     random_tie: clampRandomTie(randomFn()),
   }));
   withRandom.sort((a, b) => {
     if (b.rating !== a.rating) {
       return b.rating - a.rating;
+    }
+    const byPlayers = comparePlayerRatingsForSeed(
+      a.player_ratings,
+      b.player_ratings,
+    );
+    if (byPlayers !== 0) {
+      return byPlayers;
     }
     if (b.random_tie !== a.random_tie) {
       return b.random_tie - a.random_tie;
@@ -702,7 +752,6 @@ export function pairNextRoundByScoreGroups(
   seeds: SwissSeedEntry[],
   matchesSoFar: SwissMatchScores[],
   roundNumber: number,
-  courtStart: number = 1,
   withdrawals: SwissWithdrawal[] | null | undefined = null,
 ): SwissMatchFixture[] {
   const activeSeeds = seedsActiveForRound(seeds, withdrawals, roundNumber);
@@ -753,7 +802,6 @@ export function pairNextRoundByScoreGroups(
 
   // Порядок в туре: Wk Direct → float Wk→W(k-1) → … → W0 Direct → bye
   const fixtures: SwissMatchFixture[] = [];
-  const courtRef = { court: courtStart };
 
   for (let i = 0; i < pools.length; i++) {
     const pool = pools[i];
@@ -765,7 +813,7 @@ export function pairNextRoundByScoreGroups(
         );
       }
       for (const [a, b] of pairs) {
-        pushPairedFixture(fixtures, played, roundNumber, a, b, courtRef);
+        pushPairedFixture(fixtures, played, roundNumber, a, b);
       }
     }
     const floated = floatFromPool[i];
@@ -776,7 +824,6 @@ export function pairNextRoundByScoreGroups(
         roundNumber,
         floated[0],
         floated[1],
-        courtRef,
       );
     }
   }
@@ -795,7 +842,6 @@ function pushPairedFixture(
   roundNumber: number,
   a: PairCandidate,
   b: PairCandidate,
-  courtRef: { court: number },
 ): void {
   if (isSwissFreeTeamId(a.team_id) || isSwissFreeTeamId(b.team_id)) {
     const real = isSwissFreeTeamId(a.team_id) ? b : a;
@@ -810,7 +856,7 @@ function pushPairedFixture(
     team_a_id: higher.team_id,
     team_b_id: lower.team_id,
     is_bye: false,
-    court: courtRef.court++,
+    court: null,
   });
   played.add(pairKey(a.team_id, b.team_id));
 }
@@ -1500,17 +1546,27 @@ export function buildSwissStageView(
   };
 }
 
-/** Следующий свободный номер дорожки после уже созданных матчей. */
-export function nextCourtStart(
-  matches: Array<{ court: number | null }>,
-): number {
-  let max = 0;
+/** Проверка уникальности номера дорожки в туре швейцарки. */
+export function validateSwissCourtNumber(
+  matches: Array<{
+    id: number;
+    round_number: number;
+    court: number | null;
+    is_bye: boolean;
+  }>,
+  matchId: number,
+  roundNumber: number,
+  court: number,
+): string | null {
   for (const m of matches) {
-    if (m.court != null && m.court > max) {
-      max = m.court;
+    if (m.is_bye || m.round_number !== roundNumber || m.id === matchId) {
+      continue;
+    }
+    if (m.court === court) {
+      return `Дорожка ${court} уже занята другим матчем тура ${roundNumber}`;
     }
   }
-  return max + 1;
+  return null;
 }
 
 export function seedByTeamId(seeds: SwissSeedEntry[]): Map<number, SwissSeedEntry> {

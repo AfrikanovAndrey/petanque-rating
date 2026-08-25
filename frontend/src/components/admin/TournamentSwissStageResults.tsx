@@ -276,7 +276,15 @@ const SwissMatchScoreInputs: React.FC<{
   teamAName: string;
   teamBName: string;
   readOnly?: boolean;
-}> = ({ tournamentId, match, teamAName, teamBName, readOnly }) => {
+  occupiedCourtsInRound?: Set<number>;
+}> = ({
+  tournamentId,
+  match,
+  teamAName,
+  teamBName,
+  readOnly,
+  occupiedCourtsInRound,
+}) => {
   const queryClient = useQueryClient();
   const hasSavedScore = match.score_a != null && match.score_b != null;
   const [locked, setLocked] = useState(hasSavedScore);
@@ -406,6 +414,11 @@ const SwissMatchScoreInputs: React.FC<{
     const c = parseInt(raw, 10);
     if (!Number.isInteger(c) || c < 1 || c > 99) {
       toast.error("Номер дорожки должен быть от 1 до 99");
+      setCourt(match.court != null ? String(match.court) : "");
+      return;
+    }
+    if (occupiedCourtsInRound?.has(c)) {
+      toast.error(`Дорожка ${c} уже занята другим матчем этого тура`);
       setCourt(match.court != null ? String(match.court) : "");
       return;
     }
@@ -1185,6 +1198,16 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
               )}
               <ul className="mx-auto w-full max-w-2xl space-y-2">
                 {activeRound.matches.map((m) => {
+                  const occupiedCourtsInRound = new Set(
+                    activeRound.matches
+                      .filter(
+                        (other) =>
+                          other.id !== m.id &&
+                          !other.is_bye &&
+                          other.court != null
+                      )
+                      .map((other) => other.court as number)
+                  );
                   const aName =
                     nameById.get(m.team_a_id) ?? `Команда #${m.team_a_id}`;
                   const bName =
@@ -1202,6 +1225,7 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                         teamAName={aName}
                         teamBName={bName}
                         readOnly={readOnly || roundScoresLocked}
+                        occupiedCourtsInRound={occupiedCourtsInRound}
                       />
                     </li>
                   );

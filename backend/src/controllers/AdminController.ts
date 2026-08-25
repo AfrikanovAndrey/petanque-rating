@@ -23,11 +23,11 @@ import {
   countCompletedRounds,
   isRoundComplete,
   isSwissFreeTeamId,
-  nextCourtStart,
   pairNextRoundByScoreGroups,
   pairRound1HalfMethod,
   seedTeamsByExplicitOrder,
   seedTeamsByRating,
+  validateSwissCourtNumber,
   validateSwissSeedOrder,
   type SwissMatchScores,
   type SwissMatchView,
@@ -1670,10 +1670,14 @@ export class AdminController {
       })),
       tournamentType,
     );
-    const teamsWithRating = teams.map((t) => ({
-      team_id: t.team_id,
-      rating: ratings.get(t.team_id) ?? 0,
-    }));
+    const teamsWithRating = teams.map((t) => {
+      const details = ratings.get(t.team_id);
+      return {
+        team_id: t.team_id,
+        rating: details?.rating ?? 0,
+        player_ratings: details?.player_ratings ?? [],
+      };
+    });
 
     let baseSeeds: SwissSeedEntry[];
     if (useRating) {
@@ -1896,6 +1900,21 @@ export class AdminController {
         }
       }
 
+      if (court != null) {
+        const allMatches =
+          await TournamentSwissMatchModel.listByTournament(tournamentId);
+        const courtError = validateSwissCourtNumber(
+          allMatches,
+          matchId,
+          match.round_number,
+          court,
+        );
+        if (courtError) {
+          res.status(400).json({ success: false, message: courtError });
+          return;
+        }
+      }
+
       const saved = await TournamentSwissMatchModel.updateScores(
         matchId,
         scoreA,
@@ -1930,7 +1949,6 @@ export class AdminController {
               tournament.swiss_seed,
               scoreRows,
               nextRound,
-              nextCourtStart(rows),
               tournament.swiss_withdrawals,
             );
             await TournamentSwissMatchModel.insertFixtures(
@@ -2193,7 +2211,6 @@ export class AdminController {
           tournament.swiss_seed,
           scoreRows,
           nextRound,
-          nextCourtStart(rows),
           tournament.swiss_withdrawals,
         );
         await TournamentSwissMatchModel.insertFixtures(

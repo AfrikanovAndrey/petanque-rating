@@ -3,20 +3,23 @@ import {
   collectDownfloatersForRound,
   collectFloatInfoForRound,
   collectPlayedPairs,
+  comparePlayerRatingsForSeed,
   computeSwissStandings,
   orderSwissRoundMatches,
   pairNextRoundByScoreGroups,
   pairRound1HalfMethod,
   pickDownfloater,
   pickFloatOpponent,
+  playerRatingsForSwissSeed,
   seedTeamsByExplicitOrder,
   seedTeamsByRating,
+  validateSwissCourtNumber,
   validateSwissSeedOrder,
   type SwissMatchScores,
   type SwissMatchView,
   type SwissSeedEntry,
 } from "../swissStageService";
-import { TiebreakerCriterion } from "../../types";
+import { TiebreakerCriterion, TournamentType } from "../../types";
 
 function seedsFromIds(ids: number[]): SwissSeedEntry[] {
   return ids.map((team_id, i) => ({
@@ -27,8 +30,97 @@ function seedsFromIds(ids: number[]): SwissSeedEntry[] {
   }));
 }
 
+describe("playerRatingsForSwissSeed", () => {
+  it("сортирует DESC и в триплете оставляет не больше трёх", () => {
+    expect(
+      playerRatingsForSwissSeed(
+        [10, 40, 30, 20],
+        TournamentType.TRIPLETTE,
+      ),
+    ).toEqual([40, 30, 20]);
+    expect(
+      playerRatingsForSwissSeed([10, 40], TournamentType.DOUBLETTE_MALE),
+    ).toEqual([40, 10]);
+  });
+});
+
+describe("comparePlayerRatingsForSeed", () => {
+  it("сравнивает по позициям после сортировки DESC, недостающих считает 0", () => {
+    expect(comparePlayerRatingsForSeed([80, 70], [100, 50])).toBeGreaterThan(0);
+    expect(comparePlayerRatingsForSeed([80, 70], [80, 60])).toBeLessThan(0);
+    expect(comparePlayerRatingsForSeed([50], [50, 0])).toBe(0);
+  });
+});
+
 describe("seedTeamsByRating", () => {
-  it("сортирует по рейтингу DESC, при равенстве — по random_tie", () => {
+  it("сортирует по сумме рейтинга DESC", () => {
+    const seeded = seedTeamsByRating(
+      [
+        { team_id: 1, rating: 50, player_ratings: [50] },
+        { team_id: 2, rating: 120, player_ratings: [70, 50] },
+        { team_id: 3, rating: 80, player_ratings: [80] },
+      ],
+      () => 50,
+    );
+    expect(seeded.map((s) => s.team_id)).toEqual([2, 3, 1]);
+  });
+
+  it("при равной сумме выше сид у команды с более высоким личным рейтингом игрока", () => {
+    const seeded = seedTeamsByRating(
+      [
+        { team_id: 1, rating: 150, player_ratings: [80, 70] },
+        { team_id: 2, rating: 150, player_ratings: [100, 50] },
+        { team_id: 3, rating: 50, player_ratings: [50] },
+      ],
+      () => 99,
+    );
+    expect(seeded.map((s) => s.team_id)).toEqual([2, 1, 3]);
+  });
+
+  it("при равном первом игроке сравнивает второго и далее", () => {
+    const seeded = seedTeamsByRating(
+      [
+        { team_id: 1, rating: 150, player_ratings: [80, 40, 30] },
+        { team_id: 2, rating: 150, player_ratings: [80, 70, 0] },
+      ],
+      () => 1,
+    );
+    expect(seeded.map((s) => s.team_id)).toEqual([2, 1]);
+  });
+
+  it("личный рейтинг важнее жребия", () => {
+    const seq = [99, 1];
+    let i = 0;
+    const seeded = seedTeamsByRating(
+      [
+        { team_id: 1, rating: 100, player_ratings: [50, 50] },
+        { team_id: 2, rating: 100, player_ratings: [90, 10] },
+      ],
+      () => seq[i++],
+    );
+    expect(seeded.map((s) => s.team_id)).toEqual([2, 1]);
+    expect(seeded[0].random_tie).toBe(1);
+    expect(seeded[1].random_tie).toBe(99);
+  });
+
+  it("при полном равенстве рейтингов (включая 0) — по random_tie", () => {
+    const seq = [10, 90, 40];
+    let i = 0;
+    const seeded = seedTeamsByRating(
+      [
+        { team_id: 1, rating: 0, player_ratings: [0, 0] },
+        { team_id: 2, rating: 0, player_ratings: [0, 0] },
+        { team_id: 3, rating: 0, player_ratings: [0] },
+      ],
+      () => seq[i++],
+    );
+    expect(seeded.map((s) => s.team_id)).toEqual([2, 3, 1]);
+    expect(seeded[0].random_tie).toBe(90);
+    expect(seeded[1].random_tie).toBe(40);
+    expect(seeded[2].random_tie).toBe(10);
+  });
+
+  it("без player_ratings при равной сумме использует жребий", () => {
     const seq = [10, 90, 40];
     let i = 0;
     const seeded = seedTeamsByRating(
@@ -95,17 +187,42 @@ describe("pairRound1HalfMethod", () => {
     const pairs = fixtures.filter((f) => !f.is_bye);
     const free = fixtures.filter((f) => f.is_bye);
     expect(pairs).toHaveLength(2);
-    expect(pairs[0]).toMatchObject({ team_a_id: 11, team_b_id: 33 });
-    expect(pairs[1]).toMatchObject({ team_a_id: 22, team_b_id: 44 });
+    expect(pairs[0]).toMatchObject({ team_a_id: 11, team_b_id: 33, court: 1 });
+    expect(pairs[1]).toMatchObject({ team_a_id: 22, team_b_id: 44, court: 2 });
     expect(free).toHaveLength(1);
     expect(free[0].team_a_id).toBe(55);
     expect(free[0].team_b_id).toBeNull();
+    expect(free[0].court).toBeNull();
     expect(free[0].score_a).toBe(13);
     expect(free[0].score_b).toBe(7);
   });
 });
 
 describe("pairNextRoundByScoreGroups", () => {
+  it("не проставляет номера дорожек (только вручную)", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4]);
+    const round1: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 3,
+        score_a: 13,
+        score_b: 5,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 7,
+        is_bye: false,
+      },
+    ];
+    const round2 = pairNextRoundByScoreGroups(seeds, round1, 2);
+    expect(round2.every((f) => f.court == null)).toBe(true);
+  });
+
   it("сводит команды с одинаковым числом побед и избегает rematch", () => {
     const seeds = seedsFromIds([1, 2, 3, 4]);
     const round1: SwissMatchScores[] = [
@@ -168,7 +285,6 @@ describe("pairNextRoundByScoreGroups", () => {
       seeds,
       round1,
       2,
-      1,
       [{ team_id: 4, from_round: 2 }],
     );
     const teamIds = new Set<number>();
@@ -503,6 +619,19 @@ describe("pairNextRoundByScoreGroups", () => {
     );
     expect(opponent.team_id).toBe(20);
     expect(pool.map((t) => t.team_id)).toEqual([10, 30]);
+  });
+});
+
+describe("validateSwissCourtNumber", () => {
+  it("отклоняет повтор номера дорожки в том же туре", () => {
+    const matches = [
+      { id: 1, round_number: 2, court: 3, is_bye: false },
+      { id: 2, round_number: 2, court: 5, is_bye: false },
+      { id: 3, round_number: 1, court: 3, is_bye: false },
+    ];
+    expect(validateSwissCourtNumber(matches, 2, 2, 3)).toMatch(/уже занята/);
+    expect(validateSwissCourtNumber(matches, 2, 2, 5)).toBeNull();
+    expect(validateSwissCourtNumber(matches, 2, 1, 4)).toBeNull();
   });
 });
 

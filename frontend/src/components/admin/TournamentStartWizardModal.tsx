@@ -1,9 +1,9 @@
 import { TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
-import { useMutation } from "react-query";
-import { adminApi } from "../../services/api";
+import { useMutation, useQuery } from "react-query";
+import { adminApi, ratingApi } from "../../services/api";
 import {
   TiebreakerCriterion,
   Tournament,
@@ -13,11 +13,17 @@ import {
 } from "../../types";
 import { handleApiError } from "../../utils";
 import {
+  playerPointsForRegisteredTeam,
+  sortTeamIdsBySwissRating,
+  teamRatingFromPlayerPoints,
+} from "../../utils/swissSeed";
+import {
   ALL_TIEBREAKER_CRITERIA,
   getGroupLetter,
   getPlayFormatLabel,
   getTiebreakerLabel,
 } from "../../utils/tournamentPlaySettings";
+import SwissManualSeedList from "./SwissManualSeedList";
 
 type WizardStep = 1 | 2 | 3;
 type DrawMode = "auto" | "manual";
@@ -90,6 +96,7 @@ const TournamentStartWizardModal: React.FC<Props> = ({
   const [manualSlots, setManualSlots] = useState<number[][]>([]);
   const [swissSeedMode, setSwissSeedMode] = useState<SwissSeedMode>("rating");
   const [swissManualSeeds, setSwissManualSeeds] = useState<number[]>([]);
+  const swissManualInitedFromRating = useRef(false);
 
   useEffect(() => {
     if (!open) {
@@ -106,6 +113,7 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     setManualSlots([]);
     setSwissSeedMode("rating");
     setSwissManualSeeds([]);
+    swissManualInitedFromRating.current = false;
   }, [open, tournament]);
 
   const availableTiebreakers = useMemo(
@@ -129,6 +137,91 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     () => teams.filter((team) => team.is_confirmed),
     [teams]
   );
+
+  const { data: fullRating, isFetched: isRatingFetched } = useQuery(
+    ["registrationFullRating"],
+    async () => {
+      const response = await ratingApi.getFullRating();
+      return response.data.success && response.data.data
+        ? response.data.data
+        : [];
+    },
+    {
+      enabled: open,
+      retry: false,
+      staleTime: 60_000,
+    }
+  );
+
+  const ratingByPlayerId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const player of fullRating ?? []) {
+      if (player.player_id != null) {
+        map.set(player.player_id, player.total_points);
+      }
+    }
+    return map;
+  }, [fullRating]);
+
+  const ratingByPlayerName = useMemo(
+    () =>
+      new Map(
+        (fullRating ?? []).map((player) => [
+          player.player_name,
+          player.total_points,
+        ])
+      ),
+    [fullRating]
+  );
+
+  const buildRatingOrderedTeamIds = useCallback(() => {
+    return sortTeamIdsBySwissRating(
+      confirmedTeams.map((team) => ({
+        team_id: team.team_id,
+        player_points: playerPointsForRegisteredTeam(
+          team,
+          ratingByPlayerId,
+          ratingByPlayerName
+        ),
+      })),
+      tournament.type
+    );
+  }, [
+    confirmedTeams,
+    ratingByPlayerId,
+    ratingByPlayerName,
+    tournament.type,
+  ]);
+
+  const swissManualSeedRows = useMemo(() => {
+    const teamById = new Map(
+      confirmedTeams.map((team) => [team.team_id, team])
+    );
+    return swissManualSeeds
+      .map((teamId) => {
+        const team = teamById.get(teamId);
+        if (!team) {
+          return null;
+        }
+        const playerPoints = playerPointsForRegisteredTeam(
+          team,
+          ratingByPlayerId,
+          ratingByPlayerName
+        );
+        return {
+          team_id: team.team_id,
+          name: team.players.join(", "),
+          rating: teamRatingFromPlayerPoints(playerPoints, tournament.type),
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row != null);
+  }, [
+    confirmedTeams,
+    ratingByPlayerId,
+    ratingByPlayerName,
+    swissManualSeeds,
+    tournament.type,
+  ]);
 
   const teamNameById = useMemo(
     () =>
@@ -178,11 +271,12 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     ) {
       return false;
     }
-    return (
-      swissManualSeeds.every((id) => id > 0) &&
-      assignedSwissSeedIds.size === confirmedTeams.length
-    );
-  }, [swissManualSeeds, confirmedTeams.length, assignedSwissSeedIds.size]);
+    const confirmedIds = new Set(confirmedTeams.map((team) => team.team_id));
+    if (assignedSwissSeedIds.size !== confirmedIds.size) {
+      return false;
+    }
+    return swissManualSeeds.every((id) => confirmedIds.has(id));
+  }, [swissManualSeeds, confirmedTeams, assignedSwissSeedIds.size]);
 
   const totalSteps = 3;
 
@@ -352,47 +446,35 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     setStep(2);
   };
 
-  const initSwissManualSeeds = () => {
-    setSwissManualSeeds(Array.from({ length: confirmedTeams.length }, () => 0));
-  };
+  const initSwissManualSeeds = useCallback(() => {
+    setSwissManualSeeds(buildRatingOrderedTeamIds());
+    swissManualInitedFromRating.current = true;
+  }, [buildRatingOrderedTeamIds]);
 
   const handleSwissSeedModeChange = (mode: SwissSeedMode) => {
     setSwissSeedMode(mode);
     if (mode === "manual") {
-      initSwissManualSeeds();
+      if (isRatingFetched) {
+        initSwissManualSeeds();
+      } else {
+        swissManualInitedFromRating.current = false;
+        setSwissManualSeeds(confirmedTeams.map((team) => team.team_id));
+      }
     } else {
+      swissManualInitedFromRating.current = false;
       setSwissManualSeeds([]);
     }
   };
 
-  const setSwissSeedSlot = (slotIndex: number, teamId: number) => {
-    setSwissManualSeeds((prev) =>
-      prev.map((id, index) => {
-        if (index === slotIndex) {
-          return teamId;
-        }
-        if (teamId > 0 && id === teamId) {
-          return 0;
-        }
-        return id;
-      })
-    );
-  };
-
-  const optionsForSwissSeedSlot = (slotIndex: number) => {
-    const current = swissManualSeeds[slotIndex] ?? 0;
-    return confirmedTeams
-      .filter(
-        (team) =>
-          team.team_id === current || !assignedSwissSeedIds.has(team.team_id)
-      )
-      .slice()
-      .sort((a, b) =>
-        a.players
-          .join(", ")
-          .localeCompare(b.players.join(", "), "ru", { sensitivity: "base" })
-      );
-  };
+  useEffect(() => {
+    if (swissSeedMode !== "manual" || !isRatingFetched) {
+      return;
+    }
+    if (swissManualInitedFromRating.current) {
+      return;
+    }
+    initSwissManualSeeds();
+  }, [initSwissManualSeeds, isRatingFetched, swissSeedMode]);
 
   const handleNextFromStep2 = async () => {
     try {
@@ -404,6 +486,7 @@ const TournamentStartWizardModal: React.FC<Props> = ({
       } else {
         setSwissSeedMode("rating");
         setSwissManualSeeds([]);
+        swissManualInitedFromRating.current = false;
       }
       setStep(3);
     } catch {
@@ -467,7 +550,8 @@ const TournamentStartWizardModal: React.FC<Props> = ({
 
   const canStartWithSwiss =
     confirmedTeamsCount > 0 &&
-    (swissSeedMode === "rating" || isSwissManualSeedComplete);
+    (swissSeedMode === "rating" ||
+      (isSwissManualSeedComplete && isRatingFetched));
 
   if (!open) {
     return null;
@@ -902,8 +986,10 @@ const TournamentStartWizardModal: React.FC<Props> = ({
                           Да — по рейтингу
                         </span>
                         <span className="mt-1 block text-xs text-gray-500">
-                          Команды упорядочиваются по сумме рейтингов игроков
-                          (при равенстве — жребий)
+                          Команды упорядочиваются по сумме рейтингов игроков.
+                          При равенстве суммы выше сид у команды, где выше
+                          личный рейтинг игрока (затем второго и т.д.). Если
+                          рейтинги полностью совпадают, включая 0 — жребий.
                         </span>
                       </span>
                     </label>
@@ -927,7 +1013,8 @@ const TournamentStartWizardModal: React.FC<Props> = ({
                           Нет — задать сид вручную
                         </span>
                         <span className="mt-1 block text-xs text-gray-500">
-                          Укажите порядок команд: сид 1, сид 2, …
+                          Сначала порядок по рейтингу — перетащите команды,
+                          чтобы поменять сиды местами
                         </span>
                       </span>
                     </label>
@@ -936,49 +1023,19 @@ const TournamentStartWizardModal: React.FC<Props> = ({
                   {swissSeedMode === "manual" && (
                     <div className="space-y-3">
                       <p className="text-xs text-gray-500">
-                        Назначено: {assignedSwissSeedIds.size} из{" "}
-                        {confirmedTeams.length}.
+                        Перетащите строку за иконку или саму команду. Справа —
+                        сумма рейтинга.
                       </p>
-                      <div className="max-h-80 space-y-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
-                        {swissManualSeeds.map((teamId, slotIndex) => (
-                          <div
-                            key={slotIndex}
-                            className="flex items-center gap-2"
-                          >
-                            <span className="w-14 shrink-0 text-sm font-medium text-gray-700">
-                              Сид {slotIndex + 1}
-                            </span>
-                            <select
-                              id={`swiss-seed-${slotIndex}`}
-                              className="input-field text-sm flex-1"
-                              value={teamId || ""}
-                              disabled={isBusy}
-                              onChange={(e) =>
-                                setSwissSeedSlot(
-                                  slotIndex,
-                                  e.target.value ? Number(e.target.value) : 0
-                                )
-                              }
-                            >
-                              <option value="">Выбрать команду…</option>
-                              {optionsForSwissSeedSlot(slotIndex).map(
-                                (team) => (
-                                  <option
-                                    key={team.team_id}
-                                    value={team.team_id}
-                                  >
-                                    {team.players.join(", ")}
-                                  </option>
-                                )
-                              )}
-                            </select>
-                          </div>
-                        ))}
-                      </div>
-                      {isSwissManualSeedComplete && (
-                        <p className="text-sm text-green-700">
-                          Все сиды заданы.
+                      {!isRatingFetched ? (
+                        <p className="text-sm text-gray-500">
+                          Загрузка рейтинга…
                         </p>
+                      ) : (
+                        <SwissManualSeedList
+                          items={swissManualSeedRows}
+                          disabled={isBusy}
+                          onReorder={setSwissManualSeeds}
+                        />
                       )}
                     </div>
                   )}
