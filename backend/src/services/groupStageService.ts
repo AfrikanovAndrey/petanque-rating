@@ -1,12 +1,41 @@
 import { TournamentGroupDrawGroup } from "../types";
 
+export type GroupMatchSlot = "a" | "b";
+
 export type GroupMatchFixture = {
   group_number: number;
   round_number: number;
-  team_a_id: number;
-  team_b_id: number;
+  match_index: number;
+  team_a_id: number | null;
+  team_b_id: number | null;
   court: number;
+  is_third_place: boolean;
+  next_match_round: number | null;
+  next_match_index: number | null;
+  next_slot: GroupMatchSlot | null;
+  loser_next_match_round: number | null;
+  loser_next_match_index: number | null;
+  loser_next_slot: GroupMatchSlot | null;
 };
+
+function emptyGroupFixture(
+  partial: Partial<GroupMatchFixture> &
+    Pick<GroupMatchFixture, "group_number" | "round_number" | "match_index">,
+): GroupMatchFixture {
+  return {
+    team_a_id: null,
+    team_b_id: null,
+    court: 1,
+    is_third_place: false,
+    next_match_round: null,
+    next_match_index: null,
+    next_slot: null,
+    loser_next_match_round: null,
+    loser_next_match_index: null,
+    loser_next_slot: null,
+    ...partial,
+  };
+}
 
 export type GroupStandingRow = {
   team_id: number;
@@ -28,12 +57,22 @@ export type GroupStageMatchView = {
   id: number;
   group_number: number;
   round_number: number;
-  team_a_id: number;
-  team_b_id: number;
+  match_index: number;
+  team_a_id: number | null;
+  team_b_id: number | null;
   score_a: number | null;
   score_b: number | null;
   court: number | null;
+  is_third_place: boolean;
+  next_match_round?: number | null;
+  next_match_index?: number | null;
+  next_slot?: GroupMatchSlot | null;
+  loser_next_match_round?: number | null;
+  loser_next_match_index?: number | null;
+  loser_next_slot?: GroupMatchSlot | null;
 };
+
+export type GroupStageFormat = "ROUND_ROBIN" | "FRENCH";
 
 export type GroupStageTeamView = {
   team_id: number;
@@ -47,10 +86,62 @@ export type GroupStageTeamView = {
 
 export type GroupStageView = {
   group_number: number;
+  format: GroupStageFormat;
   teams: GroupStageTeamView[];
   standings: GroupStandingRow[];
   matches: Omit<GroupStageMatchView, "group_number">[];
 };
+
+export function isFrenchGroupMatches(
+  matches: Array<{ is_third_place?: boolean; next_match_round?: number | null }>,
+): boolean {
+  return matches.some(
+    (m) => Boolean(m.is_third_place) || m.next_match_round != null,
+  );
+}
+
+/**
+ * Нужна ли пересборка фикстур французской системы
+ * (старая схема: 1/2 + финал + матч за 3-е вместо 3 туров).
+ */
+export function frenchFixturesOutdated(
+  groupDraw: TournamentGroupDrawGroup[],
+  matches: Array<{
+    group_number: number;
+    round_number: number;
+    match_index?: number;
+    is_third_place?: boolean;
+    score_a?: number | null;
+    score_b?: number | null;
+  }>,
+): boolean {
+  if (groupDraw.length === 0 || matches.length === 0) {
+    return false;
+  }
+  if (matches.some((m) => m.score_a != null || m.score_b != null)) {
+    return false;
+  }
+  for (const group of groupDraw) {
+    if (group.team_ids.length !== 4) {
+      continue;
+    }
+    const groupMatches = matches.filter(
+      (m) => m.group_number === group.group_number,
+    );
+    if (groupMatches.length === 0) {
+      continue;
+    }
+    const hasRound3 = groupMatches.some((m) => m.round_number === 3);
+    const hasLosersRound2 = groupMatches.some(
+      (m) => m.round_number === 2 && (m.match_index ?? 0) === 1,
+    );
+    const hasLegacyThird = groupMatches.some((m) => Boolean(m.is_third_place));
+    if (!hasRound3 || !hasLosersRound2 || hasLegacyThird) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /** Собрать представление групп для API (таблица + матчи). */
 export function buildGroupStageViews(
@@ -64,15 +155,21 @@ export function buildGroupStageViews(
     const groupMatches = matches.filter(
       (m) => m.group_number === group.group_number,
     );
-    const standings = computeGroupStandings(
-      group.team_ids,
-      groupMatches.map((m) => ({
+    const french = isFrenchGroupMatches(groupMatches);
+    const scoredMatches = groupMatches
+      .filter(
+        (m): m is GroupStageMatchView & { team_a_id: number; team_b_id: number } =>
+          m.team_a_id != null && m.team_b_id != null,
+      )
+      .map((m) => ({
         team_a_id: m.team_a_id,
         team_b_id: m.team_b_id,
         score_a: m.score_a,
         score_b: m.score_b,
-      })),
-    );
+      }));
+    const standings = french
+      ? computeFrenchGroupStandings(group.team_ids, groupMatches)
+      : computeGroupStandings(group.team_ids, scoredMatches);
     const standingByTeam = new Map(standings.map((s) => [s.team_id, s]));
 
     const groupTeams = group.team_ids.map((teamId) => {
@@ -91,16 +188,25 @@ export function buildGroupStageViews(
 
     return {
       group_number: group.group_number,
+      format: french ? "FRENCH" : "ROUND_ROBIN",
       teams: groupTeams,
       standings,
       matches: groupMatches.map((m) => ({
         id: m.id,
         round_number: m.round_number,
+        match_index: m.match_index ?? 0,
         team_a_id: m.team_a_id,
         team_b_id: m.team_b_id,
         score_a: m.score_a,
         score_b: m.score_b,
         court: m.court,
+        is_third_place: Boolean(m.is_third_place),
+        next_match_round: m.next_match_round ?? null,
+        next_match_index: m.next_match_index ?? null,
+        next_slot: m.next_slot ?? null,
+        loser_next_match_round: m.loser_next_match_round ?? null,
+        loser_next_match_index: m.loser_next_match_index ?? null,
+        loser_next_slot: m.loser_next_slot ?? null,
       })),
     };
   });
@@ -133,6 +239,7 @@ export function generateRoundRobinFixtures(
   let court = courtStart;
 
   for (let round = 0; round < rounds; round++) {
+    let matchIndex = 0;
     for (let i = 0; i < half; i++) {
       const a = rotation[i];
       const b = rotation[n - 1 - i];
@@ -142,13 +249,16 @@ export function generateRoundRobinFixtures(
       // Чередуем «дома/в гостях» по турам для стабильности отображения
       const home = round % 2 === 0 ? a : b;
       const away = round % 2 === 0 ? b : a;
-      fixtures.push({
-        group_number: groupNumber,
-        round_number: round + 1,
-        team_a_id: home,
-        team_b_id: away,
-        court: court++,
-      });
+      fixtures.push(
+        emptyGroupFixture({
+          group_number: groupNumber,
+          round_number: round + 1,
+          match_index: matchIndex++,
+          team_a_id: home,
+          team_b_id: away,
+          court: court++,
+        }),
+      );
     }
 
     // Фиксируем первый элемент, вращаем остальные
@@ -161,24 +271,210 @@ export function generateRoundRobinFixtures(
   return fixtures;
 }
 
+/**
+ * Французская система на 4 команды:
+ * 1-й тур — две стартовые пары;
+ * 2-й тур — победители с победителями, проигравшие с проигравшими;
+ * 3-й тур — проигравший верхнего матча с победителем нижнего за 2–3 места.
+ */
+export function generateFrenchSystemFixtures(
+  groupNumber: number,
+  teamIds: number[],
+  courtStart: number = 1,
+): GroupMatchFixture[] {
+  if (teamIds.length !== 4) {
+    return generateRoundRobinFixtures(groupNumber, teamIds, courtStart);
+  }
+
+  let court = courtStart;
+  const [t0, t1, t2, t3] = teamIds;
+  return [
+    emptyGroupFixture({
+      group_number: groupNumber,
+      round_number: 1,
+      match_index: 0,
+      team_a_id: t0,
+      team_b_id: t1,
+      court: court++,
+      next_match_round: 2,
+      next_match_index: 0,
+      next_slot: "a",
+      loser_next_match_round: 2,
+      loser_next_match_index: 1,
+      loser_next_slot: "a",
+    }),
+    emptyGroupFixture({
+      group_number: groupNumber,
+      round_number: 1,
+      match_index: 1,
+      team_a_id: t2,
+      team_b_id: t3,
+      court: court++,
+      next_match_round: 2,
+      next_match_index: 0,
+      next_slot: "b",
+      loser_next_match_round: 2,
+      loser_next_match_index: 1,
+      loser_next_slot: "b",
+    }),
+    emptyGroupFixture({
+      group_number: groupNumber,
+      round_number: 2,
+      match_index: 0,
+      court: court++,
+      loser_next_match_round: 3,
+      loser_next_match_index: 0,
+      loser_next_slot: "a",
+    }),
+    emptyGroupFixture({
+      group_number: groupNumber,
+      round_number: 2,
+      match_index: 1,
+      court: court++,
+      next_match_round: 3,
+      next_match_index: 0,
+      next_slot: "b",
+    }),
+    emptyGroupFixture({
+      group_number: groupNumber,
+      round_number: 3,
+      match_index: 0,
+      court: court++,
+    }),
+  ];
+}
+
 /** Фикстуры для всех групп жеребьёвки; дорожки сквозные по турниру. */
 export function generateAllGroupFixtures(
   groupDraw: TournamentGroupDrawGroup[],
+  options?: { frenchSystem?: boolean },
 ): GroupMatchFixture[] {
   const all: GroupMatchFixture[] = [];
   let nextCourt = 1;
+  const french = Boolean(options?.frenchSystem);
   for (const group of groupDraw) {
-    const fixtures = generateRoundRobinFixtures(
-      group.group_number,
-      group.team_ids,
-      nextCourt,
-    );
+    const fixtures = french
+      ? generateFrenchSystemFixtures(
+          group.group_number,
+          group.team_ids,
+          nextCourt,
+        )
+      : generateRoundRobinFixtures(
+          group.group_number,
+          group.team_ids,
+          nextCourt,
+        );
     all.push(...fixtures);
     if (fixtures.length > 0) {
       nextCourt = Math.max(...fixtures.map((f) => f.court)) + 1;
     }
   }
   return all;
+}
+
+function matchWinnerId(match: {
+  team_a_id: number | null;
+  team_b_id: number | null;
+  score_a: number | null;
+  score_b: number | null;
+}): number | null {
+  if (
+    match.team_a_id == null ||
+    match.team_b_id == null ||
+    match.score_a == null ||
+    match.score_b == null
+  ) {
+    return null;
+  }
+  return match.score_a > match.score_b ? match.team_a_id : match.team_b_id;
+}
+
+function matchLoserId(match: {
+  team_a_id: number | null;
+  team_b_id: number | null;
+  score_a: number | null;
+  score_b: number | null;
+}): number | null {
+  if (
+    match.team_a_id == null ||
+    match.team_b_id == null ||
+    match.score_a == null ||
+    match.score_b == null
+  ) {
+    return null;
+  }
+  return match.score_a > match.score_b ? match.team_b_id : match.team_a_id;
+}
+
+/**
+ * Места во французской системе:
+ * 1-е — победитель верхнего матча 2-го тура (2 победы);
+ * 2–3-е — по матчу 3-го тура;
+ * 4-е — проигравший нижнего матча 2-го тура (2 поражения).
+ */
+export function computeFrenchGroupStandings(
+  teamIds: number[],
+  matches: Array<{
+    round_number: number;
+    match_index?: number;
+    is_third_place?: boolean;
+    team_a_id: number | null;
+    team_b_id: number | null;
+    score_a: number | null;
+    score_b: number | null;
+  }>,
+): GroupStandingRow[] {
+  const scored: GroupMatchScores[] = [];
+  for (const m of matches) {
+    if (m.team_a_id == null || m.team_b_id == null) {
+      continue;
+    }
+    scored.push({
+      team_a_id: m.team_a_id,
+      team_b_id: m.team_b_id,
+      score_a: m.score_a,
+      score_b: m.score_b,
+    });
+  }
+  const overallStats = accumulateStats(teamIds, scored, false);
+
+  const winnersMatch = matches.find(
+    (m) => m.round_number === 2 && (m.match_index ?? 0) === 0,
+  );
+  const losersMatch = matches.find(
+    (m) => m.round_number === 2 && (m.match_index ?? 0) === 1,
+  );
+  const placementMatch = matches.find((m) => m.round_number === 3);
+  const firstId = winnersMatch ? matchWinnerId(winnersMatch) : null;
+  const secondId = placementMatch ? matchWinnerId(placementMatch) : null;
+  const thirdId = placementMatch ? matchLoserId(placementMatch) : null;
+  const fourthId = losersMatch ? matchLoserId(losersMatch) : null;
+  const complete =
+    firstId != null &&
+    secondId != null &&
+    thirdId != null &&
+    fourthId != null;
+
+  const ordered = complete
+    ? [firstId, secondId, thirdId, fourthId]
+    : teamIds;
+
+  return ordered.map((teamId, index) => {
+    const s = overallStats.get(teamId) ?? {
+      wins: 0,
+      point_diff: 0,
+      points_for: 0,
+      played: 0,
+    };
+    return {
+      team_id: teamId,
+      wins: s.wins,
+      point_diff: s.point_diff,
+      points_for: s.points_for,
+      played: s.played,
+      place: complete ? index + 1 : 0,
+    };
+  });
 }
 
 /**

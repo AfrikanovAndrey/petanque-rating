@@ -375,6 +375,7 @@ const AdminTournamentInProgress: React.FC = () => {
                     <dt className="text-gray-500">Размер группы</dt>
                     <dd className="mt-0.5 font-medium text-gray-900">
                       {tournament.group_size}
+                      {tournament.french_system ? " · французская система" : ""}
                     </dd>
                   </div>
                 )}

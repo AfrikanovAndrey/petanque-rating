@@ -36,7 +36,12 @@ function findMatchCell(
   colTeamId: number
 ): { score_for: number; score_against: number; diff: number } | null {
   for (const m of matches) {
-    if (m.score_a == null || m.score_b == null) {
+    if (
+      m.score_a == null ||
+      m.score_b == null ||
+      m.team_a_id == null ||
+      m.team_b_id == null
+    ) {
       continue;
     }
     if (m.team_a_id === rowTeamId && m.team_b_id === colTeamId) {
@@ -66,6 +71,7 @@ const MatchScoreInputs: React.FC<{
   teamBIndex?: number;
   disabled?: boolean;
   readOnly?: boolean;
+  bracket?: boolean;
 }> = ({
   tournamentId,
   match,
@@ -75,6 +81,7 @@ const MatchScoreInputs: React.FC<{
   teamBIndex,
   disabled,
   readOnly,
+  bracket,
 }) => {
   const queryClient = useQueryClient();
   const hasSavedScore = match.score_a != null && match.score_b != null;
@@ -218,7 +225,141 @@ const MatchScoreInputs: React.FC<{
     setLocked(false);
   };
 
-  const inputsDisabled = disabled || mutation.isLoading || locked;
+  const inputsDisabled =
+    disabled ||
+    mutation.isLoading ||
+    locked ||
+    match.team_a_id == null ||
+    match.team_b_id == null;
+
+  if (bracket) {
+    const renderScore = (
+      side: "a" | "b",
+      value: string,
+      display: number | null,
+      name: string
+    ) => {
+      if (readOnly) {
+        return (
+          <span className="w-full text-center text-xs font-bold tabular-nums text-gray-800">
+            {display ?? "—"}
+          </span>
+        );
+      }
+      return (
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={13}
+          className={`w-full bg-transparent text-center text-xs font-bold tabular-nums outline-none focus:ring-1 focus:ring-gray-400/50 ${
+            locked ? "text-emerald-700" : "text-gray-900"
+          }`}
+          value={value}
+          disabled={inputsDisabled}
+          onChange={(e) =>
+            side === "a" ? setScoreA(e.target.value) : setScoreB(e.target.value)
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !locked) {
+              lockScore();
+            }
+          }}
+          aria-label={`Счёт ${name}`}
+        />
+      );
+    };
+
+    return (
+      <div className="relative flex h-14 w-[210px] shrink-0">
+        <div className="absolute -left-11 top-1/2 z-10 flex w-10 -translate-y-1/2 flex-col items-center gap-0.5 bg-gray-50/80 py-0.5">
+          <span className="text-[9px] font-medium leading-none text-gray-600">
+            дорожка
+          </span>
+          {readOnly ? (
+            <span className="inline-flex h-7 w-10 items-center justify-center rounded border-2 border-amber-400 bg-amber-50 text-sm font-bold text-amber-950">
+              {match.court ?? "—"}
+            </span>
+          ) : (
+            <input
+              type="number"
+              min={1}
+              max={99}
+              inputMode="numeric"
+              className="h-7 w-10 rounded border-2 border-amber-400 bg-amber-50 px-0.5 text-center text-sm font-bold text-amber-950 shadow-sm outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-60"
+              value={court}
+              disabled={mutation.isLoading}
+              onChange={(e) => setCourt(e.target.value)}
+              onBlur={saveCourt}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              aria-label="Номер дорожки"
+              placeholder="№"
+            />
+          )}
+        </div>
+        <div className="relative flex h-full w-full overflow-hidden rounded border border-black bg-white">
+          <div className="flex min-w-0 flex-1 flex-col">
+            {[teamAName, teamBName].map((name, index) => (
+              <div
+                key={index}
+                className={`flex min-h-0 flex-1 items-center px-2 ${
+                  index === 0 ? "border-b border-black/20" : ""
+                }`}
+              >
+                <span
+                  className={`min-w-0 flex-1 truncate text-[11px] leading-tight ${
+                    (index === 0 ? match.team_a_id : match.team_b_id) == null
+                      ? "italic text-gray-400"
+                      : "font-medium text-gray-900"
+                  }`}
+                  title={name}
+                >
+                  {name}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="flex w-7 shrink-0 flex-col border-l border-black bg-gray-100">
+            <div className="flex min-h-0 flex-1 items-center justify-center border-b border-black/20 px-0.5">
+              {renderScore("a", scoreA, match.score_a, teamAName)}
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center px-0.5">
+              {renderScore("b", scoreB, match.score_b, teamBName)}
+            </div>
+          </div>
+          {!readOnly && (
+            <div className="flex w-7 shrink-0 items-center justify-center border-l border-black bg-gray-50">
+              {!locked ? (
+                <button
+                  type="button"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40"
+                  disabled={inputsDisabled}
+                  onClick={lockScore}
+                  title="Зафиксировать счёт"
+                >
+                  <CheckIcon className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
+                  disabled={mutation.isLoading}
+                  onClick={unlockScore}
+                  title="Изменить счёт"
+                >
+                  <PencilIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const scoreInputClass = `w-14 rounded border px-1.5 py-1 text-center text-sm ${
     locked
@@ -388,6 +529,422 @@ const MatchScoreInputs: React.FC<{
   );
 };
 
+const FRENCH_MATCH_H = 56;
+const FRENCH_MATCH_W = 210;
+const FRENCH_CONNECTOR_W = 36;
+
+const FrenchGroupBracket: React.FC<{
+  tournamentId?: number;
+  group: TournamentGroupStageView;
+  teamNameById: Map<number, string>;
+  indexByTeamId: Map<number, number>;
+  readOnly?: boolean;
+  allMatchesPlayed: boolean;
+}> = ({
+  tournamentId,
+  group,
+  teamNameById,
+  indexByTeamId,
+  readOnly,
+  allMatchesPlayed,
+}) => {
+  const firstRound = useMemo(
+    () =>
+      group.matches
+        .filter((m) => m.round_number === 1)
+        .sort(
+          (a, b) =>
+            (a.match_index ?? 0) - (b.match_index ?? 0) || a.id - b.id
+        ),
+    [group.matches]
+  );
+
+  const round2 = useMemo(
+    () =>
+      group.matches
+        .filter((m) => m.round_number === 2 && !m.is_third_place)
+        .sort(
+          (a, b) =>
+            (a.match_index ?? 0) - (b.match_index ?? 0) || a.id - b.id
+        ),
+    [group.matches]
+  );
+
+  const winnersMatch =
+    round2.find((m) => m.loser_next_match_round === 3) ??
+    round2.find((m) => (m.match_index ?? 0) === 0) ??
+    round2[0];
+  const losersMatch =
+    round2.find(
+      (m) => m.id !== winnersMatch?.id && m.next_match_round === 3
+    ) ??
+    round2.find((m) => m.id !== winnersMatch?.id) ??
+    round2.find((m) => (m.match_index ?? 0) === 1);
+  const placementMatch =
+    group.matches.find((m) => m.round_number === 3) ??
+    group.matches.find((m) => Boolean(m.is_third_place));
+
+  const resolveName = (teamId: number | null | undefined) => {
+    if (teamId == null) {
+      return "Будет определён";
+    }
+    return teamNameById.get(teamId) ?? `Команда #${teamId}`;
+  };
+
+  const renderMatch = (match: TournamentGroupMatchView | undefined) => {
+    if (!match) {
+      return (
+        <div
+          className="flex items-center justify-center rounded border border-dashed border-gray-300 bg-white text-[11px] text-gray-400"
+          style={{ height: FRENCH_MATCH_H, width: FRENCH_MATCH_W }}
+        >
+          Матч не создан
+        </div>
+      );
+    }
+    return (
+      <MatchScoreInputs
+        tournamentId={tournamentId}
+        match={match}
+        teamAName={resolveName(match.team_a_id)}
+        teamBName={resolveName(match.team_b_id)}
+        teamAIndex={
+          match.team_a_id != null
+            ? indexByTeamId.get(match.team_a_id)
+            : undefined
+        }
+        teamBIndex={
+          match.team_b_id != null
+            ? indexByTeamId.get(match.team_b_id)
+            : undefined
+        }
+        readOnly={readOnly}
+        disabled={match.team_a_id == null || match.team_b_id == null}
+        bracket
+      />
+    );
+  };
+
+  const matchWinnerId = (
+    match: TournamentGroupMatchView | undefined
+  ): number | null => {
+    if (
+      !match ||
+      match.team_a_id == null ||
+      match.team_b_id == null ||
+      match.score_a == null ||
+      match.score_b == null
+    ) {
+      return null;
+    }
+    return match.score_a > match.score_b ? match.team_a_id : match.team_b_id;
+  };
+
+  const matchLoserId = (
+    match: TournamentGroupMatchView | undefined
+  ): number | null => {
+    if (
+      !match ||
+      match.team_a_id == null ||
+      match.team_b_id == null ||
+      match.score_a == null ||
+      match.score_b == null
+    ) {
+      return null;
+    }
+    return match.score_a > match.score_b ? match.team_b_id : match.team_a_id;
+  };
+
+  const placeCard = (name: string | null, place: string) => (
+    <div className="relative" style={{ width: FRENCH_MATCH_W }}>
+      <p className="absolute -top-4 left-0 w-full text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {place}
+      </p>
+      <div className="flex h-7 items-center overflow-hidden rounded border border-black bg-white px-2">
+        <span
+          className={`min-w-0 truncate text-[11px] leading-tight ${
+            name ? "font-medium text-gray-900" : "italic text-gray-400"
+          }`}
+        >
+          {name ?? "Будет определён"}
+        </span>
+      </div>
+    </div>
+  );
+
+  const winnerCard = (name: string | null) => (
+    <div
+      className="flex items-center overflow-hidden rounded border border-black bg-white px-2"
+      style={{ height: 28, width: FRENCH_MATCH_W }}
+    >
+      <span
+        className={`min-w-0 truncate text-[11px] leading-tight ${
+          name ? "font-medium text-gray-900" : "italic text-gray-400"
+        }`}
+      >
+        {name ?? "Будет определён"}
+      </span>
+    </div>
+  );
+
+  const placedTeams = [...group.teams].sort((a, b) => {
+    if (a.place > 0 && b.place > 0) {
+      return a.place - b.place;
+    }
+    if (a.place > 0) {
+      return -1;
+    }
+    if (b.place > 0) {
+      return 1;
+    }
+    return 0;
+  });
+
+  /*
+   *  [R1-0] ─┐
+   *          ├─ [Winners] ── [побед.] ── места 1..4
+   *  [R1-1] ─┘
+   *             [Losers]   ── [побед.]
+   *             [За 2–3]   ── [побед.]
+   */
+  const headerH = 20;
+  const stackGap = 40;
+  const r1Gap = 28;
+  // Как в кубках: линия заканчивается до «дорожки», дорожка в отдельном зазоре.
+  const courtPad = 48;
+  const col1X = 48;
+  const col12Gap = FRENCH_CONNECTOR_W + courtPad;
+  const col2X = col1X + FRENCH_MATCH_W + col12Gap;
+  const col3X = col2X + FRENCH_MATCH_W + FRENCH_CONNECTOR_W;
+  const col4X = col3X + FRENCH_MATCH_W + FRENCH_CONNECTOR_W;
+
+  const winnersTop = headerH + 18;
+  const losersTop = winnersTop + FRENCH_MATCH_H + stackGap;
+  const placementTop = losersTop + FRENCH_MATCH_H + stackGap;
+
+  const winnersC = winnersTop + FRENCH_MATCH_H / 2;
+  const losersC = losersTop + FRENCH_MATCH_H / 2;
+  const placementC = placementTop + FRENCH_MATCH_H / 2;
+
+  const r1BlockH = FRENCH_MATCH_H * 2 + r1Gap;
+  const r1Top0 = winnersC - r1BlockH / 2;
+  const r1Top1 = r1Top0 + FRENCH_MATCH_H + r1Gap;
+  const r1c0 = r1Top0 + FRENCH_MATCH_H / 2;
+  const r1c1 = r1Top1 + FRENCH_MATCH_H / 2;
+
+  const winnerCardH = 28;
+  const winnersOutTop = winnersTop + (FRENCH_MATCH_H - winnerCardH) / 2;
+  const losersOutTop = losersTop + (FRENCH_MATCH_H - winnerCardH) / 2;
+  const placementOutTop = placementTop + (FRENCH_MATCH_H - winnerCardH) / 2;
+
+  const placeGap = 24;
+  const placeCardH = 28;
+  const placesBlockH = placeCardH * 4 + placeGap * 3 + 16;
+  const placesTop0 = Math.max(8, winnersC - placesBlockH / 2 + 8);
+  const placeTops = [0, 1, 2, 3].map(
+    (i) => placesTop0 + i * (placeCardH + placeGap)
+  );
+
+  const boardW = col4X + FRENCH_MATCH_W + 24;
+  const boardH = Math.max(
+    placementTop + FRENCH_MATCH_H + 24,
+    placeTops[3] + placeCardH + 24
+  );
+
+  const c1Right = col1X + FRENCH_MATCH_W;
+  const c2Right = col2X + FRENCH_MATCH_W;
+  const mid12 = c1Right + FRENCH_CONNECTOR_W / 2;
+  const col2LineEnd = col2X - courtPad;
+
+  const nameOrNull = (id: number | null) =>
+    id != null ? resolveName(id) : null;
+
+  const winnersWinnerName = nameOrNull(matchWinnerId(winnersMatch));
+  const losersWinnerName = nameOrNull(matchWinnerId(losersMatch));
+  const placementWinnerName = nameOrNull(matchWinnerId(placementMatch));
+
+  // Места: 1 — победитель верхнего, 2 — победитель матча за 2–3,
+  // 3 — проигравший матча за 2–3, 4 — проигравший нижнего.
+  const placeNames = [
+    winnersWinnerName,
+    nameOrNull(matchWinnerId(placementMatch)),
+    nameOrNull(matchLoserId(placementMatch)),
+    nameOrNull(matchLoserId(losersMatch)),
+  ];
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-gray-600">
+        Французская система: во 2-м туре победители играют с победителями,
+        проигравшие — с проигравшими. В 3-м туре определяется 2-е и 3-е место.
+      </p>
+      {!losersMatch && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Матч «проигравшие с проигравшими» не найден в данных группы. Если
+          турнир стартовал со старой схемой, сбросьте проведение и запустите
+          группы заново.
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600">
+                Команда
+              </th>
+              <th className="w-16 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600">
+                победы
+              </th>
+              <th className="w-16 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600">
+                доп
+              </th>
+              <th className="w-16 border border-gray-200 px-1 py-1.5 text-center font-medium text-gray-600">
+                место
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {placedTeams.map((rowTeam) => {
+              const name = teamLabel(rowTeam.players);
+              return (
+                <tr key={rowTeam.team_id} className="bg-white">
+                  <td
+                    className="truncate border border-gray-200 px-2 py-1 font-medium text-gray-900"
+                    title={name}
+                  >
+                    {name}
+                  </td>
+                  <td className="border border-gray-200 px-1 py-1 text-center font-semibold">
+                    {rowTeam.wins}
+                  </td>
+                  <td className="border border-gray-200 px-1 py-1 text-center">
+                    {formatDiff(rowTeam.point_diff)}
+                  </td>
+                  <td className="border border-gray-200 px-1 py-1 text-center font-semibold">
+                    {allMatchesPlayed && rowTeam.place > 0
+                      ? rowTeam.place
+                      : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-50/80 p-3">
+        <div className="relative" style={{ width: boardW, height: boardH }}>
+          <svg
+            className="pointer-events-none absolute inset-0"
+            width={boardW}
+            height={boardH}
+            aria-hidden="true"
+          >
+            {/* R1 → winners (линия не заходит под «дорожку») */}
+            <path
+              d={`M${c1Right} ${r1c0} H${mid12} V${winnersC} H${col2LineEnd}`}
+              fill="none"
+              stroke="black"
+              strokeWidth="2"
+            />
+            <path
+              d={`M${c1Right} ${r1c1} H${mid12} V${winnersC}`}
+              fill="none"
+              stroke="black"
+              strokeWidth="2"
+            />
+            {/* winners → winner card */}
+            <path
+              d={`M${c2Right} ${winnersC} H${col3X}`}
+              fill="none"
+              stroke="black"
+              strokeWidth="2"
+            />
+            {/* losers → winner card */}
+            <path
+              d={`M${c2Right} ${losersC} H${col3X}`}
+              fill="none"
+              stroke="black"
+              strokeWidth="2"
+            />
+            {/* placement → winner card */}
+            <path
+              d={`M${c2Right} ${placementC} H${col3X}`}
+              fill="none"
+              stroke="black"
+              strokeWidth="2"
+            />
+          </svg>
+
+          <p
+            className="absolute text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500"
+            style={{ left: col1X, top: Math.max(0, r1Top0 - 18), width: FRENCH_MATCH_W }}
+          >
+            1 тур
+          </p>
+          <p
+            className="absolute text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500"
+            style={{ left: col2X, top: winnersTop - 16, width: FRENCH_MATCH_W }}
+          >
+            Победители
+          </p>
+          <p
+            className="absolute text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500"
+            style={{ left: col2X, top: losersTop - 16, width: FRENCH_MATCH_W }}
+          >
+            Проигравшие
+          </p>
+          <p
+            className="absolute text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500"
+            style={{ left: col2X, top: placementTop - 16, width: FRENCH_MATCH_W }}
+          >
+            За 2–3 место
+          </p>
+          <div className="absolute" style={{ left: col1X, top: r1Top0 }}>
+            {renderMatch(firstRound[0])}
+          </div>
+          <div className="absolute" style={{ left: col1X, top: r1Top1 }}>
+            {renderMatch(firstRound[1])}
+          </div>
+
+          <div className="absolute" style={{ left: col2X, top: winnersTop }}>
+            {renderMatch(winnersMatch)}
+          </div>
+          <div className="absolute" style={{ left: col2X, top: losersTop }}>
+            {renderMatch(losersMatch)}
+          </div>
+          <div className="absolute" style={{ left: col2X, top: placementTop }}>
+            {renderMatch(placementMatch)}
+          </div>
+
+          <div className="absolute" style={{ left: col3X, top: winnersOutTop }}>
+            {winnerCard(winnersWinnerName)}
+          </div>
+          <div className="absolute" style={{ left: col3X, top: losersOutTop }}>
+            {winnerCard(losersWinnerName)}
+          </div>
+          <div
+            className="absolute"
+            style={{ left: col3X, top: placementOutTop }}
+          >
+            {winnerCard(placementWinnerName)}
+          </div>
+
+          {placeNames.map((name, index) => (
+            <div
+              key={`place-${index + 1}`}
+              className="absolute"
+              style={{ left: col4X, top: placeTops[index] }}
+            >
+              {placeCard(name, `${index + 1} место`)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const GroupResultsPanel: React.FC<{
   tournamentId?: number;
   group: TournamentGroupStageView;
@@ -406,6 +963,8 @@ const GroupResultsPanel: React.FC<{
     group.teams.forEach((t, i) => map.set(t.team_id, i + 1));
     return map;
   }, [group.teams]);
+
+  const isFrench = group.format === "FRENCH";
 
   const orderedTeams = group.teams;
 
@@ -431,6 +990,17 @@ const GroupResultsPanel: React.FC<{
 
   return (
     <div className="space-y-5">
+      {isFrench ? (
+        <FrenchGroupBracket
+          tournamentId={tournamentId}
+          group={group}
+          teamNameById={teamNameById}
+          indexByTeamId={indexByTeamId}
+          readOnly={readOnly}
+          allMatchesPlayed={allMatchesPlayed}
+        />
+      ) : (
+        <>
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="w-full table-fixed border-collapse text-sm">
           <thead>
@@ -543,11 +1113,17 @@ const GroupResultsPanel: React.FC<{
             <ul className="space-y-2">
               {matches.map((m) => {
                 const aName =
-                  teamNameById.get(m.team_a_id) ?? `Команда #${m.team_a_id}`;
+                  m.team_a_id != null
+                    ? teamNameById.get(m.team_a_id) ?? `Команда #${m.team_a_id}`
+                    : "Будет определён";
                 const bName =
-                  teamNameById.get(m.team_b_id) ?? `Команда #${m.team_b_id}`;
-                const aIdx = indexByTeamId.get(m.team_a_id);
-                const bIdx = indexByTeamId.get(m.team_b_id);
+                  m.team_b_id != null
+                    ? teamNameById.get(m.team_b_id) ?? `Команда #${m.team_b_id}`
+                    : "Будет определён";
+                const aIdx =
+                  m.team_a_id != null ? indexByTeamId.get(m.team_a_id) : undefined;
+                const bIdx =
+                  m.team_b_id != null ? indexByTeamId.get(m.team_b_id) : undefined;
                 return (
                   <li
                     key={m.id}
@@ -569,6 +1145,8 @@ const GroupResultsPanel: React.FC<{
           </div>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 };

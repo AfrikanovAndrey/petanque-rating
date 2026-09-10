@@ -105,6 +105,8 @@ export interface Tournament {
   regulations?: string | null;
   play_format?: TournamentPlayFormat | null;
   group_size?: number | null;
+  /** Трёхтуровая французская система в группах из 4 */
+  french_system?: boolean;
   swiss_rounds?: number | null;
   tiebreaker_order?: TiebreakerCriterion[] | null;
   group_draw?: TournamentGroupDrawGroup[] | null;
@@ -190,11 +192,19 @@ export interface TournamentFinishedPageData {
 export interface TournamentGroupMatchView {
   id: number;
   round_number: number;
-  team_a_id: number;
-  team_b_id: number;
+  match_index?: number;
+  team_a_id: number | null;
+  team_b_id: number | null;
   score_a: number | null;
   score_b: number | null;
   court: number | null;
+  is_third_place?: boolean;
+  next_match_round?: number | null;
+  next_match_index?: number | null;
+  next_slot?: "a" | "b" | null;
+  loser_next_match_round?: number | null;
+  loser_next_match_index?: number | null;
+  loser_next_slot?: "a" | "b" | null;
 }
 
 export interface TournamentGroupTeamStanding {
@@ -209,6 +219,7 @@ export interface TournamentGroupTeamStanding {
 
 export interface TournamentGroupStageView {
   group_number: number;
+  format?: "ROUND_ROBIN" | "FRENCH";
   teams: TournamentGroupTeamStanding[];
   matches: TournamentGroupMatchView[];
 }

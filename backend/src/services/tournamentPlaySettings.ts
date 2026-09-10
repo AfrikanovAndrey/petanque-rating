@@ -17,6 +17,7 @@ export const ALL_TIEBREAKER_CRITERIA = [...DEFAULT_TIEBREAKER_ORDER];
 export interface TournamentPlaySettingsInput {
   play_format: TournamentPlayFormat;
   group_size?: number | null;
+  french_system?: boolean | null;
   swiss_rounds?: number | null;
   tiebreaker_order?: TiebreakerCriterion[] | null;
 }
@@ -77,6 +78,9 @@ export function validatePlaySettings(
     const size = input.group_size;
     if (size == null || size < 4 || size > 6) {
       return "Для группового формата укажите размер группы от 4 до 6";
+    }
+    if (input.french_system && size !== 4) {
+      return "Французская система доступна только при размере группы 4";
     }
     return null;
   }

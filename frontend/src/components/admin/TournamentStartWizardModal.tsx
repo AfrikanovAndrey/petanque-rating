@@ -80,6 +80,9 @@ const TournamentStartWizardModal: React.FC<Props> = ({
   const [groupSize, setGroupSize] = useState<number>(
     tournament.group_size ?? 4
   );
+  const [frenchSystem, setFrenchSystem] = useState<boolean>(
+    Boolean(tournament.french_system) && (tournament.group_size ?? 4) === 4
+  );
   const [swissRounds, setSwissRounds] = useState<number>(
     tournament.swiss_rounds ?? 5
   );
@@ -105,6 +108,9 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     setStep(1);
     setPlayFormat(tournament.play_format ?? null);
     setGroupSize(tournament.group_size ?? 4);
+    setFrenchSystem(
+      Boolean(tournament.french_system) && (tournament.group_size ?? 4) === 4
+    );
     setSwissRounds(tournament.swiss_rounds ?? 5);
     setTiebreakerOrder(tournament.tiebreaker_order ?? []);
     setPendingTiebreaker("");
@@ -291,6 +297,10 @@ const TournamentStartWizardModal: React.FC<Props> = ({
           play_format: playFormat,
           group_size:
             playFormat === TournamentPlayFormat.GROUPS ? groupSize : null,
+          french_system:
+            playFormat === TournamentPlayFormat.GROUPS &&
+            groupSize === 4 &&
+            frenchSystem,
           swiss_rounds:
             playFormat === TournamentPlayFormat.SWISS ? swissRounds : null,
           tiebreaker_order:
@@ -672,7 +682,13 @@ const TournamentStartWizardModal: React.FC<Props> = ({
                   id="group-size"
                   className="input-field max-w-xs"
                   value={groupSize}
-                  onChange={(e) => setGroupSize(Number(e.target.value))}
+                  onChange={(e) => {
+                    const size = Number(e.target.value);
+                    setGroupSize(size);
+                    if (size !== 4) {
+                      setFrenchSystem(false);
+                    }
+                  }}
                 >
                   {[4, 5, 6].map((size) => (
                     <option key={size} value={size}>
@@ -681,6 +697,27 @@ const TournamentStartWizardModal: React.FC<Props> = ({
                   ))}
                 </select>
               </div>
+              {groupSize === 4 && (
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4 hover:border-gray-300">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    checked={frenchSystem}
+                    onChange={(e) => setFrenchSystem(e.target.checked)}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-900">
+                      Французская система
+                    </span>
+                    <span className="mt-1 block text-xs text-gray-500">
+                      В группах из 4 команд: после стартовых пар победители
+                      играют с победителями, проигравшие — с проигравшими.
+                      Затем команды с одной победой играют за 2-е и 3-е место.
+                      Если в группе 3 команды — круговой график.
+                    </span>
+                  </span>
+                </label>
+              )}
               <p className="text-sm text-gray-500">
                 Подтверждённых заявок: {confirmedTeamsCount}
               </p>

@@ -98,6 +98,8 @@ export interface Tournament {
   regulations?: string | null;
   play_format?: TournamentPlayFormat | null;
   group_size?: number | null;
+  /** Трёхтуровая французская система в группах из 4 */
+  french_system?: boolean;
   swiss_rounds?: number | null;
   tiebreaker_order?: TiebreakerCriterion[] | null;
   /** Сиды швейцарки после старта проведения */

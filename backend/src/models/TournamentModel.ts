@@ -41,6 +41,7 @@ export class TournamentModel {
     const tournament: Tournament = {
       ...row,
       organizer_user_id: organizerUserId,
+      french_system: Boolean(row.french_system),
       tiebreaker_order: parseTiebreakerOrder(row.tiebreaker_order),
       group_draw: parseGroupDraw(row.group_draw),
       swiss_seed: parseSwissSeed(row.swiss_seed),
@@ -256,11 +257,13 @@ export class TournamentModel {
     groupSize: number | null,
     swissRounds: number | null,
     tiebreakerOrder: TiebreakerCriterion[] | null,
+    frenchSystem: boolean = false,
   ): Promise<boolean> {
     const [result] = await pool.execute<ResultSetHeader>(
       `UPDATE tournaments
        SET play_format = ?,
            group_size = ?,
+           french_system = ?,
            swiss_rounds = ?,
            tiebreaker_order = ?,
            group_draw = NULL,
@@ -270,6 +273,7 @@ export class TournamentModel {
       [
         playFormat,
         groupSize,
+        frenchSystem ? 1 : 0,
         swissRounds,
         tiebreakerOrder ? JSON.stringify(tiebreakerOrder) : null,
         id,

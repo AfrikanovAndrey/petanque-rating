@@ -10,11 +10,13 @@ import { TeamModel } from "../models/TeamModel";
 import { TournamentModel } from "../models/TournamentModel";
 import { TournamentRegistrationModel } from "../models/TournamentRegistrationModel";
 import { TournamentGroupMatchModel } from "../models/TournamentGroupMatchModel";
+import type { TournamentGroupMatchRow } from "../models/TournamentGroupMatchModel";
 import { TournamentCupMatchModel } from "../models/TournamentCupMatchModel";
 import { TournamentSwissMatchModel } from "../models/TournamentSwissMatchModel";
 import { UserModel } from "../models/UserModel";
 import {
   buildGroupStageViews,
+  frenchFixturesOutdated,
   validateMatchScores,
 } from "../services/groupStageService";
 import {
@@ -1330,7 +1332,18 @@ export class AdminController {
           await TournamentGroupMatchModel.regenerateFromDraw(
             tournamentId,
             tournament.group_draw,
+            Boolean(tournament.french_system),
           );
+        } else if (tournament.french_system) {
+          const existing =
+            await TournamentGroupMatchModel.listByTournament(tournamentId);
+          if (frenchFixturesOutdated(tournament.group_draw, existing)) {
+            await TournamentGroupMatchModel.regenerateFromDraw(
+              tournamentId,
+              tournament.group_draw,
+              true,
+            );
+          }
         }
         const matches =
           await TournamentGroupMatchModel.listByTournament(tournamentId);
@@ -1576,6 +1589,13 @@ export class AdminController {
         scoreA = null;
         scoreB = null;
       } else if (body.score_a !== undefined || body.score_b !== undefined) {
+        if (match.team_a_id == null || match.team_b_id == null) {
+          res.status(400).json({
+            success: false,
+            message: "Нельзя ввести счёт, пока не определены обе команды",
+          });
+          return;
+        }
         const validated = validateMatchScores(body.score_a, body.score_b);
         if (typeof validated === "string") {
           res.status(400).json({ success: false, message: validated });
@@ -1611,6 +1631,26 @@ export class AdminController {
         }
       }
 
+      const hadScore = match.score_a != null && match.score_b != null;
+      const scoreChanging =
+        body.clear === true ||
+        body.score_a !== undefined ||
+        body.score_b !== undefined;
+
+      if (scoreChanging && (hadScore || body.clear === true)) {
+        const blocked = await AdminController.frenchGroupDownstreamHasScores(
+          match,
+        );
+        if (blocked) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Сначала сбросьте счёт следующего матча сетки (финал или игра за 3-е место)",
+          });
+          return;
+        }
+      }
+
       const saved = await TournamentGroupMatchModel.updateScores(
         matchId,
         scoreA,
@@ -1623,6 +1663,31 @@ export class AdminController {
           message: "Не удалось обновить матч",
         });
         return;
+      }
+
+      if (body.clear === true && hadScore) {
+        await AdminController.advanceFrenchGroupWinner(match, null, null);
+        await AdminController.syncFrenchGroupThirdPlace(
+          tournamentId,
+          match.group_number,
+        );
+      } else if (
+        scoreA != null &&
+        scoreB != null &&
+        match.team_a_id != null &&
+        match.team_b_id != null
+      ) {
+        const winnerId = scoreA > scoreB ? match.team_a_id : match.team_b_id;
+        const loserId = scoreA > scoreB ? match.team_b_id : match.team_a_id;
+        await AdminController.advanceFrenchGroupWinner(
+          match,
+          winnerId,
+          loserId,
+        );
+        await AdminController.syncFrenchGroupThirdPlace(
+          tournamentId,
+          match.group_number,
+        );
       }
 
       const teams =
@@ -2581,6 +2646,223 @@ export class AdminController {
       }
     }
     return qualified;
+  }
+
+  private static async frenchGroupDownstreamHasScores(
+    match: TournamentGroupMatchRow,
+  ): Promise<boolean> {
+    if (
+      match.next_match_round != null &&
+      match.next_match_index != null
+    ) {
+      const next = await TournamentGroupMatchModel.findSlot(
+        match.tournament_id,
+        match.group_number,
+        match.next_match_round,
+        match.next_match_index,
+        false,
+      );
+      if (next && next.score_a != null && next.score_b != null) {
+        return true;
+      }
+    }
+    if (
+      match.loser_next_match_round != null &&
+      match.loser_next_match_index != null
+    ) {
+      // Новая французская схема: слот без is_third_place; старая — с флагом.
+      const loserNext =
+        (await TournamentGroupMatchModel.findSlot(
+          match.tournament_id,
+          match.group_number,
+          match.loser_next_match_round,
+          match.loser_next_match_index,
+          false,
+        )) ??
+        (await TournamentGroupMatchModel.findSlot(
+          match.tournament_id,
+          match.group_number,
+          match.loser_next_match_round,
+          match.loser_next_match_index,
+          true,
+        ));
+      if (loserNext && loserNext.score_a != null && loserNext.score_b != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static async findFrenchLoserDestination(
+    match: TournamentGroupMatchRow,
+  ): Promise<TournamentGroupMatchRow | null> {
+    if (
+      match.loser_next_match_round == null ||
+      match.loser_next_match_index == null
+    ) {
+      return null;
+    }
+    return (
+      (await TournamentGroupMatchModel.findSlot(
+        match.tournament_id,
+        match.group_number,
+        match.loser_next_match_round,
+        match.loser_next_match_index,
+        false,
+      )) ??
+      (await TournamentGroupMatchModel.findSlot(
+        match.tournament_id,
+        match.group_number,
+        match.loser_next_match_round,
+        match.loser_next_match_index,
+        true,
+      ))
+    );
+  }
+
+  private static async advanceFrenchGroupWinner(
+    match: TournamentGroupMatchRow,
+    winnerId: number | null,
+    loserId: number | null,
+  ): Promise<void> {
+    if (
+      match.next_match_round != null &&
+      match.next_match_index != null &&
+      match.next_slot
+    ) {
+      const next = await TournamentGroupMatchModel.findSlot(
+        match.tournament_id,
+        match.group_number,
+        match.next_match_round,
+        match.next_match_index,
+        false,
+      );
+      if (next) {
+        await TournamentGroupMatchModel.setTeamSlot(
+          next.id,
+          match.next_slot,
+          winnerId,
+        );
+      }
+    }
+
+    if (match.is_third_place) {
+      return;
+    }
+
+    if (match.loser_next_slot) {
+      const loserDest = await AdminController.findFrenchLoserDestination(match);
+      if (loserDest) {
+        await TournamentGroupMatchModel.setTeamSlot(
+          loserDest.id,
+          match.loser_next_slot,
+          loserId,
+        );
+      }
+    }
+  }
+
+  /** Заполнить матч за 2–3 место из уже сыгранных матчей 2-го тура. */
+  private static async syncFrenchGroupThirdPlace(
+    tournamentId: number,
+    groupNumber: number,
+  ): Promise<void> {
+    const all = await TournamentGroupMatchModel.listByTournament(tournamentId);
+    const groupMatches = all.filter((m) => m.group_number === groupNumber);
+
+    // Новая схема: round 3. Старая: is_third_place.
+    const placement =
+      groupMatches.find((m) => m.round_number === 3 && !m.is_third_place) ??
+      groupMatches.find((m) => m.is_third_place);
+    if (!placement || placement.score_a != null || placement.score_b != null) {
+      return;
+    }
+
+    const winnersMatch = groupMatches.find(
+      (m) =>
+        !m.is_third_place &&
+        m.round_number === 2 &&
+        m.match_index === 0,
+    );
+    const losersMatch = groupMatches.find(
+      (m) =>
+        !m.is_third_place &&
+        m.round_number === 2 &&
+        m.match_index === 1,
+    );
+
+    let teamA: number | null = placement.team_a_id;
+    let teamB: number | null = placement.team_b_id;
+
+    if (
+      winnersMatch &&
+      winnersMatch.score_a != null &&
+      winnersMatch.score_b != null &&
+      winnersMatch.team_a_id != null &&
+      winnersMatch.team_b_id != null
+    ) {
+      const loserId =
+        winnersMatch.score_a > winnersMatch.score_b
+          ? winnersMatch.team_b_id
+          : winnersMatch.team_a_id;
+      const slot = winnersMatch.loser_next_slot ?? "a";
+      if (slot === "a") {
+        teamA = loserId;
+      } else {
+        teamB = loserId;
+      }
+    }
+
+    if (
+      losersMatch &&
+      losersMatch.score_a != null &&
+      losersMatch.score_b != null &&
+      losersMatch.team_a_id != null &&
+      losersMatch.team_b_id != null
+    ) {
+      const winnerId =
+        losersMatch.score_a > losersMatch.score_b
+          ? losersMatch.team_a_id
+          : losersMatch.team_b_id;
+      const slot = losersMatch.next_slot ?? "b";
+      if (slot === "a") {
+        teamA = winnerId;
+      } else {
+        teamB = winnerId;
+      }
+    }
+
+    // Legacy fallback: полуфиналы со ссылкой на is_third_place-матч
+    if (placement.is_third_place && teamA == null && teamB == null) {
+      const semis = groupMatches.filter(
+        (m) =>
+          !m.is_third_place &&
+          m.loser_next_match_round === placement.round_number &&
+          m.loser_next_match_index === placement.match_index,
+      );
+      for (const semi of semis) {
+        if (
+          semi.score_a == null ||
+          semi.score_b == null ||
+          semi.team_a_id == null ||
+          semi.team_b_id == null
+        ) {
+          continue;
+        }
+        const loserId =
+          semi.score_a > semi.score_b ? semi.team_b_id : semi.team_a_id;
+        const slot: "a" | "b" =
+          semi.loser_next_slot ?? (semi.match_index % 2 === 0 ? "a" : "b");
+        if (slot === "a") {
+          teamA = loserId;
+        } else {
+          teamB = loserId;
+        }
+      }
+    }
+
+    await TournamentGroupMatchModel.setTeamSlot(placement.id, "a", teamA);
+    await TournamentGroupMatchModel.setTeamSlot(placement.id, "b", teamB);
   }
 
   private static async advanceCupWinner(
@@ -3984,8 +4266,13 @@ export class AdminController {
         return;
       }
 
-      const { play_format, group_size, swiss_rounds, tiebreaker_order } =
-        req.body;
+      const {
+        play_format,
+        group_size,
+        french_system,
+        swiss_rounds,
+        tiebreaker_order,
+      } = req.body;
 
       const allowedFormats = Object.values(TournamentPlayFormat);
       if (
@@ -4005,6 +4292,7 @@ export class AdminController {
           group_size === undefined || group_size === null
             ? null
             : Number(group_size),
+        french_system: Boolean(french_system),
         swiss_rounds:
           swiss_rounds === undefined || swiss_rounds === null
             ? null
@@ -4023,6 +4311,11 @@ export class AdminController {
         return;
       }
 
+      const frenchSystem =
+        settingsInput.play_format === TournamentPlayFormat.GROUPS &&
+        settingsInput.group_size === 4 &&
+        Boolean(settingsInput.french_system);
+
       const success = await TournamentModel.updateTournamentPlaySettings(
         tournamentId,
         settingsInput.play_format,
@@ -4035,6 +4328,7 @@ export class AdminController {
         settingsInput.play_format === TournamentPlayFormat.SWISS
           ? settingsInput.tiebreaker_order!
           : null,
+        frenchSystem,
       );
 
       if (!success) {
@@ -4447,6 +4741,7 @@ export class AdminController {
       const settingsInput: TournamentPlaySettingsInput = {
         play_format: tournament.play_format,
         group_size: tournament.group_size,
+        french_system: Boolean(tournament.french_system),
         swiss_rounds: tournament.swiss_rounds,
         tiebreaker_order: tournament.tiebreaker_order,
       };
@@ -4488,6 +4783,7 @@ export class AdminController {
         await TournamentGroupMatchModel.regenerateFromDraw(
           tournamentId,
           tournament.group_draw,
+          Boolean(tournament.french_system),
         );
       }
 

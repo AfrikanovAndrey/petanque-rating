@@ -3,6 +3,7 @@ import { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import {
   generateAllGroupFixtures,
   type GroupMatchFixture,
+  type GroupMatchSlot,
 } from "../services/groupStageService";
 import { TournamentGroupDrawGroup } from "../types";
 
@@ -11,14 +12,54 @@ export type TournamentGroupMatchRow = {
   tournament_id: number;
   group_number: number;
   round_number: number;
-  team_a_id: number;
-  team_b_id: number;
+  match_index: number;
+  team_a_id: number | null;
+  team_b_id: number | null;
   score_a: number | null;
   score_b: number | null;
   court: number | null;
+  is_third_place: boolean;
+  next_match_round: number | null;
+  next_match_index: number | null;
+  next_slot: GroupMatchSlot | null;
+  loser_next_match_round: number | null;
+  loser_next_match_index: number | null;
+  loser_next_slot: GroupMatchSlot | null;
   created_at: Date;
   updated_at: Date;
 };
+
+function mapRow(row: RowDataPacket): TournamentGroupMatchRow {
+  return {
+    id: row.id as number,
+    tournament_id: row.tournament_id as number,
+    group_number: Number(row.group_number),
+    round_number: Number(row.round_number),
+    match_index: Number(row.match_index ?? 0),
+    team_a_id: row.team_a_id == null ? null : Number(row.team_a_id),
+    team_b_id: row.team_b_id == null ? null : Number(row.team_b_id),
+    score_a: row.score_a == null ? null : Number(row.score_a),
+    score_b: row.score_b == null ? null : Number(row.score_b),
+    court: row.court == null ? null : Number(row.court),
+    is_third_place: Boolean(row.is_third_place),
+    next_match_round:
+      row.next_match_round == null ? null : Number(row.next_match_round),
+    next_match_index:
+      row.next_match_index == null ? null : Number(row.next_match_index),
+    next_slot: (row.next_slot as GroupMatchSlot | null) ?? null,
+    loser_next_match_round:
+      row.loser_next_match_round == null
+        ? null
+        : Number(row.loser_next_match_round),
+    loser_next_match_index:
+      row.loser_next_match_index == null
+        ? null
+        : Number(row.loser_next_match_index),
+    loser_next_slot: (row.loser_next_slot as GroupMatchSlot | null) ?? null,
+    created_at: row.created_at as Date,
+    updated_at: row.updated_at as Date,
+  };
+}
 
 export class TournamentGroupMatchModel {
   static async deleteByTournament(
@@ -56,17 +97,28 @@ export class TournamentGroupMatchModel {
           tournamentId,
           f.group_number,
           f.round_number,
+          f.match_index,
           f.team_a_id,
           f.team_b_id,
           f.court,
+          f.is_third_place ? 1 : 0,
+          f.next_match_round,
+          f.next_match_index,
+          f.next_slot,
+          f.loser_next_match_round,
+          f.loser_next_match_index,
+          f.loser_next_slot,
         );
-        return "(?, ?, ?, ?, ?, ?)";
+        return "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
       })
       .join(", ");
 
     await exec.execute(
       `INSERT INTO tournament_group_matches
-        (tournament_id, group_number, round_number, team_a_id, team_b_id, court)
+        (tournament_id, group_number, round_number, match_index,
+         team_a_id, team_b_id, court, is_third_place,
+         next_match_round, next_match_index, next_slot,
+         loser_next_match_round, loser_next_match_index, loser_next_slot)
        VALUES ${placeholders}`,
       values,
     );
@@ -76,10 +128,11 @@ export class TournamentGroupMatchModel {
   static async regenerateFromDraw(
     tournamentId: number,
     groupDraw: TournamentGroupDrawGroup[],
+    frenchSystem: boolean = false,
     connection?: PoolConnection,
   ): Promise<number> {
     await this.deleteByTournament(tournamentId, connection);
-    const fixtures = generateAllGroupFixtures(groupDraw);
+    const fixtures = generateAllGroupFixtures(groupDraw, { frenchSystem });
     await this.insertFixtures(tournamentId, fixtures, connection);
     return fixtures.length;
   }
@@ -88,58 +141,60 @@ export class TournamentGroupMatchModel {
     tournamentId: number,
   ): Promise<TournamentGroupMatchRow[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT id, tournament_id, group_number, round_number,
-              team_a_id, team_b_id, score_a, score_b, court,
-              created_at, updated_at
+      `SELECT *
        FROM tournament_group_matches
        WHERE tournament_id = ?
-       ORDER BY group_number ASC, round_number ASC, id ASC`,
+       ORDER BY group_number ASC, round_number ASC, is_third_place ASC, match_index ASC, id ASC`,
       [tournamentId],
     );
-    return rows.map((row) => ({
-      id: row.id as number,
-      tournament_id: row.tournament_id as number,
-      group_number: row.group_number as number,
-      round_number: row.round_number as number,
-      team_a_id: row.team_a_id as number,
-      team_b_id: row.team_b_id as number,
-      score_a: row.score_a == null ? null : Number(row.score_a),
-      score_b: row.score_b == null ? null : Number(row.score_b),
-      court: row.court == null ? null : Number(row.court),
-      created_at: row.created_at as Date,
-      updated_at: row.updated_at as Date,
-    }));
+    return rows.map(mapRow);
   }
 
   static async getById(
     matchId: number,
   ): Promise<TournamentGroupMatchRow | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT id, tournament_id, group_number, round_number,
-              team_a_id, team_b_id, score_a, score_b, court,
-              created_at, updated_at
-       FROM tournament_group_matches
-       WHERE id = ?
-       LIMIT 1`,
+      `SELECT * FROM tournament_group_matches WHERE id = ? LIMIT 1`,
       [matchId],
     );
     if (rows.length === 0) {
       return null;
     }
-    const row = rows[0];
-    return {
-      id: row.id as number,
-      tournament_id: row.tournament_id as number,
-      group_number: row.group_number as number,
-      round_number: row.round_number as number,
-      team_a_id: row.team_a_id as number,
-      team_b_id: row.team_b_id as number,
-      score_a: row.score_a == null ? null : Number(row.score_a),
-      score_b: row.score_b == null ? null : Number(row.score_b),
-      court: row.court == null ? null : Number(row.court),
-      created_at: row.created_at as Date,
-      updated_at: row.updated_at as Date,
-    };
+    return mapRow(rows[0]);
+  }
+
+  static async findSlot(
+    tournamentId: number,
+    groupNumber: number,
+    roundNumber: number,
+    matchIndex: number,
+    isThirdPlace: boolean,
+  ): Promise<TournamentGroupMatchRow | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      `SELECT * FROM tournament_group_matches
+       WHERE tournament_id = ? AND group_number = ?
+         AND round_number = ? AND match_index = ?
+         AND is_third_place = ?
+       LIMIT 1`,
+      [tournamentId, groupNumber, roundNumber, matchIndex, isThirdPlace ? 1 : 0],
+    );
+    if (rows.length === 0) {
+      return null;
+    }
+    return mapRow(rows[0]);
+  }
+
+  static async setTeamSlot(
+    matchId: number,
+    slot: GroupMatchSlot,
+    teamId: number | null,
+  ): Promise<boolean> {
+    const col = slot === "a" ? "team_a_id" : "team_b_id";
+    const [result] = await pool.execute<ResultSetHeader>(
+      `UPDATE tournament_group_matches SET ${col} = ? WHERE id = ?`,
+      [teamId, matchId],
+    );
+    return result.affectedRows > 0;
   }
 
   static async updateScores(

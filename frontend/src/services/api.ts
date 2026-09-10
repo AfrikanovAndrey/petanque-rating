@@ -570,6 +570,7 @@ export const adminApi = {
     data: {
       play_format: TournamentPlayFormat;
       group_size?: number | null;
+      french_system?: boolean | null;
       swiss_rounds?: number | null;
       tiebreaker_order?: TiebreakerCriterion[] | null;
     }

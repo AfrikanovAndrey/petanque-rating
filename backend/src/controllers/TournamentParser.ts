@@ -24,7 +24,7 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
-export function getCupListName(cup: Cup) {
+export function getCupListName(cup: Cup): string {
   switch (cup) {
     case "A":
       return `^Кубок [AaАа]$`;
@@ -32,6 +32,8 @@ export function getCupListName(cup: Cup) {
       return `^Кубок [BbБбВв]$`;
     case "C":
       return `^Кубок [CcСс]$`;
+    case "D":
+      return `^Кубок [DdДд]$`;
   }
 }
 

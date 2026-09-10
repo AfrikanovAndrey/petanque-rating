@@ -1,6 +1,8 @@
 import {
   generateAllGroupFixtures,
+  generateFrenchSystemFixtures,
   generateRoundRobinFixtures,
+  computeFrenchGroupStandings,
   computeGroupStandings,
   getCrossTableCell,
 } from "../groupStageService";
@@ -31,6 +33,45 @@ describe("generateAllGroupFixtures", () => {
     ]);
     expect(fixtures[0].court).toBe(1);
     expect(Math.max(...fixtures.map((f) => f.court))).toBe(fixtures.length);
+  });
+
+  it("французская система: 5 матчей на группу из 4", () => {
+    const fixtures = generateAllGroupFixtures(
+      [
+        { group_number: 1, team_ids: [1, 2, 3, 4] },
+        { group_number: 2, team_ids: [5, 6, 7] },
+      ],
+      { frenchSystem: true },
+    );
+    const g1 = fixtures.filter((f) => f.group_number === 1);
+    const g2 = fixtures.filter((f) => f.group_number === 2);
+    expect(g1).toHaveLength(5);
+    expect(g1.filter((f) => f.round_number === 1)).toHaveLength(2);
+    expect(g1.filter((f) => f.round_number === 2)).toHaveLength(2);
+    expect(g1.filter((f) => f.round_number === 3)).toHaveLength(1);
+    expect(g1.filter((f) => f.round_number === 2)[0].team_a_id).toBeNull();
+    expect(g2).toHaveLength(3);
+  });
+});
+
+describe("generateFrenchSystemFixtures", () => {
+  it("пары 1-го раунда по порядку жеребьёвки", () => {
+    const fixtures = generateFrenchSystemFixtures(1, [10, 20, 30, 40]);
+    const semis = fixtures.filter((f) => f.round_number === 1);
+    expect(semis[0]).toMatchObject({
+      team_a_id: 10,
+      team_b_id: 20,
+      next_slot: "a",
+      loser_next_slot: "a",
+      loser_next_match_index: 1,
+    });
+    expect(semis[1]).toMatchObject({
+      team_a_id: 30,
+      team_b_id: 40,
+      next_slot: "b",
+      loser_next_slot: "b",
+      loser_next_match_index: 1,
+    });
   });
 });
 
@@ -157,5 +198,102 @@ describe("getCrossTableCell", () => {
       score_against: 8,
       diff: 5,
     });
+  });
+});
+
+describe("computeFrenchGroupStandings", () => {
+  it("ставит места по верхнему, нижнему и решающему матчам", () => {
+    const standings = computeFrenchGroupStandings(
+      [1, 2, 3, 4],
+      [
+        {
+          round_number: 1,
+          team_a_id: 1,
+          team_b_id: 2,
+          score_a: 13,
+          score_b: 0,
+        },
+        {
+          round_number: 1,
+          team_a_id: 3,
+          team_b_id: 4,
+          score_a: 5,
+          score_b: 13,
+        },
+        {
+          round_number: 2,
+          match_index: 0,
+          team_a_id: 1,
+          team_b_id: 4,
+          score_a: 13,
+          score_b: 12,
+        },
+        {
+          round_number: 2,
+          match_index: 1,
+          team_a_id: 2,
+          team_b_id: 3,
+          score_a: 13,
+          score_b: 7,
+        },
+        {
+          round_number: 3,
+          match_index: 0,
+          team_a_id: 4,
+          team_b_id: 2,
+          score_a: 13,
+          score_b: 11,
+        },
+      ],
+    );
+    expect(standings.map((s) => s.team_id)).toEqual([1, 4, 2, 3]);
+    expect(standings.map((s) => s.place)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("не ставит места, пока не завершён 3-й тур", () => {
+    const standings = computeFrenchGroupStandings(
+      [1, 2, 3, 4],
+      [
+        {
+          round_number: 1,
+          team_a_id: 1,
+          team_b_id: 2,
+          score_a: 13,
+          score_b: 5,
+        },
+        {
+          round_number: 1,
+          team_a_id: 3,
+          team_b_id: 4,
+          score_a: 13,
+          score_b: 8,
+        },
+        {
+          round_number: 2,
+          match_index: 0,
+          team_a_id: null,
+          team_b_id: null,
+          score_a: null,
+          score_b: null,
+        },
+        {
+          round_number: 2,
+          match_index: 1,
+          team_a_id: null,
+          team_b_id: null,
+          score_a: null,
+          score_b: null,
+        },
+        {
+          round_number: 3,
+          match_index: 0,
+          team_a_id: null,
+          team_b_id: null,
+          score_a: null,
+          score_b: null,
+        },
+      ],
+    );
+    expect(standings.every((s) => s.place === 0)).toBe(true);
   });
 });

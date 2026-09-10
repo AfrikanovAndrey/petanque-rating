@@ -9,13 +9,21 @@ import {
 } from "../../types";
 
 describe("validatePlaySettings", () => {
-  it("принимает групповой формат с размером 4–6", () => {
+  it("принимает французскую систему только при размере 4", () => {
+    expect(
+      validatePlaySettings({
+        play_format: TournamentPlayFormat.GROUPS,
+        group_size: 4,
+        french_system: true,
+      }),
+    ).toBeNull();
     expect(
       validatePlaySettings({
         play_format: TournamentPlayFormat.GROUPS,
         group_size: 5,
+        french_system: true,
       }),
-    ).toBeNull();
+    ).not.toBeNull();
   });
 
   it("отклоняет групповой формат без размера", () => {
