@@ -63,6 +63,13 @@ export function getTournamentTypeIcons(
           <UserIcon className={iconClass(options, "female")} />
         </span>
       );
+    case TournamentType.DOUBLETTE_ANY:
+      return (
+        <span className={wrapClass(options)} title="Дуплеты смешанные">
+          <UserIcon className={iconClass(options, "neutral")} />
+          <UserIcon className={iconClass(options, "neutral")} />
+        </span>
+      );
     case TournamentType.TET_A_TET_MALE:
       return (
         <span className={wrapClass(options)} title="Тет-а-тет мужской">
@@ -73,6 +80,12 @@ export function getTournamentTypeIcons(
       return (
         <span className={wrapClass(options)} title="Тет-а-тет женский">
           <UserIcon className={iconClass(options, "female")} />
+        </span>
+      );
+    case TournamentType.TET_A_TET_ANY:
+      return (
+        <span className={wrapClass(options)} title="Тет-а-тет смешанный">
+          <UserIcon className={iconClass(options, "neutral")} />
         </span>
       );
     default:

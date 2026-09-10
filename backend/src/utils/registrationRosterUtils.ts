@@ -151,9 +151,11 @@ export function getExpectedSlotCount(type: TournamentType): number {
     case TournamentType.DOUBLETTE_MALE:
     case TournamentType.DOUBLETTE_FEMALE:
     case TournamentType.DOUBLETTE_MIXT:
+    case TournamentType.DOUBLETTE_ANY:
       return 2;
     case TournamentType.TET_A_TET_MALE:
     case TournamentType.TET_A_TET_FEMALE:
+    case TournamentType.TET_A_TET_ANY:
       return 1;
     default:
       return 1;

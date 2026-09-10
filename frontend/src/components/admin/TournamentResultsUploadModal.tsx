@@ -593,11 +593,17 @@ const TournamentResultsUploadModal: React.FC<
                 <option value={TournamentType.DOUBLETTE_MIXT}>
                   Дуплеты микст
                 </option>
+                <option value={TournamentType.DOUBLETTE_ANY}>
+                  Дуплеты смешанные
+                </option>
                 <option value={TournamentType.TET_A_TET_MALE}>
                   Тет-а-тет мужской
                 </option>
                 <option value={TournamentType.TET_A_TET_FEMALE}>
                   Тет-а-тет женский
+                </option>
+                <option value={TournamentType.TET_A_TET_ANY}>
+                  Тет-а-тет смешанный
                 </option>
               </select>
               {errors.tournament_type && (
@@ -617,8 +623,9 @@ const TournamentResultsUploadModal: React.FC<
                   required: "Категория турнира обязательна",
                 })}
               >
-                <option value="1">1-я категория</option>
-                <option value="2">2-я категория</option>
+                <option value="1">1-я категория (РФП)</option>
+                <option value="2">2-я категория (Региональный)</option>
+                <option value="3">Клубный</option>
               </select>
               {errors.tournament_category && (
                 <p className="mt-1 text-sm text-red-600">

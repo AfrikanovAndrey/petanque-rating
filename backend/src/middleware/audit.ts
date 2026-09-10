@@ -247,6 +247,9 @@ export const getEntityNameFromDB = async (
       case "user":
         query = "SELECT name FROM users WHERE id = ?";
         break;
+      case "club":
+        query = "SELECT name FROM clubs WHERE id = ?";
+        break;
       case "team":
         query = "SELECT id FROM teams WHERE id = ?";
         nameField = "id";

@@ -25,6 +25,7 @@ import {
   formatDateForInput,
   formatDateTime,
   getTornamentCategoryText,
+  tournamentCategoryToFormValue,
   getTournamentStatusText,
   getTournamentTypeIcons,
   hasAnyUserRole,
@@ -339,15 +340,12 @@ const AdminTournaments: React.FC = () => {
   };
 
   const handleOpenEditModal = (tournament: Tournament) => {
-    const categoryRaw = String(tournament.category ?? "");
-    const category =
-      categoryRaw === "FEDERAL" || categoryRaw === "1" ? "1" : "2";
     setEditingTournament(tournament);
     setIsEditModalOpen(true);
     resetEdit({
       name: tournament.name,
       type: tournament.type,
-      category,
+      category: tournamentCategoryToFormValue(tournament.category),
       date: formatDateForInput(String(tournament.date ?? "")),
       status: tournament.status ?? TournamentStatus.FINISHED,
     });
@@ -962,11 +960,17 @@ const AdminTournaments: React.FC = () => {
                   <option value={TournamentType.DOUBLETTE_MIXT}>
                     Дуплеты микст
                   </option>
+                  <option value={TournamentType.DOUBLETTE_ANY}>
+                    Дуплеты смешанные
+                  </option>
                   <option value={TournamentType.TET_A_TET_MALE}>
                     Тет-а-тет мужской
                   </option>
                   <option value={TournamentType.TET_A_TET_FEMALE}>
                     Тет-а-тет женский
+                  </option>
+                  <option value={TournamentType.TET_A_TET_ANY}>
+                    Тет-а-тет смешанный
                   </option>
                 </select>
                 {errorsCreate.type && (
@@ -986,8 +990,9 @@ const AdminTournaments: React.FC = () => {
                     required: "Категория обязательна",
                   })}
                 >
-                  <option value="1">1-я категория</option>
-                  <option value="2">2-я категория</option>
+                  <option value="1">1-я категория (РФП)</option>
+                  <option value="2">2-я категория (Региональный)</option>
+                  <option value="3">Клубный</option>
                 </select>
                 {errorsCreate.category && (
                   <p className="mt-1 text-sm text-red-600">
@@ -1152,11 +1157,17 @@ const AdminTournaments: React.FC = () => {
                   <option value={TournamentType.DOUBLETTE_MIXT}>
                     Дуплеты микст
                   </option>
+                  <option value={TournamentType.DOUBLETTE_ANY}>
+                    Дуплеты смешанные
+                  </option>
                   <option value={TournamentType.TET_A_TET_MALE}>
                     Тет-а-тет мужской
                   </option>
                   <option value={TournamentType.TET_A_TET_FEMALE}>
                     Тет-а-тет женский
+                  </option>
+                  <option value={TournamentType.TET_A_TET_ANY}>
+                    Тет-а-тет смешанный
                   </option>
                 </select>
                 {errorsEdit.type && (
@@ -1178,8 +1189,9 @@ const AdminTournaments: React.FC = () => {
                     required: "Категория турнира обязательна",
                   })}
                 >
-                  <option value="1">1-я категория</option>
-                  <option value="2">2-я категория</option>
+                  <option value="1">1-я категория (РФП)</option>
+                  <option value="2">2-я категория (Региональный)</option>
+                  <option value="3">Клубный</option>
                 </select>
                 {errorsEdit.category && (
                   <p className="mt-1 text-sm text-red-600">

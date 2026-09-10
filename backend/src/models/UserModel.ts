@@ -9,6 +9,7 @@ export class UserModel {
     UserRole.MANAGER,
     UserRole.LICENSE_MANAGER,
     UserRole.PRESIDIUM_MEMBER,
+    UserRole.CLUB_OWNER,
   ];
 
   private static getPrimaryRole(roles: UserRole[], fallback: UserRole): UserRole {

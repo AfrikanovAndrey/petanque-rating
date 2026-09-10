@@ -23,6 +23,9 @@ import {
   UpdateUserRequest,
   TournamentStatus,
   TournamentType,
+  Club,
+  CreateClubRequest,
+  UpdateClubRequest,
 } from "../types";
 
 // Создаем экземпляр axios
@@ -752,6 +755,71 @@ export const adminApi = {
   // Удалить старые записи аудита
   cleanupAuditLogs: (days: number): Promise<AxiosResponse<ApiResponse>> =>
     api.delete("/admin/audit-logs/cleanup", { data: { days } }),
+
+  // === КЛУБЫ ===
+  getClubs: (): Promise<AxiosResponse<ApiResponse<Club[]>>> =>
+    api.get("/admin/clubs"),
+
+  getClubOwnerCandidates: (): Promise<
+    AxiosResponse<
+      ApiResponse<{ id: number; name: string; username: string }[]>
+    >
+  > => api.get("/admin/clubs/owner-candidates"),
+
+  getClub: (clubId: number): Promise<AxiosResponse<ApiResponse<Club>>> =>
+    api.get(`/admin/clubs/${clubId}`),
+
+  createClub: (
+    data: CreateClubRequest
+  ): Promise<AxiosResponse<ApiResponse<Club>>> =>
+    api.post("/admin/clubs", data),
+
+  updateClub: (
+    clubId: number,
+    data: UpdateClubRequest
+  ): Promise<AxiosResponse<ApiResponse<Club>>> =>
+    api.put(`/admin/clubs/${clubId}`, data),
+
+  uploadClubLogo: (
+    clubId: number,
+    formData: FormData
+  ): Promise<AxiosResponse<ApiResponse<Club>>> =>
+    api.post(`/admin/clubs/${clubId}/logo`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
+  deleteClub: (clubId: number): Promise<AxiosResponse<ApiResponse>> =>
+    api.delete(`/admin/clubs/${clubId}`),
+};
+
+/** Публичное API клубов */
+export const clubsApi = {
+  getClubs: (): Promise<
+    AxiosResponse<
+      ApiResponse<
+        Pick<Club, "id" | "name" | "logo_url" | "members_count">[]
+      >
+    >
+  > => api.get("/clubs"),
+
+  getClub: (
+    clubId: number
+  ): Promise<
+    AxiosResponse<
+      ApiResponse<{
+        id: number;
+        name: string;
+        logo_url: string | null;
+        members: {
+          player_id: number;
+          player_name: string;
+          city: string | null;
+          joined_at: string;
+          created_at: string;
+        }[];
+      }>
+    >
+  > => api.get(`/clubs/${clubId}`),
 };
 
 export default api;

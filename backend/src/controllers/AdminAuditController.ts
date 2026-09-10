@@ -250,6 +250,10 @@ export class AdminAuditController {
           value: "TOURNAMENT_GROUP_DRAW_MANUAL",
           label: "Ручная жеребьёвка по группам",
         },
+        { value: "CREATE_CLUB", label: "Создание клуба" },
+        { value: "UPDATE_CLUB", label: "Редактирование клуба" },
+        { value: "UPDATE_CLUB_LOGO", label: "Загрузка логотипа клуба" },
+        { value: "DELETE_CLUB", label: "Удаление клуба" },
       ];
 
       return res.json({
@@ -277,6 +281,7 @@ export class AdminAuditController {
         { value: "player", label: "Игрок" },
         { value: "team", label: "Команда" },
         { value: "user", label: "Пользователь" },
+        { value: "club", label: "Клуб" },
         { value: "settings", label: "Настройки" },
         { value: "licensed_player", label: "Лицензированный игрок" },
       ];

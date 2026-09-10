@@ -23,8 +23,10 @@ export enum TournamentType {
   DOUBLETTE_MALE = "DOUBLETTE_MALE",
   DOUBLETTE_FEMALE = "DOUBLETTE_FEMALE",
   DOUBLETTE_MIXT = "DOUBLETTE_MIXT",
+  DOUBLETTE_ANY = "DOUBLETTE_ANY",
   TET_A_TET_MALE = "TET_A_TET_MALE",
   TET_A_TET_FEMALE = "TET_A_TET_FEMALE",
+  TET_A_TET_ANY = "TET_A_TET_ANY",
 }
 
 export enum TournamentStatus {
@@ -272,7 +274,7 @@ export interface PlayerSearchResult {
   gender: "male" | "female" | null;
 }
 
-export type TournamentCategory = "FEDERAL" | "REGIONAL";
+export type TournamentCategory = "FEDERAL" | "REGIONAL" | "CLUB";
 
 // Enum для причин получения очков
 export enum CupPosition {
@@ -419,6 +421,55 @@ export enum UserRole {
   MANAGER = "MANAGER",
   LICENSE_MANAGER = "LICENSE_MANAGER",
   PRESIDIUM_MEMBER = "PRESIDIUM_MEMBER",
+  CLUB_OWNER = "CLUB_OWNER",
+}
+
+export interface ClubOwnerSummary {
+  user_id: number;
+  name: string;
+  username: string;
+}
+
+export interface ClubMemberSummary {
+  player_id: number;
+  player_name: string;
+  city?: string | null;
+  license_number?: string | null;
+  /** Дата вступления в клуб (YYYY-MM-DD) */
+  joined_at?: string;
+  /** Когда запись о членстве создана в системе */
+  created_at?: string;
+}
+
+export interface ClubMemberInput {
+  player_id: number;
+  joined_at?: string;
+}
+
+export interface Club {
+  id: number;
+  name: string;
+  logo_path?: string | null;
+  logo_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  owners?: ClubOwnerSummary[];
+  members?: ClubMemberSummary[];
+  members_count?: number;
+}
+
+export interface CreateClubRequest {
+  name: string;
+  owner_user_ids?: number[];
+  member_player_ids?: number[];
+  members?: ClubMemberInput[];
+}
+
+export interface UpdateClubRequest {
+  name?: string;
+  owner_user_ids?: number[];
+  member_player_ids?: number[];
+  members?: ClubMemberInput[];
 }
 
 // Пользователь

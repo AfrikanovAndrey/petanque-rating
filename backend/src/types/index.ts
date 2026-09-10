@@ -13,8 +13,10 @@ export enum TournamentType {
   DOUBLETTE_MALE = "DOUBLETTE_MALE",
   DOUBLETTE_FEMALE = "DOUBLETTE_FEMALE",
   DOUBLETTE_MIXT = "DOUBLETTE_MIXT",
+  DOUBLETTE_ANY = "DOUBLETTE_ANY",
   TET_A_TET_MALE = "TET_A_TET_MALE",
   TET_A_TET_FEMALE = "TET_A_TET_FEMALE",
+  TET_A_TET_ANY = "TET_A_TET_ANY",
 }
 
 export enum TournamentStatus {
@@ -180,6 +182,59 @@ export enum UserRole {
   LICENSE_MANAGER = "LICENSE_MANAGER",
   /** Признание результатов турниров для рейтинга */
   PRESIDIUM_MEMBER = "PRESIDIUM_MEMBER",
+  /** Владелец клуба: свой клуб + раздел игроков (без удаления) */
+  CLUB_OWNER = "CLUB_OWNER",
+}
+
+export interface Club {
+  id: number;
+  name: string;
+  logo_path: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+export interface ClubOwnerSummary {
+  user_id: number;
+  name: string;
+  username: string;
+}
+
+export interface ClubMemberSummary {
+  player_id: number;
+  player_name: string;
+  city?: string | null;
+  license_number?: string | null;
+  /** Дата вступления в клуб (YYYY-MM-DD) */
+  joined_at: string;
+  /** Когда запись о членстве создана в системе */
+  created_at: Date | string;
+}
+
+export interface ClubMemberInput {
+  player_id: number;
+  /** Дата вступления в клуб (YYYY-MM-DD); только ADMIN */
+  joined_at?: string;
+}
+
+export interface ClubWithDetails extends Club {
+  owners: ClubOwnerSummary[];
+  members: ClubMemberSummary[];
+  logo_url?: string | null;
+}
+
+export interface CreateClubRequest {
+  name: string;
+  owner_user_ids?: number[];
+  member_player_ids?: number[];
+  members?: ClubMemberInput[];
+}
+
+export interface UpdateClubRequest {
+  name?: string;
+  owner_user_ids?: number[];
+  member_player_ids?: number[];
+  members?: ClubMemberInput[];
 }
 
 export interface User {
@@ -235,7 +290,7 @@ export interface TournamentUploadData {
   tournament_date: string;
   tournament_type: TournamentType; // тип турнира
   total_teams?: number; // общее количество команд для расчета очков кубка
-  tournament_category?: "1" | "2"; // категория турнира (1 - высшая, 2 - вторая)
+  tournament_category?: "1" | "2" | "3"; // категория турнира (1 — РФП, 2 — региональный, 3 — клубный)
   results: Array<{
     player_name: string;
     cup_position: string;
@@ -277,11 +332,12 @@ export interface UpdateUserRequest {
   roles?: UserRole[];
 }
 
-export type TournamentCategory = "FEDERAL" | "REGIONAL";
+export type TournamentCategory = "FEDERAL" | "REGIONAL" | "CLUB";
 
 export enum TournamentCategoryEnum {
   FEDERAL = 1,
   REGIONAL = 2,
+  CLUB = 3,
 }
 
 export enum CupPosition {
@@ -372,7 +428,7 @@ export interface TournamentTeamUploadData {
   tournament_date: string;
   tournament_type: TournamentType; // тип турнира
   total_teams?: number;
-  tournament_category?: "1" | "2";
+  tournament_category?: "1" | "2" | "3";
   results: Array<{
     team_name: string;
     team_players: string[]; // массив имен игроков в команде (1-4)

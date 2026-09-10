@@ -9,6 +9,7 @@ import {
   Cog6ToothIcon,
   Bars3Icon,
   XMarkIcon,
+  BuildingLibraryIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "../utils";
 
@@ -39,6 +40,12 @@ const PublicNavigation: React.FC = () => {
       href: "/licenses",
       icon: IdentificationIcon,
       current: location.pathname === "/licenses",
+    },
+    {
+      name: "Клубы",
+      href: "/clubs",
+      icon: BuildingLibraryIcon,
+      current: location.pathname.startsWith("/clubs"),
     },
     {
       name: "Админ панель",

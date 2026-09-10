@@ -35,6 +35,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // API routes
 app.use("/api", routes);
 
+// Логотипы клубов и прочие загруженные файлы
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 // Serve static files from React build (в продакшене)
 if (process.env.NODE_ENV === "production") {
   const buildPath = path.join(__dirname, "../../frontend/dist");

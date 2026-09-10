@@ -38,6 +38,14 @@ export function cn(...inputs: ClassValue[]) {
 // Форматирование даты
 export function formatDate(dateString: string): string {
   try {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split("-").map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString("ru-RU", {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+      });
+    }
     const date = new Date(dateString);
     return date.toLocaleDateString("ru-RU", {
       year: "numeric",
@@ -76,7 +84,21 @@ export function getTornamentCategoryText(category: TournamentCategory) {
     return "РФП";
   } else if (category === "REGIONAL") {
     return "Региональный";
+  } else if (category === "CLUB") {
+    return "Клубный";
   }
+}
+
+export function tournamentCategoryToFormValue(
+  category: TournamentCategory,
+): string {
+  if (category === "FEDERAL") {
+    return "1";
+  }
+  if (category === "REGIONAL") {
+    return "2";
+  }
+  return "3";
 }
 
 export function getTournamentStatusText(
@@ -108,10 +130,14 @@ export function getTournamentTypeText(type: TournamentType) {
       return "Дуплеты женские";
     case "DOUBLETTE_MIXT":
       return "Дуплеты микст";
+    case "DOUBLETTE_ANY":
+      return "Дуплеты смешанные";
     case "TET_A_TET_MALE":
       return "Тет-а-тет мужской";
     case "TET_A_TET_FEMALE":
       return "Тет-а-тет женский";
+    case "TET_A_TET_ANY":
+      return "Тет-а-тет смешанный";
   }
 }
 
@@ -192,6 +218,7 @@ export function getAdminHomePath(roleOrRoles: UserRole | UserRole[]): string {
   if (roles.includes(UserRole.MANAGER)) return "/admin/tournaments";
   if (roles.includes(UserRole.LICENSE_MANAGER)) return "/admin/players";
   if (roles.includes(UserRole.PRESIDIUM_MEMBER)) return "/admin/tournaments";
+  if (roles.includes(UserRole.CLUB_OWNER)) return "/admin/clubs";
   return "/admin/tournaments";
 }
 
@@ -205,6 +232,8 @@ export function getUserRoleLabel(role: UserRole): string {
       return "Менеджер лицензий";
     case UserRole.PRESIDIUM_MEMBER:
       return "Член президиума";
+    case UserRole.CLUB_OWNER:
+      return "Владелец клуба";
     default:
       return String(role);
   }

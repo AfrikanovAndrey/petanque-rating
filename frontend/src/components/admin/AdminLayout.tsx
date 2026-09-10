@@ -12,6 +12,7 @@ import {
   UserGroupIcon,
   DocumentTextIcon,
   BookOpenIcon,
+  BuildingLibraryIcon,
 } from "@heroicons/react/24/outline";
 import {
   getUserRoles,
@@ -27,10 +28,21 @@ const ROLES_ALL_STAFF: UserRole[] = [
   UserRole.MANAGER,
   UserRole.LICENSE_MANAGER,
 ];
+const ROLES_PLAYERS_NAV: UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.LICENSE_MANAGER,
+  UserRole.CLUB_OWNER,
+];
 const ROLES_TOURNAMENTS_NAV: UserRole[] = [
   UserRole.ADMIN,
   UserRole.MANAGER,
   UserRole.PRESIDIUM_MEMBER,
+];
+const ROLES_CLUBS_NAV: UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.PRESIDIUM_MEMBER,
+  UserRole.CLUB_OWNER,
 ];
 
 interface AdminLayoutProps {
@@ -103,7 +115,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       name: "Игроки",
       href: "/admin/players",
       icon: UsersIcon,
-      roles: ROLES_ALL_STAFF,
+      roles: ROLES_PLAYERS_NAV,
+    },
+    {
+      name: "Клубы",
+      href: "/admin/clubs",
+      icon: BuildingLibraryIcon,
+      roles: ROLES_CLUBS_NAV,
     },
     {
       name: "Лицензии",
@@ -139,7 +157,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       name: "Справка",
       href: "/admin/help",
       icon: BookOpenIcon,
-      roles: ROLES_ALL_STAFF,
+      roles: [...ROLES_ALL_STAFF, UserRole.CLUB_OWNER, UserRole.PRESIDIUM_MEMBER],
     },
   ].filter(
     (item) =>

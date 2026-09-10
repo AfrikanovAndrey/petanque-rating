@@ -26,6 +26,11 @@ import {
   TournamentStatus,
   TournamentType,
 } from "../types";
+import {
+  parseTournamentCategoryInput,
+  tournamentCategoryDbToEnum,
+  isRatingTournamentCategory,
+} from "../utils/tournamentCategory";
 
 export class TournamentModel {
   private static mapTournamentRow(row: Tournament & RowDataPacket): Tournament {
@@ -139,9 +144,31 @@ export class TournamentModel {
     return rows[0] ? this.mapTournamentRow(rows[0]) : null;
   }
 
+  /**
+   * Число команд турнира для расчёта очков.
+   * Для DRAFT / REGISTRATION / IN_PROGRESS — подтверждённые заявки;
+   * для FINISHED — записи в tournament_results.
+   */
   static async getTournamentTeamsCount(tournamentId: number): Promise<number> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      "SELECT COUNT(DISTINCT team_id) as teams_count FROM tournament_results WHERE tournament_id = ?",
+      `SELECT
+        CASE
+          WHEN t.status IN ('DRAFT', 'REGISTRATION', 'IN_PROGRESS') THEN COALESCE(reg.cnt, 0)
+          ELSE COALESCE(res.cnt, 0)
+        END AS teams_count
+      FROM tournaments t
+      LEFT JOIN (
+        SELECT tournament_id, COUNT(DISTINCT team_id) AS cnt
+        FROM tournament_registrations
+        WHERE is_confirmed = 1
+        GROUP BY tournament_id
+      ) reg ON reg.tournament_id = t.id
+      LEFT JOIN (
+        SELECT tournament_id, COUNT(DISTINCT team_id) AS cnt
+        FROM tournament_results
+        GROUP BY tournament_id
+      ) res ON res.tournament_id = t.id
+      WHERE t.id = ?`,
       [tournamentId],
     );
     return (rows[0]?.teams_count as number) || 0;
@@ -210,14 +237,9 @@ export class TournamentModel {
     }
     if (category !== undefined) {
       updates.push("category = ?");
-      const raw = category as string | number;
-      let member: TournamentCategoryEnum;
-      if (raw === "1" || raw === 1 || raw === "FEDERAL") {
-        member = TournamentCategoryEnum.FEDERAL;
-      } else if (raw === "2" || raw === 2 || raw === "REGIONAL") {
-        member = TournamentCategoryEnum.REGIONAL;
-      } else {
-        member = raw as TournamentCategoryEnum;
+      const member = parseTournamentCategoryInput(category);
+      if (member === null) {
+        throw new Error(`Недопустимая категория турнира: ${category}`);
       }
       values.push(TournamentCategoryEnum[member]);
     }
@@ -505,12 +527,10 @@ export class TournamentModel {
       tournamentId,
       normalizedDate,
       tournament.type,
+      tournament.category,
     );
 
-    const categoryEnum =
-      tournament.category === "FEDERAL"
-        ? TournamentCategoryEnum.FEDERAL
-        : TournamentCategoryEnum.REGIONAL;
+    const categoryEnum = tournamentCategoryDbToEnum(tournament.category);
 
     for (const result of resultsRows) {
       let newPoints = 0;
@@ -575,7 +595,17 @@ export class TournamentModel {
     tournamentId: number,
     tournamentDate: string,
     tournamentType: TournamentType,
+    tournamentCategory?: string,
   ): Promise<number> {
+    if (
+      tournamentCategory &&
+      !isRatingTournamentCategory(
+        tournamentCategoryDbToEnum(tournamentCategory),
+      )
+    ) {
+      return TournamentModel.getTournamentTeamsCount(tournamentId);
+    }
+
     // Получаем количество команд текущего турнира
     const currentTournamentTeams =
       await TournamentModel.getTournamentTeamsCount(tournamentId);
@@ -610,7 +640,7 @@ export class TournamentModel {
 
     const [pairTournaments] = await pool.execute<RowDataPacket[]>(
       `SELECT id FROM tournaments 
-       WHERE date = ? AND type = ? AND id != ?`,
+       WHERE date = ? AND type = ? AND id != ? AND category IN ('FEDERAL', 'REGIONAL')`,
       [tournamentDate, pairType, tournamentId],
     );
 

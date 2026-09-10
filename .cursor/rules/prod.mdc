@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+
+# Production
+Для подключения к production используй подключение по ssh root@45.8.251.230

@@ -44,12 +44,16 @@ function getSlotConfig(type: TournamentType): SlotCfg {
       return { slots: 1, min: 1, max: 1, genders: ["male"] };
     case TournamentType.TET_A_TET_FEMALE:
       return { slots: 1, min: 1, max: 1, genders: ["female"] };
+    case TournamentType.TET_A_TET_ANY:
+      return { slots: 1, min: 1, max: 1, genders: [undefined] };
     case TournamentType.DOUBLETTE_MALE:
       return { slots: 2, min: 2, max: 2, genders: ["male", "male"] };
     case TournamentType.DOUBLETTE_FEMALE:
       return { slots: 2, min: 2, max: 2, genders: ["female", "female"] };
     case TournamentType.DOUBLETTE_MIXT:
       return { slots: 2, min: 2, max: 2, genders: ["female", "male"] };
+    case TournamentType.DOUBLETTE_ANY:
+      return { slots: 2, min: 2, max: 2, genders: [undefined, undefined] };
     case TournamentType.TRIPLETTE:
       return { slots: 4, min: 3, max: 4, genders: [undefined, undefined, undefined, undefined], tripletteHint: true };
     default:

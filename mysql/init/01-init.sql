@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE TABLE IF NOT EXISTS tournaments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  category ENUM('FEDERAL', 'REGIONAL') NOT NULL DEFAULT 'REGIONAL',
+  category ENUM('FEDERAL', 'REGIONAL', 'CLUB') NOT NULL DEFAULT 'REGIONAL',
   teams_count INT NOT NULL DEFAULT 0,
   date DATE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL COMMENT 'Фамилия Имя',
   username VARCHAR(100) NOT NULL UNIQUE COMMENT 'Логин пользователя',
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('ADMIN', 'MANAGER', 'LICENSE_MANAGER', 'PRESIDIUM_MEMBER') NOT NULL DEFAULT 'MANAGER',
+  role ENUM('ADMIN', 'MANAGER', 'LICENSE_MANAGER', 'PRESIDIUM_MEMBER', 'CLUB_OWNER') NOT NULL DEFAULT 'MANAGER',
   roles JSON NULL COMMENT 'Массив ролей пользователя',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -168,12 +168,46 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_role (role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Таблица клубов
+CREATE TABLE IF NOT EXISTS clubs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL COMMENT 'Название клуба',
+  logo_path VARCHAR(512) NULL COMMENT 'Относительный путь к логотипу',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_clubs_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS club_owners (
+  club_id INT NOT NULL,
+  user_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (club_id, user_id),
+  UNIQUE KEY uq_club_owners_user (user_id),
+  CONSTRAINT fk_club_owners_club
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_club_owners_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS club_members (
+  club_id INT NOT NULL,
+  player_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (club_id, player_id),
+  UNIQUE KEY uq_club_members_player (player_id),
+  CONSTRAINT fk_club_members_club
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_club_members_player
+    FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Таблица логов аудита
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL COMMENT 'ID пользователя, совершившего действие',
   username VARCHAR(100) NOT NULL COMMENT 'Имя пользователя для удобства',
-  user_role ENUM('ADMIN', 'MANAGER', 'LICENSE_MANAGER', 'PRESIDIUM_MEMBER') NOT NULL COMMENT 'Роль пользователя на момент действия',
+  user_role ENUM('ADMIN', 'MANAGER', 'LICENSE_MANAGER', 'PRESIDIUM_MEMBER', 'CLUB_OWNER') NOT NULL COMMENT 'Роль пользователя на момент действия',
   action VARCHAR(100) NOT NULL COMMENT 'Тип действия (CREATE, UPDATE, DELETE, LOGIN, etc.)',
   entity_type VARCHAR(50) NULL COMMENT 'Тип сущности (tournament, player, team, user, etc.)',
   entity_id INT NULL COMMENT 'ID сущности, над которой совершено действие',

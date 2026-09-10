@@ -28,6 +28,7 @@ import {
   formatDateTime,
   formatDateForInput,
   getTornamentCategoryText,
+  tournamentCategoryToFormValue,
   handleApiError,
 } from "../../utils";
 import CsvUtils from "../../utils/csv";
@@ -222,7 +223,7 @@ const AdminTournamentRegistration: React.FC = () => {
       name: t.name,
       date: formatDateForInput(t.date),
       type: t.type as TournamentType,
-      category: t.category === "FEDERAL" ? "1" : "2",
+      category: tournamentCategoryToFormValue(t.category),
       status: (t.status ??
         (isDraftPage
           ? TournamentStatus.DRAFT
@@ -626,11 +627,17 @@ const AdminTournamentRegistration: React.FC = () => {
                 <option value={TournamentType.DOUBLETTE_MIXT}>
                   Дуплеты микст
                 </option>
+                <option value={TournamentType.DOUBLETTE_ANY}>
+                  Дуплеты смешанные
+                </option>
                 <option value={TournamentType.TET_A_TET_MALE}>
                   Тет-а-тет мужской
                 </option>
                 <option value={TournamentType.TET_A_TET_FEMALE}>
                   Тет-а-тет женский
+                </option>
+                <option value={TournamentType.TET_A_TET_ANY}>
+                  Тет-а-тет смешанный
                 </option>
               </select>
             </div>
@@ -648,6 +655,9 @@ const AdminTournamentRegistration: React.FC = () => {
                 </option>
                 <option value="2">
                   2-я категория ({getTornamentCategoryText("REGIONAL")})
+                </option>
+                <option value="3">
+                  {getTornamentCategoryText("CLUB")}
                 </option>
               </select>
             </div>
@@ -703,7 +713,7 @@ const AdminTournamentRegistration: React.FC = () => {
                   name: t.name,
                   date: formatDateForInput(t.date),
                   type: t.type as TournamentType,
-                  category: t.category === "FEDERAL" ? "1" : "2",
+                  category: tournamentCategoryToFormValue(t.category),
                   status: (t.status ??
                     (isDraftPage
                       ? TournamentStatus.DRAFT
