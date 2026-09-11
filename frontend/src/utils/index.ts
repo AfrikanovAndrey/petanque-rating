@@ -79,6 +79,16 @@ export function formatDateForInput(dateString: string): string {
   }
 }
 
+/** YYYY-MM-DD для расчёта рейтинга команд; undefined — актуальный рейтинг */
+export function tournamentRatingAsOfDate(
+  ratingFixedDate: string | null | undefined
+): string | undefined {
+  if (!ratingFixedDate) {
+    return undefined;
+  }
+  return formatDateForInput(String(ratingFixedDate));
+}
+
 export function getTornamentCategoryText(category: TournamentCategory) {
   if (category === "FEDERAL") {
     return "РФП";

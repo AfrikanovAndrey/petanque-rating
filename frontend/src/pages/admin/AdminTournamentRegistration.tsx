@@ -25,11 +25,13 @@ import {
   TournamentType,
 } from "../../types";
 import {
+  formatDate,
   formatDateTime,
   formatDateForInput,
   getTornamentCategoryText,
   tournamentCategoryToFormValue,
   handleApiError,
+  tournamentRatingAsOfDate,
 } from "../../utils";
 import CsvUtils from "../../utils/csv";
 
@@ -40,6 +42,8 @@ interface TournamentParamsForm {
   category: string;
   status: TournamentStatus;
   regulations: string;
+  fix_rating: boolean;
+  rating_fixed_date: string;
 }
 
 type TeamsSortColumn = "rating" | "updated_at" | "status";
@@ -93,12 +97,19 @@ const AdminTournamentRegistration: React.FC = () => {
   );
 
   const { data: fullRating } = useQuery(
-    ["registrationFullRating"],
+    [
+      "registrationFullRating",
+      tournamentRatingAsOfDate(data?.tournament.rating_fixed_date) ?? "today",
+    ],
     async () => {
-      const response = await ratingApi.getFullRating();
+      const asOf = tournamentRatingAsOfDate(data?.tournament.rating_fixed_date);
+      const response = await ratingApi.getFullRating(
+        asOf ? { date: asOf } : undefined
+      );
       return response.data.success && response.data.data ? response.data.data : [];
     },
     {
+      enabled: Boolean(data?.tournament),
       retry: false,
       staleTime: 60_000,
     }
@@ -173,6 +184,8 @@ const AdminTournamentRegistration: React.FC = () => {
     handleSubmit,
     reset,
     watch,
+    setValue,
+    getValues,
     formState: { errors, isDirty },
   } = useForm<TournamentParamsForm>({
     defaultValues: {
@@ -184,6 +197,8 @@ const AdminTournamentRegistration: React.FC = () => {
         ? TournamentStatus.DRAFT
         : TournamentStatus.REGISTRATION,
       regulations: "",
+      fix_rating: false,
+      rating_fixed_date: "",
     },
   });
 
@@ -231,6 +246,10 @@ const AdminTournamentRegistration: React.FC = () => {
             ? TournamentStatus.FINAL_REGISTRATION
             : TournamentStatus.REGISTRATION)) as TournamentStatus,
       regulations: t.regulations ?? "",
+      fix_rating: Boolean(t.rating_fixed_date),
+      rating_fixed_date: t.rating_fixed_date
+        ? formatDateForInput(String(t.rating_fixed_date))
+        : "",
     });
   }, [data, reset, isDraftPage, isFinalRegistrationPage]);
 
@@ -243,6 +262,7 @@ const AdminTournamentRegistration: React.FC = () => {
         date: form.date,
         status: form.status,
         regulations: form.regulations.trim() === "" ? null : form.regulations,
+        rating_fixed_date: form.fix_rating ? form.rating_fixed_date : null,
       });
     },
     {
@@ -258,6 +278,7 @@ const AdminTournamentRegistration: React.FC = () => {
             tournamentId,
           ]);
           void queryClient.invalidateQueries(["tournamentDraft", tournamentId]);
+          void queryClient.invalidateQueries("registrationFullRating");
           if (isDraftPage && form.status === TournamentStatus.REGISTRATION) {
             navigate(`/admin/tournaments/${tournamentId}/registration`);
           }
@@ -663,6 +684,63 @@ const AdminTournamentRegistration: React.FC = () => {
             </div>
           </div>
 
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                checked={watch("fix_rating")}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setValue("fix_rating", checked, { shouldDirty: true });
+                  if (checked && !getValues("rating_fixed_date")) {
+                    setValue("rating_fixed_date", getValues("date") || "", {
+                      shouldDirty: true,
+                    });
+                  }
+                  if (!checked) {
+                    setValue("rating_fixed_date", "", { shouldDirty: true });
+                  }
+                }}
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-700">
+                  Фиксировать рейтинг на указанную дату
+                </span>
+                <span className="mt-0.5 block text-xs text-gray-500">
+                  Для посева и рейтинга команд в заявках берётся рейтинг на эту
+                  дату, а не на сегодня.
+                </span>
+              </span>
+            </label>
+            {watch("fix_rating") && (
+              <div className="pl-7">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Дата фиксации рейтинга
+                </label>
+                <input
+                  type="date"
+                  className={`input-field max-w-xs ${
+                    errors.rating_fixed_date ? "border-red-300" : ""
+                  }`}
+                  {...register("rating_fixed_date", {
+                    validate: (value, formValues) => {
+                      if (!formValues.fix_rating) {
+                        return true;
+                      }
+                      return value ? true : "Укажите дату фиксации рейтинга";
+                    },
+                  })}
+                />
+                {errors.rating_fixed_date && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.rating_fixed_date.message}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <input type="hidden" {...register("status", { required: true })} />
 
           <div>
@@ -719,6 +797,10 @@ const AdminTournamentRegistration: React.FC = () => {
                       ? TournamentStatus.DRAFT
                       : TournamentStatus.REGISTRATION)) as TournamentStatus,
                   regulations: t.regulations ?? "",
+                  fix_rating: Boolean(t.rating_fixed_date),
+                  rating_fixed_date: t.rating_fixed_date
+                    ? formatDateForInput(String(t.rating_fixed_date))
+                    : "",
                 });
               }}
             >
@@ -757,6 +839,11 @@ const AdminTournamentRegistration: React.FC = () => {
                 Всего: {teams.length} • Подтверждено: {confirmedTeamsCount}
                 {isFinalRegistrationPage
                   ? " — подтвердите явку команды отдельной кнопкой"
+                  : ""}
+                {tournamentRatingAsOfDate(tournament.rating_fixed_date)
+                  ? ` • Рейтинг на ${formatDate(
+                      tournamentRatingAsOfDate(tournament.rating_fixed_date)!
+                    )}`
                   : ""}
               </p>
             </div>

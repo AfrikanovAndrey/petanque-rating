@@ -102,6 +102,8 @@ export interface Tournament {
   type: TournamentType;
   category: TournamentCategory;
   date: string;
+  /** Если задана — рейтинг команд считается на эту дату, а не на сегодня */
+  rating_fixed_date?: string | null;
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
   status: TournamentStatus;
   regulations?: string | null;

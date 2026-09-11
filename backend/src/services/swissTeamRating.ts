@@ -5,19 +5,15 @@ import {
   computeTeamRatingFromPlayerPoints,
   playerRatingsForSwissSeed,
 } from "./swissStageService";
+import {
+  resolveAsOfDateStr,
+  subtractDaysFromDateStr,
+} from "../utils/ymdDate";
 
 export type SwissTeamRatingDetails = {
   rating: number;
   player_ratings: number[];
 };
-
-function todayDateStr(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 /** Как RatingController.getBestResultsCount */
 async function getBestResultsCount(
@@ -54,6 +50,7 @@ function licenseDateStr(licenseDate: unknown): string {
  */
 export async function loadPlayerTotalPointsMap(
   playerIds: number[],
+  asOfDateStr?: string | null,
 ): Promise<Map<number, number>> {
   const result = new Map<number, number>();
   const unique = [...new Set(playerIds.filter((id) => id > 0))];
@@ -64,19 +61,16 @@ export async function loadPlayerTotalPointsMap(
     return result;
   }
 
-  const asOfDateStr = todayDateStr();
-  const currentYear = new Date().getFullYear();
-  const bestResultsCount = await getBestResultsCount(currentYear, asOfDateStr);
-
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() - 365);
-  const minDateStr = minDate.toISOString().split("T")[0];
+  const refDateStr = resolveAsOfDateStr(asOfDateStr);
+  const refYear = Number(refDateStr.slice(0, 4));
+  const bestResultsCount = await getBestResultsCount(refYear, refDateStr);
+  const minDateStr = subtractDaysFromDateStr(refDateStr, 365);
 
   for (const playerId of unique) {
     const [licensesRows] = await pool.execute<RowDataPacket[]>(
       `SELECT year, license_date FROM licensed_players
        WHERE player_id = ? AND year IN (?, ?)`,
-      [playerId, currentYear, currentYear - 1],
+      [playerId, refYear, refYear - 1],
     );
 
     if (licensesRows.length === 0) {
@@ -103,10 +97,11 @@ export async function loadPlayerTotalPointsMap(
        )
          AND tr.points > 0
          AND t.date >= ?
+         AND t.date <= ?
          AND t.results_validated_at IS NOT NULL
          AND (${licenseConditions})
        ORDER BY tr.points DESC, t.date DESC`,
-      [playerId, minDateStr],
+      [playerId, minDateStr, refDateStr],
     );
 
     const total = rows
@@ -121,9 +116,13 @@ export async function loadPlayerTotalPointsMap(
 export async function computeTeamRatingsForSwiss(
   teams: Array<{ team_id: number; player_ids: number[] }>,
   tournamentType: TournamentType,
+  asOfDateStr?: string | null,
 ): Promise<Map<number, SwissTeamRatingDetails>> {
   const allPlayerIds = teams.flatMap((t) => t.player_ids);
-  const pointsByPlayer = await loadPlayerTotalPointsMap(allPlayerIds);
+  const pointsByPlayer = await loadPlayerTotalPointsMap(
+    allPlayerIds,
+    asOfDateStr,
+  );
   const ratings = new Map<number, SwissTeamRatingDetails>();
   for (const team of teams) {
     const playerPoints = team.player_ids.map(

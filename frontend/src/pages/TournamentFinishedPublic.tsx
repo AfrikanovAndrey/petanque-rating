@@ -22,6 +22,7 @@ import {
   getTournamentTypeIcons,
   getTournamentTypeText,
   handleApiError,
+  tournamentRatingAsOfDate,
 } from "../utils";
 
 const TournamentFinishedPublic: React.FC = () => {
@@ -47,15 +48,20 @@ const TournamentFinishedPublic: React.FC = () => {
     }
   );
 
+  const ratingAsOf = tournamentRatingAsOfDate(data?.tournament.rating_fixed_date);
+
   const { data: fullRating } = useQuery(
-    ["publicFinishedFullRating"],
+    ["publicFinishedFullRating", ratingAsOf ?? "today"],
     async () => {
-      const response = await ratingApi.getFullRating();
+      const response = await ratingApi.getFullRating(
+        ratingAsOf ? { date: ratingAsOf } : undefined
+      );
       return response.data.success && response.data.data
         ? response.data.data
         : [];
     },
     {
+      enabled: Boolean(data?.tournament),
       retry: false,
       staleTime: 60_000,
     }

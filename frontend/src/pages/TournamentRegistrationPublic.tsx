@@ -13,6 +13,7 @@ import {
   getTournamentTypeIcons,
   getTournamentTypeText,
   handleApiError,
+  tournamentRatingAsOfDate,
 } from "../utils";
 
 const TournamentRegistrationPublic: React.FC = () => {
@@ -37,13 +38,18 @@ const TournamentRegistrationPublic: React.FC = () => {
     }
   );
 
+  const ratingAsOf = tournamentRatingAsOfDate(data?.tournament.rating_fixed_date);
+
   const { data: fullRating } = useQuery(
-    ["publicRegistrationFullRating"],
+    ["publicRegistrationFullRating", ratingAsOf ?? "today"],
     async () => {
-      const response = await ratingApi.getFullRating();
+      const response = await ratingApi.getFullRating(
+        ratingAsOf ? { date: ratingAsOf } : undefined
+      );
       return response.data.success && response.data.data ? response.data.data : [];
     },
     {
+      enabled: Boolean(data?.tournament),
       retry: false,
       staleTime: 60_000,
     }
@@ -192,6 +198,11 @@ const TournamentRegistrationPublic: React.FC = () => {
             </h2>
             <p className="mt-1 text-sm text-gray-500">
               Подтверждённые заявки
+              {tournamentRatingAsOfDate(tournament.rating_fixed_date)
+                ? ` • рейтинг на ${formatDate(
+                    tournamentRatingAsOfDate(tournament.rating_fixed_date)!
+                  )}`
+                : ""}
             </p>
           </div>
           {/* Страница с данными с сервера доступна только в фазе регистрации */}

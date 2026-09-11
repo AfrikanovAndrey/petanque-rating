@@ -191,37 +191,34 @@ export class RatingController {
   // Получить полную таблицу рейтинга с детальными данными (публичный доступ)
   static async getFullRatingTable(req: Request, res: Response): Promise<void> {
     try {
-      const asOfDateStr = RatingController.todayDateStr();
-      const currentYear = new Date().getFullYear();
+      const parsedDate = RatingController.parseRatingDateContext(req);
+      if (!parsedDate.ok) {
+        res.status(400).json({ success: false, message: parsedDate.message });
+        return;
+      }
+      const { refDateStr, minDateStr, refYear } = parsedDate.ctx;
       const bestResultsCount = await RatingController.getBestResultsCount(
-        currentYear,
-        asOfDateStr
+        refYear,
+        refDateStr
       );
 
-      // Берем всех игроков с лицензией за текущий или прошлый год
+      // Берем всех игроков с лицензией за год даты расчёта или предыдущий
       const [playersRows] = await pool.execute<RowDataPacket[]>(
         `SELECT DISTINCT p.id as player_id, p.name as player_name
          FROM players p
          JOIN licensed_players lp ON lp.player_id = p.id AND lp.year IN (?, ?)
          ORDER BY p.name`,
-        [currentYear, currentYear - 1]
+        [refYear, refYear - 1]
       );
-
-      // Вычисляем дату 365 дней назад от текущей даты
-      const currentDate = new Date();
-      const minDate = new Date(currentDate);
-      minDate.setDate(minDate.getDate() - 365);
-      const minDateStr = minDate.toISOString().split("T")[0];
 
       const result: any[] = [];
       for (const row of playersRows as any[]) {
         const playerId = row.player_id;
         const playerName = row.player_name;
 
-        // Получаем лицензии игрока за текущий и прошлый год
         const [licensesRows] = await pool.execute<RowDataPacket[]>(
           `SELECT year, license_date FROM licensed_players WHERE player_id = ? AND year IN (?, ?)`,
-          [playerId, currentYear, currentYear - 1]
+          [playerId, refYear, refYear - 1]
         );
 
         // Создаем условие для SQL: турнир должен быть после даты лицензии соответствующего года
@@ -250,10 +247,10 @@ export class RatingController {
            JOIN tournaments t ON tr.tournament_id = t.id
            WHERE EXISTS (
              SELECT 1 FROM team_players tp2 WHERE tp2.team_id = tr.team_id AND tp2.player_id = ?
-           ) AND tr.points > 0 AND t.date >= ? AND t.results_validated_at IS NOT NULL${additionalWhere}
+           ) AND tr.points > 0 AND t.date >= ? AND t.date <= ? AND t.results_validated_at IS NOT NULL${additionalWhere}
            GROUP BY tr.id
            ORDER BY tr.points DESC, t.date DESC`,
-          [playerId, minDateStr]
+          [playerId, minDateStr, refDateStr]
         );
 
         const allResults = (results as any[]).map((r, idx) => ({

@@ -11,7 +11,7 @@ import {
   TournamentPlayFormat,
   TournamentRegisteredTeam,
 } from "../../types";
-import { handleApiError } from "../../utils";
+import { handleApiError, tournamentRatingAsOfDate } from "../../utils";
 import {
   playerPointsForRegisteredTeam,
   sortTeamIdsBySwissRating,
@@ -144,10 +144,14 @@ const TournamentStartWizardModal: React.FC<Props> = ({
     [teams]
   );
 
+  const ratingAsOf = tournamentRatingAsOfDate(tournament.rating_fixed_date);
+
   const { data: fullRating, isFetched: isRatingFetched } = useQuery(
-    ["registrationFullRating"],
+    ["registrationFullRating", ratingAsOf ?? "today"],
     async () => {
-      const response = await ratingApi.getFullRating();
+      const response = await ratingApi.getFullRating(
+        ratingAsOf ? { date: ratingAsOf } : undefined
+      );
       return response.data.success && response.data.data
         ? response.data.data
         : [];

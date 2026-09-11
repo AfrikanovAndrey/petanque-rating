@@ -37,6 +37,7 @@ import {
   type SwissWithdrawal,
 } from "../services/swissStageService";
 import { computeTeamRatingsForSwiss } from "../services/swissTeamRating";
+import { ymdFromSqlDate } from "../utils/ymdDate";
 import { getPoints } from "../config/cupPoints";
 import {
   allocateCups,
@@ -1378,6 +1379,7 @@ export class AdminController {
               tournamentId,
               confirmed,
               tournament.type as TournamentType,
+              { asOfDate: ymdFromSqlDate(tournament.rating_fixed_date) },
             );
             const refreshed =
               await TournamentModel.getTournamentById(tournamentId);
@@ -1738,6 +1740,7 @@ export class AdminController {
     options: {
       useRating?: boolean;
       seedOrder?: number[];
+      asOfDate?: string | null;
     } = {},
   ): Promise<SwissSeedEntry[]> {
     const useRating = options.useRating !== false;
@@ -1747,6 +1750,7 @@ export class AdminController {
         player_ids: t.player_ids,
       })),
       tournamentType,
+      options.asOfDate,
     );
     const teamsWithRating = teams.map((t) => {
       const details = ratings.get(t.team_id);
@@ -4829,7 +4833,11 @@ export class AdminController {
               tournamentId,
               confirmedTeams,
               tournament.type as TournamentType,
-              { useRating: false, seedOrder },
+              {
+                useRating: false,
+                seedOrder,
+                asOfDate: ymdFromSqlDate(tournament.rating_fixed_date),
+              },
             );
           } catch (seedError) {
             res.status(400).json({
@@ -4846,7 +4854,10 @@ export class AdminController {
             tournamentId,
             confirmedTeams,
             tournament.type as TournamentType,
-            { useRating: true },
+            {
+              useRating: true,
+              asOfDate: ymdFromSqlDate(tournament.rating_fixed_date),
+            },
           );
         }
       }
@@ -4895,8 +4906,16 @@ export class AdminController {
         return;
       }
 
-      const { name, type, category, date, manual, status, regulations } =
-        req.body;
+      const {
+        name,
+        type,
+        category,
+        date,
+        manual,
+        status,
+        regulations,
+        rating_fixed_date,
+      } = req.body;
 
       // Проверяем, что передан хотя бы один параметр для обновления
       if (
@@ -4906,7 +4925,8 @@ export class AdminController {
         !date &&
         manual === undefined &&
         status === undefined &&
-        regulations === undefined
+        regulations === undefined &&
+        rating_fixed_date === undefined
       ) {
         res.status(400).json({
           success: false,
@@ -4954,6 +4974,29 @@ export class AdminController {
         }
       }
 
+      let ratingFixedDateValue: string | null | undefined = undefined;
+      if (rating_fixed_date !== undefined) {
+        if (rating_fixed_date === null || rating_fixed_date === "") {
+          ratingFixedDateValue = null;
+        } else if (typeof rating_fixed_date === "string") {
+          const parsed = ymdFromSqlDate(rating_fixed_date.trim());
+          if (!parsed) {
+            res.status(400).json({
+              success: false,
+              message: "Некорректная дата фиксации рейтинга (нужен YYYY-MM-DD)",
+            });
+            return;
+          }
+          ratingFixedDateValue = parsed;
+        } else {
+          res.status(400).json({
+            success: false,
+            message: "Поле rating_fixed_date должно быть строкой или null",
+          });
+          return;
+        }
+      }
+
       const success = await TournamentModel.updateTournament(
         tournamentId,
         name,
@@ -4963,6 +5006,7 @@ export class AdminController {
         manual,
         status as TournamentStatus | undefined,
         regulationsValue,
+        ratingFixedDateValue,
       );
 
       if (success) {

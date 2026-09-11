@@ -78,8 +78,14 @@ api.interceptors.response.use(
 // === ПУБЛИЧНЫЕ API (рейтинг) ===
 export const ratingApi = {
   // Получить полную таблицу рейтинга с деталями
-  getFullRating: (): Promise<AxiosResponse<ApiResponse<PlayerRating[]>>> =>
-    api.get("/rating/full"),
+  getFullRating: (
+    options?: { date?: string }
+  ): Promise<AxiosResponse<ApiResponse<PlayerRating[]>>> => {
+    const params = new URLSearchParams();
+    if (options?.date) params.set("date", options.date);
+    const qs = params.toString();
+    return api.get("/rating/full" + (qs ? `?${qs}` : ""));
+  },
 
   // Получить рейтинги разделенные по полу
   getRatingsByGender: (
@@ -555,6 +561,7 @@ export const adminApi = {
       status?: TournamentStatus;
       manual?: boolean;
       regulations?: string | null;
+      rating_fixed_date?: string | null;
     }
   ): Promise<AxiosResponse<ApiResponse>> =>
     api.put(`/admin/tournaments/${tournamentId}`, data),

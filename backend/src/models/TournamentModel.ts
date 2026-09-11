@@ -223,6 +223,7 @@ export class TournamentModel {
     manual?: boolean,
     status?: TournamentStatus,
     regulations?: string | null,
+    ratingFixedDate?: string | null,
   ): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
@@ -258,6 +259,10 @@ export class TournamentModel {
     if (regulations !== undefined) {
       updates.push("regulations = ?");
       values.push(regulations);
+    }
+    if (ratingFixedDate !== undefined) {
+      updates.push("rating_fixed_date = ?");
+      values.push(ratingFixedDate);
     }
 
     if (updates.length === 0) {
