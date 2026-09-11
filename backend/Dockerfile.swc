@@ -32,13 +32,18 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
+# su-exec: entrypoint правит права на bind-mount uploads и сбрасывает привилегии
 RUN addgroup -g 1001 -S nodejs \
  && adduser -S nodejs -u 1001 \
- && mkdir -p /app/uploads \
- && chown -R nodejs:nodejs /app
+ && apk add --no-cache su-exec \
+ && mkdir -p /app/uploads/clubs \
+ && chown -R nodejs:nodejs /app /app/uploads
 
-USER nodejs
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
+# Остаёмся root: entrypoint создаст uploads/clubs на volume и переключится на nodejs
 EXPOSE 3001
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["npm", "start"]

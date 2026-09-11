@@ -227,8 +227,12 @@ docker-compose up -d
 ### Проблемы с правами доступа
 
 ```bash
-# Исправление прав на uploads директорию
-sudo chown -R $USER:$USER uploads/
+# Каталог uploads монтируется в контейнер, процесс пишет от uid 1001 (nodejs).
+# Если загрузка логотипа падает с EACCES, выставьте владельца:
+sudo chown -R 1001:1001 uploads/
+# либо из контейнера:
+docker exec -u root petanque-backend mkdir -p /app/uploads/clubs
+docker exec -u root petanque-backend chown -R nodejs:nodejs /app/uploads
 
 # Исправление прав на MySQL данные
 sudo chown -R $USER:$USER mysql/data/

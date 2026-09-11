@@ -64,6 +64,16 @@ export class RatingController {
     };
   }
 
+  /** Больше очков выше; при равенстве — меньше турниров выше */
+  private static compareRatingRows(
+    a: { total_points: number; all_results?: unknown[] },
+    b: { total_points: number; all_results?: unknown[] }
+  ): number {
+    const pointsDiff = b.total_points - a.total_points;
+    if (pointsDiff !== 0) return pointsDiff;
+    return (a.all_results?.length ?? 0) - (b.all_results?.length ?? 0);
+  }
+
   // Получить количество лучших результатов для расчёта суммы рейтинга
   private static async getBestResultsCount(
     refYear: number,
@@ -109,7 +119,7 @@ export class RatingController {
       const minDateStr = minDate.toISOString().split("T")[0];
 
       // Для каждого игрока собираем его командные результаты и считаем сумму лучших N
-      const ratingTable: RatingTableRow[] = [];
+      const ratingTable: (RatingTableRow & { all_results: unknown[] })[] = [];
       for (const row of playersRows as any[]) {
         const playerId = row.player_id;
         const playerName = row.player_name;
@@ -156,13 +166,20 @@ export class RatingController {
           player_id: playerId,
           player_name: playerName,
           total_points: totalPoints,
+          all_results: results as unknown[],
         });
       }
 
-      ratingTable.sort((a, b) => b.total_points - a.total_points);
+      ratingTable.sort(RatingController.compareRatingRows);
       ratingTable.forEach((r, i) => (r.rank = i + 1));
 
-      res.json({ success: true, data: ratingTable });
+      const data: RatingTableRow[] = ratingTable.map((row) => ({
+        rank: row.rank,
+        player_id: row.player_id,
+        player_name: row.player_name,
+        total_points: row.total_points,
+      }));
+      res.json({ success: true, data });
     } catch (error) {
       console.error("Ошибка получения рейтинга:", error);
       res
@@ -256,7 +273,7 @@ export class RatingController {
         });
       }
 
-      result.sort((a, b) => b.total_points - a.total_points);
+      result.sort(RatingController.compareRatingRows);
       result.forEach((r, i) => (r.rank = i + 1));
 
       res.json({ success: true, data: result });
@@ -448,7 +465,7 @@ export class RatingController {
       });
     }
 
-    playerRatings.sort((a, b) => b.total_points - a.total_points);
+    playerRatings.sort(RatingController.compareRatingRows);
     playerRatings.forEach((r, i) => (r.rank = i + 1));
     res.json({
       success: true,
