@@ -362,6 +362,25 @@ export class TournamentRegistrationModel {
     return result.affectedRows;
   }
 
+  /** Подтвердить все заявки (возврат из финальной регистрации в обычную). */
+  static async confirmAllRegistrations(
+    tournamentId: number,
+    connection?: PoolConnection,
+  ): Promise<number> {
+    const exec = connection ?? pool;
+    const hasUpdatedAt = await this.hasColumn("updated_at");
+    const setClause = hasUpdatedAt
+      ? "is_confirmed = 1, updated_at = NOW()"
+      : "is_confirmed = 1";
+    const [result] = await exec.execute<ResultSetHeader>(
+      `UPDATE tournament_registrations
+       SET ${setClause}
+       WHERE tournament_id = ? AND is_confirmed = 0`,
+      [tournamentId],
+    );
+    return result.affectedRows;
+  }
+
   /** При смене состава сбросить подтверждение заявки. */
   static async unconfirmRegistration(
     tournamentId: number,

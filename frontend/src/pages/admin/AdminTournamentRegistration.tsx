@@ -2,6 +2,7 @@ import {
   ArrowDownTrayIcon,
   ArrowLeftIcon,
   ArrowUpTrayIcon,
+  ArrowUturnLeftIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   ClipboardDocumentListIcon,
@@ -388,6 +389,35 @@ const AdminTournamentRegistration: React.FC = () => {
     }
   );
 
+  const revertToRegistrationMutation = useMutation(
+    async () =>
+      adminApi.updateTournament(tournamentId, {
+        status: TournamentStatus.REGISTRATION,
+      }),
+    {
+      onSuccess: (res) => {
+        if (res.data.success) {
+          toast.success("Турнир возвращён в статус «Регистрация»");
+          void queryClient.removeQueries([
+            "tournamentFinalRegistration",
+            tournamentId,
+          ]);
+          void queryClient.invalidateQueries([
+            "tournamentRegistration",
+            tournamentId,
+          ]);
+          void queryClient.invalidateQueries("tournaments");
+          navigate(`/admin/tournaments/${tournamentId}/registration`);
+        } else {
+          toast.error(res.data.message || "Не удалось сменить статус");
+        }
+      },
+      onError: (e) => {
+        toast.error(handleApiError(e));
+      },
+    }
+  );
+
   const importCsvMutation = useMutation(
     async (file: File) => {
       const response = await adminApi.importTournamentRegistrationsFromCsv(
@@ -569,6 +599,27 @@ const AdminTournamentRegistration: React.FC = () => {
               )}
             {isFinalRegistrationPage &&
               tournament.status === TournamentStatus.FINAL_REGISTRATION && (
+                <>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 shadow-sm hover:bg-amber-100 disabled:opacity-50"
+                    disabled={revertToRegistrationMutation.isLoading}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          "Вернуть турнир в обычную регистрацию? Снова откроется публичная запись команд. Все текущие заявки будут отмечены как подтверждённые."
+                        )
+                      ) {
+                        return;
+                      }
+                      revertToRegistrationMutation.mutate();
+                    }}
+                  >
+                    <ArrowUturnLeftIcon className="h-5 w-5" />
+                    {revertToRegistrationMutation.isLoading
+                      ? "Сохранение…"
+                      : "Вернуть в регистрацию"}
+                  </button>
                   <button
                     type="button"
                     className="btn-primary shrink-0"
@@ -582,6 +633,7 @@ const AdminTournamentRegistration: React.FC = () => {
                   >
                     Начать проведение
                   </button>
+                </>
               )}
           </div>
         </div>

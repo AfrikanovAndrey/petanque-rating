@@ -5,6 +5,10 @@ import toast from "react-hot-toast";
 import { useMutation } from "react-query";
 import { adminApi } from "../../services/api";
 import { handleApiError } from "../../utils";
+import {
+  firstRoundLabel,
+  firstRoundPairSeeds,
+} from "../../utils/cupBracket";
 import { getGroupLetter } from "../../utils/tournamentPlaySettings";
 
 const SIZE_OPTIONS = [0, 2, 4, 8, 16] as const;
@@ -32,8 +36,6 @@ type Props = {
   availableTeams: number;
   /** Команды с местами после групп/швейцарки (для ручного распределения) */
   candidates: CupQualificationCandidate[];
-  /** Ручной режим доступен (сейчас — после групп) */
-  allowManual: boolean;
   onSuccess: () => void;
 };
 
@@ -125,7 +127,6 @@ const CupStageStartModal: React.FC<Props> = ({
   tournamentId,
   availableTeams,
   candidates,
-  allowManual,
   onSuccess,
 }) => {
   const [step, setStep] = useState<1 | 2>(1);
@@ -162,13 +163,6 @@ const CupStageStartModal: React.FC<Props> = ({
       setB(8);
     }
   }, [abPlayoff]);
-
-  useEffect(() => {
-    if (!allowManual && mode === "manual") {
-      setMode("auto");
-      setStep(1);
-    }
-  }, [allowManual, mode]);
 
   const ranked = useMemo(() => rankCandidates(candidates), [candidates]);
 
@@ -368,14 +362,14 @@ const CupStageStartModal: React.FC<Props> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
         className={`w-full rounded-xl bg-white shadow-xl ${
-          step === 2 ? "max-w-3xl" : "max-w-lg"
+          step === 2 ? "max-w-5xl" : "max-w-lg"
         }`}
       >
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <h2 className="text-lg font-semibold text-gray-900">
             {step === 1
               ? "Начать финальную часть"
-              : "Ручное распределение по кубкам"}
+              : "Ручная сетка кубков"}
           </h2>
           <button
             type="button"
@@ -493,40 +487,38 @@ const CupStageStartModal: React.FC<Props> = ({
               </span>
             </label>
 
-            {allowManual && (
-              <div className="space-y-2">
-                <p className="font-medium text-gray-900">Распределение команд</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className={`rounded-md border px-3 py-2 text-sm font-medium ${
-                      mode === "auto"
-                        ? "border-primary-500 bg-primary-50 text-primary-900"
-                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
-                    onClick={() => setMode("auto")}
-                  >
-                    Автоматически
-                  </button>
-                  <button
-                    type="button"
-                    className={`rounded-md border px-3 py-2 text-sm font-medium ${
-                      mode === "manual"
-                        ? "border-primary-500 bg-primary-50 text-primary-900"
-                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
-                    onClick={() => setMode("manual")}
-                  >
-                    Вручную
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">
-                  {mode === "auto"
-                    ? "По местам в группах: сначала все 1-е, затем лучшие 2-е и т.д."
-                    : "Слоты кубков и порядок посева задаёте сами (можно править автозаполнение)."}
-                </p>
+            <div className="space-y-2">
+              <p className="font-medium text-gray-900">Распределение команд</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                    mode === "auto"
+                      ? "border-primary-500 bg-primary-50 text-primary-900"
+                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                  onClick={() => setMode("auto")}
+                >
+                  Автоматически
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                    mode === "manual"
+                      ? "border-primary-500 bg-primary-50 text-primary-900"
+                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                  onClick={() => setMode("manual")}
+                >
+                  Вручную
+                </button>
               </div>
-            )}
+              <p className="text-xs text-gray-500">
+                {mode === "auto"
+                  ? "По местам квалификации: сначала все 1-е, затем лучшие 2-е и т.д., сетка — классический посев."
+                  : "Сами выбираете, кто в каком кубке и кто с кем играет в первом раунде. Можно начать с авторасстановки."}
+              </p>
+            </div>
 
             <p
               className={`text-sm ${
@@ -539,54 +531,125 @@ const CupStageStartModal: React.FC<Props> = ({
           </div>
         ) : (
           <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4 text-sm">
-            <p className="text-gray-600">
-              Порядок в кубке = посев (сид 1 сверху). Назначено:{" "}
-              {assignedIds.size} из {needed}. Уже выбранные команды скрываются
-              из остальных списков.
-            </p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="text-gray-600">
+                Расставьте команды по матчам 1-го раунда. Назначено:{" "}
+                {assignedIds.size} из {needed}. Уже выбранные команды скрываются
+                из остальных списков.
+              </p>
+              <button
+                type="button"
+                className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                onClick={initManualFromAuto}
+              >
+                Авторасстановка
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {poolSections.map((section) => {
                 const slots =
                   manualPools[section.key] ?? emptySlots(section.size);
+                const pairs = firstRoundPairSeeds(section.size);
+                const roundName = firstRoundLabel(section.size);
+                const branches = new Map<number, typeof pairs>();
+                for (const pair of pairs) {
+                  const list = branches.get(pair.nextMatchIndex) ?? [];
+                  list.push(pair);
+                  branches.set(pair.nextMatchIndex, list);
+                }
+                const branchEntries = [...branches.entries()];
                 return (
                   <div
                     key={section.key}
                     className="rounded-lg border border-gray-200 bg-gray-50 p-4"
                   >
-                    <h3 className="mb-2 text-sm font-semibold text-gray-900">
+                    <h3 className="mb-3 text-sm font-semibold text-gray-900">
                       {section.title}
                       <span className="ml-1 font-normal text-gray-500">
-                        ({section.size})
+                        ({section.size}, {roundName})
                       </span>
                     </h3>
-                    <ol className="space-y-2">
-                      {slots.map((teamId, index) => (
-                        <li key={`${section.key}-${index}`} className="flex gap-2">
-                          <span className="mt-2 w-6 shrink-0 text-xs text-gray-500">
-                            {index + 1}.
-                          </span>
-                          <select
-                            className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                            value={teamId || ""}
-                            aria-label={`${section.title}, сид ${index + 1}`}
-                            onChange={(e) =>
-                              setSlot(
-                                section.key,
-                                index,
-                                Number(e.target.value) || 0
-                              )
-                            }
-                          >
-                            <option value="">— выберите —</option>
-                            {optionsForSlot(section.key, index).map((t) => (
-                              <option key={t.team_id} value={t.team_id}>
-                                {candidateLabel(t)}
-                              </option>
-                            ))}
-                          </select>
-                        </li>
+                    <div className="space-y-3">
+                      {branchEntries.map(([branch, branchPairs], branchIdx) => (
+                        <div
+                          key={`${section.key}-branch-${branch}`}
+                          className="space-y-2"
+                        >
+                          {branchEntries.length > 1 ? (
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                              Ветка {branchIdx + 1}
+                            </p>
+                          ) : null}
+                          {branchPairs.map((pair) => {
+                            const slotA = pair.seedA - 1;
+                            const slotB = pair.seedB - 1;
+                            return (
+                              <div
+                                key={`${section.key}-m${pair.matchIndex}`}
+                                className="rounded-md border border-gray-200 bg-white p-2"
+                              >
+                                <p className="mb-1 text-xs text-gray-500">
+                                  {roundName} · матч {pair.matchIndex + 1}
+                                </p>
+                                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                                  <select
+                                    className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                                    value={slots[slotA] || ""}
+                                    aria-label={`${section.title}, ${roundName} матч ${pair.matchIndex + 1}, слот ${pair.seedA}`}
+                                    onChange={(e) =>
+                                      setSlot(
+                                        section.key,
+                                        slotA,
+                                        Number(e.target.value) || 0
+                                      )
+                                    }
+                                  >
+                                    <option value="">— выберите —</option>
+                                    {optionsForSlot(section.key, slotA).map(
+                                      (t) => (
+                                        <option
+                                          key={t.team_id}
+                                          value={t.team_id}
+                                        >
+                                          {candidateLabel(t)}
+                                        </option>
+                                      )
+                                    )}
+                                  </select>
+                                  <span className="shrink-0 text-center text-xs font-medium text-gray-400">
+                                    vs
+                                  </span>
+                                  <select
+                                    className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                                    value={slots[slotB] || ""}
+                                    aria-label={`${section.title}, ${roundName} матч ${pair.matchIndex + 1}, слот ${pair.seedB}`}
+                                    onChange={(e) =>
+                                      setSlot(
+                                        section.key,
+                                        slotB,
+                                        Number(e.target.value) || 0
+                                      )
+                                    }
+                                  >
+                                    <option value="">— выберите —</option>
+                                    {optionsForSlot(section.key, slotB).map(
+                                      (t) => (
+                                        <option
+                                          key={t.team_id}
+                                          value={t.team_id}
+                                        >
+                                          {candidateLabel(t)}
+                                        </option>
+                                      )
+                                    )}
+                                  </select>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       ))}
-                    </ol>
+                    </div>
                   </div>
                 );
               })}
@@ -613,7 +676,7 @@ const CupStageStartModal: React.FC<Props> = ({
           >
             Отмена
           </button>
-          {step === 1 && mode === "manual" && allowManual ? (
+          {step === 1 && mode === "manual" ? (
             <button
               type="button"
               className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"

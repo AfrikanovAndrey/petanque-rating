@@ -5022,6 +5022,14 @@ export class AdminController {
           await TournamentModel.saveSwissSeed(tournamentId, null);
           await TournamentModel.saveSwissWithdrawals(tournamentId, null);
         }
+        if (
+          status === TournamentStatus.REGISTRATION &&
+          existingTournament.status === TournamentStatus.FINAL_REGISTRATION
+        ) {
+          await TournamentRegistrationModel.confirmAllRegistrations(
+            tournamentId,
+          );
+        }
         res.json({
           success: true,
           message: "Турнир успешно обновлен",

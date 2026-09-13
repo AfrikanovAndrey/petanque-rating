@@ -654,7 +654,6 @@ const AdminTournamentInProgress: React.FC = () => {
                 0
               ) ?? 0
         }
-        allowManual={tournament.play_format === TournamentPlayFormat.GROUPS}
         candidates={
           tournament.play_format === TournamentPlayFormat.GROUPS
             ? (data.groups ?? []).flatMap((g) =>
