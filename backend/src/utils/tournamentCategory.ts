@@ -15,8 +15,8 @@ export function parseTournamentCategoryInput(
   if (value === "2" || value === "REGIONAL") {
     return TournamentCategoryEnum.REGIONAL;
   }
-  if (value === "3" || value === "CLUB") {
-    return TournamentCategoryEnum.CLUB;
+  if (value === "3" || value === "NO_RATING" || value === "CLUB") {
+    return TournamentCategoryEnum.NO_RATING;
   }
 
   return null;
@@ -33,5 +33,5 @@ export function tournamentCategoryDbToEnum(
 export function isRatingTournamentCategory(
   category: TournamentCategoryEnum,
 ): boolean {
-  return category !== TournamentCategoryEnum.CLUB;
+  return category !== TournamentCategoryEnum.NO_RATING;
 }

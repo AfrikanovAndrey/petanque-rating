@@ -992,7 +992,7 @@ const AdminTournaments: React.FC = () => {
                 >
                   <option value="1">1-я категория (РФП)</option>
                   <option value="2">2-я категория (Региональный)</option>
-                  <option value="3">Клубный</option>
+                  <option value="3">Без рейтинга</option>
                 </select>
                 {errorsCreate.category && (
                   <p className="mt-1 text-sm text-red-600">
@@ -1191,7 +1191,7 @@ const AdminTournaments: React.FC = () => {
                 >
                   <option value="1">1-я категория (РФП)</option>
                   <option value="2">2-я категория (Региональный)</option>
-                  <option value="3">Клубный</option>
+                  <option value="3">Без рейтинга</option>
                 </select>
                 {errorsEdit.category && (
                   <p className="mt-1 text-sm text-red-600">

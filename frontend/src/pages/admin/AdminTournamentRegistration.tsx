@@ -730,7 +730,7 @@ const AdminTournamentRegistration: React.FC = () => {
                   2-я категория ({getTornamentCategoryText("REGIONAL")})
                 </option>
                 <option value="3">
-                  {getTornamentCategoryText("CLUB")}
+                  {getTornamentCategoryText("NO_RATING")}
                 </option>
               </select>
             </div>

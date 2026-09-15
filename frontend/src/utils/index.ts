@@ -94,8 +94,8 @@ export function getTornamentCategoryText(category: TournamentCategory) {
     return "РФП";
   } else if (category === "REGIONAL") {
     return "Региональный";
-  } else if (category === "CLUB") {
-    return "Клубный";
+  } else if (category === "NO_RATING" || category === "CLUB") {
+    return "Без рейтинга";
   }
 }
 
@@ -107,6 +107,9 @@ export function tournamentCategoryToFormValue(
   }
   if (category === "REGIONAL") {
     return "2";
+  }
+  if (category === "NO_RATING" || category === "CLUB") {
+    return "3";
   }
   return "3";
 }

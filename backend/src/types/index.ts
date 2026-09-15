@@ -292,7 +292,7 @@ export interface TournamentUploadData {
   tournament_date: string;
   tournament_type: TournamentType; // тип турнира
   total_teams?: number; // общее количество команд для расчета очков кубка
-  tournament_category?: "1" | "2" | "3"; // категория турнира (1 — РФП, 2 — региональный, 3 — клубный)
+  tournament_category?: "1" | "2" | "3"; // категория турнира (1 — РФП, 2 — региональный, 3 — без рейтинга)
   results: Array<{
     player_name: string;
     cup_position: string;
@@ -334,12 +334,12 @@ export interface UpdateUserRequest {
   roles?: UserRole[];
 }
 
-export type TournamentCategory = "FEDERAL" | "REGIONAL" | "CLUB";
+export type TournamentCategory = "FEDERAL" | "REGIONAL" | "NO_RATING";
 
 export enum TournamentCategoryEnum {
   FEDERAL = 1,
   REGIONAL = 2,
-  CLUB = 3,
+  NO_RATING = 3,
 }
 
 export enum CupPosition {

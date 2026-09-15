@@ -199,7 +199,7 @@ export function getPoints(
   qualifyingWins: number = 0,
   teamPlayerCount?: number,
 ): number {
-  if (category === TournamentCategoryEnum.CLUB) {
+  if (category === TournamentCategoryEnum.NO_RATING) {
     return 0;
   }
 

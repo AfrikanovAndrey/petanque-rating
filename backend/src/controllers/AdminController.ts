@@ -90,6 +90,7 @@ import { TournamentParser } from "./TournamentParser";
 import type { TournamentCupMatchRow } from "../models/TournamentCupMatchModel";
 import type { RegisteredTeamRow } from "../models/TournamentRegistrationModel";
 import {
+  isRatingTournamentCategory,
   parseTournamentCategoryInput,
   tournamentCategoryDbToEnum,
 } from "../utils/tournamentCategory";
@@ -3443,11 +3444,7 @@ export class AdminController {
       }
 
       const placements = deriveCupPlacements(cupMatches);
-      const categoryEnum =
-        String(tournament.category).toUpperCase() === "REGIONAL" ||
-        String(tournament.category) === "2"
-          ? TournamentCategoryEnum.REGIONAL
-          : TournamentCategoryEnum.FEDERAL;
+      const categoryEnum = tournamentCategoryDbToEnum(tournament.category);
       const tournamentType = tournament.type as TournamentType;
 
       const rawDate = tournament.date as unknown;
@@ -3553,8 +3550,9 @@ export class AdminController {
 
       res.json({
         success: true,
-        message:
-          "Турнир завершён. Очки рассчитаны; для рейтинга нужно признание результатов в админке.",
+        message: isRatingTournamentCategory(categoryEnum)
+          ? "Турнир завершён. Очки рассчитаны; для рейтинга нужно признание результатов в админке."
+          : "Турнир завершён.",
         data: {
           tournament_id: tournamentId,
           results_count: qualifying.size,

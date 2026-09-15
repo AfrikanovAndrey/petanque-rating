@@ -17,8 +17,11 @@ export async function up(): Promise<void> {
   `);
 
   const columnType = columns[0]?.COLUMN_TYPE as string | undefined;
-  if (columnType?.includes("'CLUB'")) {
-    console.log("  ✅ Категория CLUB уже добавлена");
+  if (
+    columnType?.includes("'CLUB'") ||
+    columnType?.includes("'NO_RATING'")
+  ) {
+    console.log("  ✅ Категория без рейтинга уже добавлена");
     return;
   }
 

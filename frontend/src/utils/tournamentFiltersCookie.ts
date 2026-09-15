@@ -44,7 +44,11 @@ const ADMIN_FILTER_STATUSES: TournamentStatus[] = [
 ];
 
 const ALL_TOURNAMENT_TYPES = Object.values(TournamentType);
-const ALL_CATEGORIES: TournamentCategory[] = ["FEDERAL", "REGIONAL", "CLUB"];
+const ALL_CATEGORIES: TournamentCategory[] = [
+  "FEDERAL",
+  "REGIONAL",
+  "NO_RATING",
+];
 
 function isTournamentStatus(value: unknown): value is TournamentStatus {
   return (
@@ -64,8 +68,19 @@ function isTournamentType(value: unknown): value is TournamentType {
   return typeof value === "string" && ALL_TOURNAMENT_TYPES.includes(value as TournamentType);
 }
 
-function isTournamentCategory(value: unknown): value is TournamentCategory {
-  return typeof value === "string" && ALL_CATEGORIES.includes(value as TournamentCategory);
+function normalizeTournamentCategory(
+  value: unknown,
+): TournamentCategory | null {
+  if (value === "CLUB") {
+    return "NO_RATING";
+  }
+  if (
+    typeof value === "string" &&
+    ALL_CATEGORIES.includes(value as TournamentCategory)
+  ) {
+    return value as TournamentCategory;
+  }
+  return null;
 }
 
 function parseStringArray<T>(
@@ -87,7 +102,12 @@ function parseFiltersJson(
     return {
       statuses: parseStringArray(parsed.statuses, isStatus),
       types: parseStringArray(parsed.types, isTournamentType),
-      categories: parseStringArray(parsed.categories, isTournamentCategory),
+      categories: (Array.isArray(parsed.categories)
+        ? parsed.categories
+        : []
+      )
+        .map(normalizeTournamentCategory)
+        .filter((c): c is TournamentCategory => c != null),
     };
   } catch {
     return null;
@@ -211,7 +231,11 @@ export function applyTournamentListFilters(
     }
     if (
       filters.categories.length > 0 &&
-      !filters.categories.includes(tournament.category)
+      !filters.categories.includes(
+        String(tournament.category) === "CLUB"
+          ? "NO_RATING"
+          : tournament.category,
+      )
     ) {
       return false;
     }
