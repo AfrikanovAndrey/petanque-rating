@@ -47,6 +47,32 @@ export function comparePlayerRatingsForSeed(
   return 0;
 }
 
+export function playerPointsFromNames(
+  players: string[],
+  ratingByPlayerName: Map<string, number>
+): number[] {
+  return players.map((name) => ratingByPlayerName.get(name) ?? 0);
+}
+
+/**
+ * Сортировка списков заявок: сумма DESC → личные рейтинги DESC.
+ * Без жребия (в отличие от сида швейцарки).
+ */
+export function compareTeamsByRating(
+  aPlayerPoints: number[],
+  bPlayerPoints: number[],
+  tournamentType: TournamentType
+): number {
+  const aRatings = playerRatingsForSwissSeed(aPlayerPoints, tournamentType);
+  const bRatings = playerRatingsForSwissSeed(bPlayerPoints, tournamentType);
+  const aTotal = aRatings.reduce((sum, value) => sum + value, 0);
+  const bTotal = bRatings.reduce((sum, value) => sum + value, 0);
+  if (bTotal !== aTotal) {
+    return bTotal - aTotal;
+  }
+  return comparePlayerRatingsForSeed(aRatings, bRatings);
+}
+
 export function playerPointsForRegisteredTeam(
   team: TournamentRegisteredTeam,
   ratingByPlayerId: Map<number, number>,

@@ -37,6 +37,11 @@ import {
   isSwissFreeTeamId,
 } from "../../utils/tournamentPlaySettings";
 import CsvUtils from "../../utils/csv";
+import {
+  compareTeamsByRating,
+  playerPointsFromNames,
+  teamRatingFromPlayerPoints,
+} from "../../utils/swissSeed";
 
 const AdminTournamentInProgress: React.FC = () => {
   const { tournamentId: tournamentIdParam } = useParams<{
@@ -230,19 +235,18 @@ const AdminTournamentInProgress: React.FC = () => {
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
 
-  const getTeamTotalRating = (players: string[]) => {
-    const sortedRatings = players
-      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
-      .sort((a, b) => b - a);
-    const ratingValues =
-      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
-        ? sortedRatings.slice(0, 3)
-        : sortedRatings;
-    return ratingValues.reduce((sum, value) => sum + value, 0);
-  };
+  const getTeamPlayerPoints = (players: string[]) =>
+    playerPointsFromNames(players, ratingByPlayerName);
 
-  const teamsByRating = [...teams].sort(
-    (a, b) => getTeamTotalRating(b.players) - getTeamTotalRating(a.players)
+  const getTeamTotalRating = (players: string[]) =>
+    teamRatingFromPlayerPoints(getTeamPlayerPoints(players), tournament.type);
+
+  const teamsByRating = [...teams].sort((a, b) =>
+    compareTeamsByRating(
+      getTeamPlayerPoints(a.players),
+      getTeamPlayerPoints(b.players),
+      tournament.type
+    )
   );
 
   const downloadTeamsCsv = () => {

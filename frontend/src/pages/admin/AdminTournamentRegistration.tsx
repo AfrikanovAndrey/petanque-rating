@@ -35,6 +35,11 @@ import {
   tournamentRatingAsOfDate,
 } from "../../utils";
 import CsvUtils from "../../utils/csv";
+import {
+  compareTeamsByRating,
+  playerPointsFromNames,
+  teamRatingFromPlayerPoints,
+} from "../../utils/swissSeed";
 
 interface TournamentParamsForm {
   name: string;
@@ -130,20 +135,15 @@ const AdminTournamentRegistration: React.FC = () => {
   const teams = data?.teams ?? [];
   const tournamentType = data?.tournament?.type ?? TournamentType.TRIPLETTE;
 
+  const getTeamPlayerPoints = useCallback(
+    (players: string[]) => playerPointsFromNames(players, ratingByPlayerName),
+    [ratingByPlayerName]
+  );
+
   const getTeamTotalRating = useCallback(
-    (players: string[]) => {
-      const sortedRatings = players
-        .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
-        .sort((a, b) => b - a);
-
-      const ratingValues =
-        tournamentType === TournamentType.TRIPLETTE && sortedRatings.length > 3
-          ? sortedRatings.slice(0, 3)
-          : sortedRatings;
-
-      return ratingValues.reduce((sum, value) => sum + value, 0);
-    },
-    [ratingByPlayerName, tournamentType]
+    (players: string[]) =>
+      teamRatingFromPlayerPoints(getTeamPlayerPoints(players), tournamentType),
+    [getTeamPlayerPoints, tournamentType]
   );
 
   const handleTeamsSortClick = useCallback(
@@ -168,8 +168,11 @@ const AdminTournamentRegistration: React.FC = () => {
     return [...teams].sort((a, b) => {
       let comparison = 0;
       if (teamsSortColumn === "rating") {
-        comparison =
-          getTeamTotalRating(a.players) - getTeamTotalRating(b.players);
+        comparison = -compareTeamsByRating(
+          getTeamPlayerPoints(a.players),
+          getTeamPlayerPoints(b.players),
+          tournamentType
+        );
       } else if (teamsSortColumn === "updated_at") {
         comparison =
           new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
@@ -178,7 +181,13 @@ const AdminTournamentRegistration: React.FC = () => {
       }
       return teamsSortDirection === "asc" ? comparison : -comparison;
     });
-  }, [teams, teamsSortColumn, teamsSortDirection, getTeamTotalRating]);
+  }, [
+    teams,
+    teamsSortColumn,
+    teamsSortDirection,
+    getTeamPlayerPoints,
+    tournamentType,
+  ]);
 
   const {
     register,
@@ -503,9 +512,12 @@ const AdminTournamentRegistration: React.FC = () => {
   const confirmedTeamsCount = teams.filter((team) => team.is_confirmed).length;
 
   const downloadTeamsCsv = () => {
-    const teamsByRating = [...teams].sort(
-      (a, b) =>
-        getTeamTotalRating(b.players) - getTeamTotalRating(a.players)
+    const teamsByRating = [...teams].sort((a, b) =>
+      compareTeamsByRating(
+        getTeamPlayerPoints(a.players),
+        getTeamPlayerPoints(b.players),
+        tournamentType
+      )
     );
     const lines = [
       "№,состав команды,рейтинг",

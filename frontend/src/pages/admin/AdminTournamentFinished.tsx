@@ -16,6 +16,11 @@ import TournamentSwissStageResults from "../../components/admin/TournamentSwissS
 import { adminApi, ratingApi } from "../../services/api";
 import { TournamentStatus, TournamentType } from "../../types";
 import {
+  compareTeamsByRating,
+  playerPointsFromNames,
+  teamRatingFromPlayerPoints,
+} from "../../utils/swissSeed";
+import {
   formatDate,
   formatDateTime,
   getTornamentCategoryText,
@@ -132,21 +137,18 @@ const AdminTournamentFinished: React.FC = () => {
   const formatPlayerWithRating = (playerName: string) =>
     `${playerName} (${ratingByPlayerName.get(playerName) ?? 0})`;
 
-  const getTeamTotalRating = (players: string[]) => {
-    const sortedRatings = players
-      .map((playerName) => ratingByPlayerName.get(playerName) ?? 0)
-      .sort((a, b) => b - a);
+  const getTeamPlayerPoints = (players: string[]) =>
+    playerPointsFromNames(players, ratingByPlayerName);
 
-    const ratingValues =
-      tournament.type === TournamentType.TRIPLETTE && sortedRatings.length > 3
-        ? sortedRatings.slice(0, 3)
-        : sortedRatings;
+  const getTeamTotalRating = (players: string[]) =>
+    teamRatingFromPlayerPoints(getTeamPlayerPoints(players), tournament.type);
 
-    return ratingValues.reduce((sum, value) => sum + value, 0);
-  };
-
-  const teamsByRating = [...teams].sort(
-    (a, b) => getTeamTotalRating(b.players) - getTeamTotalRating(a.players)
+  const teamsByRating = [...teams].sort((a, b) =>
+    compareTeamsByRating(
+      getTeamPlayerPoints(a.players),
+      getTeamPlayerPoints(b.players),
+      tournament.type
+    )
   );
 
   const downloadTeamsCsv = () => {
