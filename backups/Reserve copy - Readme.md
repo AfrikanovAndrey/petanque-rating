@@ -26,10 +26,16 @@ docker exec -i petanque-mysql mysql --default-character-set=utf8 -u petanque_use
 ```
 
 ## Скачать резервную копию с удалённого сервера
-
 ```bash
 sftp user@remote-host
 get /remote/file.txt  # скачать один файл
 get -r /remote/dir/   # скачать папку
 exit
 ```
+
+## Загрузить резервную копию на удлаённый сервер
+```bash
+put dump.sql
+```
+
+
