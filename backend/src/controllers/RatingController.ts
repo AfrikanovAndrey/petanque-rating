@@ -64,6 +64,24 @@ export class RatingController {
     };
   }
 
+  /**
+   * Кого показывать в публичной таблице: лицензия на год расчёта (даже при 0 очков)
+   * или положительный рейтинг при лицензии только за предыдущий год (хвост в окне 365 дней).
+   */
+  private static shouldIncludeInPublicRatingTable(
+    licensesRows: { year: number }[],
+    refYear: number,
+    totalPoints: number
+  ): boolean {
+    const hasRefYearLicense = licensesRows.some(
+      (lic) => Number(lic.year) === refYear
+    );
+    if (hasRefYearLicense) {
+      return true;
+    }
+    return totalPoints > 0;
+  }
+
   /** Больше очков выше; при равенстве — меньше турниров выше */
   private static compareRatingRows(
     a: { total_points: number; all_results?: unknown[] },
@@ -160,6 +178,16 @@ export class RatingController {
 
         const best = (results as any[]).slice(0, bestResultsCount);
         const totalPoints = best.reduce((s, r) => s + (r.points || 0), 0);
+
+        if (
+          !RatingController.shouldIncludeInPublicRatingTable(
+            licensesRows as { year: number }[],
+            currentYear,
+            totalPoints
+          )
+        ) {
+          continue;
+        }
 
         ratingTable.push({
           rank: 0,
@@ -259,6 +287,16 @@ export class RatingController {
         }));
         const best = allResults.slice(0, bestResultsCount);
         const totalPoints = best.reduce((s, r) => s + (r.points || 0), 0);
+
+        if (
+          !RatingController.shouldIncludeInPublicRatingTable(
+            licensesRows as { year: number }[],
+            refYear,
+            totalPoints
+          )
+        ) {
+          continue;
+        }
 
         result.push({
           rank: 0,
@@ -452,6 +490,17 @@ export class RatingController {
       }));
       const best = allResults.slice(0, bestResultsCount);
       const totalPoints = best.reduce((s, r) => s + (r.points || 0), 0);
+
+      if (
+        !RatingController.shouldIncludeInPublicRatingTable(
+          licensesRows as { year: number }[],
+          refYear,
+          totalPoints
+        )
+      ) {
+        continue;
+      }
+
       playerRatings.push({
         rank: 0,
         player_id: playerId,
