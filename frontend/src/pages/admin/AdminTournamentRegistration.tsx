@@ -3,6 +3,7 @@ import {
   ArrowLeftIcon,
   ArrowUpTrayIcon,
   ArrowUturnLeftIcon,
+  DocumentArrowUpIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   ClipboardDocumentListIcon,
@@ -16,6 +17,7 @@ import toast from "react-hot-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import TournamentStartWizardModal from "../../components/admin/TournamentStartWizardModal";
+import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
 import { EditRegisteredTeamModal } from "../../components/EditRegisteredTeamModal";
 import { RegisterTeamModal } from "../../components/RegisterTeamModal";
 import RegulationsMarkdown from "../../components/RegulationsMarkdown";
@@ -50,6 +52,7 @@ interface TournamentParamsForm {
   regulations: string;
   fix_rating: boolean;
   rating_fixed_date: string;
+  conducted_online: boolean;
 }
 
 type TeamsSortColumn = "rating" | "updated_at" | "status";
@@ -72,6 +75,7 @@ const AdminTournamentRegistration: React.FC = () => {
   );
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [startWizardOpen, setStartWizardOpen] = useState(false);
+  const [resultsUploadModalOpen, setResultsUploadModalOpen] = useState(false);
   const csvImportInputRef = useRef<HTMLInputElement>(null);
   const [teamsSortColumn, setTeamsSortColumn] = useState<TeamsSortColumn | null>(
     null
@@ -260,6 +264,7 @@ const AdminTournamentRegistration: React.FC = () => {
       rating_fixed_date: t.rating_fixed_date
         ? formatDateForInput(String(t.rating_fixed_date))
         : "",
+      conducted_online: t.conducted_online !== false,
     });
   }, [data, reset, isDraftPage, isFinalRegistrationPage]);
 
@@ -273,6 +278,7 @@ const AdminTournamentRegistration: React.FC = () => {
         status: form.status,
         regulations: form.regulations.trim() === "" ? null : form.regulations,
         rating_fixed_date: form.fix_rating ? form.rating_fixed_date : null,
+        conducted_online: form.conducted_online,
       });
     },
     {
@@ -632,19 +638,30 @@ const AdminTournamentRegistration: React.FC = () => {
                       ? "Сохранение…"
                       : "Вернуть в регистрацию"}
                   </button>
-                  <button
-                    type="button"
-                    className="btn-primary shrink-0"
-                    disabled={confirmedTeamsCount === 0}
-                    title={
-                      confirmedTeamsCount === 0
-                        ? "Подтвердите хотя бы одну команду"
-                        : undefined
-                    }
-                    onClick={() => setStartWizardOpen(true)}
-                  >
-                    Начать проведение
-                  </button>
+                  {tournament.conducted_online !== false ? (
+                    <button
+                      type="button"
+                      className="btn-primary shrink-0"
+                      disabled={confirmedTeamsCount === 0}
+                      title={
+                        confirmedTeamsCount === 0
+                          ? "Подтвердите хотя бы одну команду"
+                          : undefined
+                      }
+                      onClick={() => setStartWizardOpen(true)}
+                    >
+                      Начать проведение
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 shrink-0"
+                      onClick={() => setResultsUploadModalOpen(true)}
+                    >
+                      <DocumentArrowUpIcon className="h-5 w-5 text-gray-500" />
+                      Загрузить результаты
+                    </button>
+                  )}
                 </>
               )}
           </div>
@@ -747,6 +764,35 @@ const AdminTournamentRegistration: React.FC = () => {
               </select>
             </div>
           </div>
+
+          {(isDraftPage ||
+            tournament.status === TournamentStatus.REGISTRATION ||
+            tournament.status === TournamentStatus.FINAL_REGISTRATION) && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  checked={watch("conducted_online")}
+                  onChange={(e) => {
+                    setValue("conducted_online", e.target.checked, {
+                      shouldDirty: true,
+                    });
+                  }}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-700">
+                    Проводить турнир онлайн в системе
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gray-500">
+                    Если выключено, на финальной регистрации можно загрузить
+                    итоги из Excel или Google Таблицы без группового этапа и
+                    кубков в системе.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
             <label className="flex items-start gap-3 cursor-pointer">
@@ -1184,6 +1230,31 @@ const AdminTournamentRegistration: React.FC = () => {
           onClose={() => setRegisterModalOpen(false)}
         />
       )}
+
+      <TournamentResultsUploadModal
+        variant="complete-in-progress"
+        open={resultsUploadModalOpen}
+        onClose={() => setResultsUploadModalOpen(false)}
+        tournament={
+          data?.tournament
+            ? {
+                id: data.tournament.id,
+                name: data.tournament.name,
+                date: data.tournament.date,
+                type: data.tournament.type,
+                category: String(data.tournament.category),
+              }
+            : undefined
+        }
+        onAfterSuccess={() => {
+          void queryClient.invalidateQueries([
+            "tournamentFinalRegistration",
+            tournamentId,
+          ]);
+          void queryClient.invalidateQueries("tournaments");
+          navigate(`/admin/tournaments/${tournamentId}/finished`);
+        }}
+      />
 
       {startWizardOpen && (
         <TournamentStartWizardModal

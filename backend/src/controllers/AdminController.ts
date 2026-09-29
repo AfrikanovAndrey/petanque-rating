@@ -182,6 +182,35 @@ export class AdminController {
     );
   }
 
+  /** Загрузка Excel/Sheets в существующую запись турнира (завершение). */
+  private static canUploadResultsIntoTournament(tournament: {
+    status: TournamentStatus | string;
+    conducted_online?: boolean | null;
+  }): boolean {
+    if (tournament.status === TournamentStatus.IN_PROGRESS) {
+      return true;
+    }
+    if (tournament.status === TournamentStatus.FINAL_REGISTRATION) {
+      return tournament.conducted_online === false;
+    }
+    return false;
+  }
+
+  private static uploadResultsIntoTournamentDeniedMessage(
+    tournament: {
+      status: TournamentStatus | string;
+      conducted_online?: boolean | null;
+    },
+  ): string {
+    if (
+      tournament.status === TournamentStatus.FINAL_REGISTRATION &&
+      tournament.conducted_online !== false
+    ) {
+      return "На финальной регистрации загрузка доступна только если турнир не проводится онлайн в системе";
+    }
+    return "Загрузка результатов в эту запись доступна только для турниров в статусе «В процессе» или на финальной регистрации без онлайн-ведения";
+  }
+
   /** Проверка состава команды по типу турнира (игроки уже загружены из БД). */
   private static validateRegistrationRoster(
     type: TournamentType,
@@ -498,11 +527,11 @@ export class AdminController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+      if (!AdminController.canUploadResultsIntoTournament(tournament)) {
         res.status(400).json({
           success: false,
           message:
-            "Загрузка результатов в эту запись доступна только для турниров в статусе «В процессе»",
+            AdminController.uploadResultsIntoTournamentDeniedMessage(tournament),
         });
         return;
       }
@@ -624,11 +653,11 @@ export class AdminController {
         return;
       }
 
-      if (tournament.status !== TournamentStatus.IN_PROGRESS) {
+      if (!AdminController.canUploadResultsIntoTournament(tournament)) {
         res.status(400).json({
           success: false,
           message:
-            "Загрузка результатов в эту запись доступна только для турниров в статусе «В процессе»",
+            AdminController.uploadResultsIntoTournamentDeniedMessage(tournament),
         });
         return;
       }
@@ -1009,7 +1038,8 @@ export class AdminController {
   static async createTournament(req: Request, res: Response): Promise<void> {
     try {
       const authReq = req as AuthRequest;
-      const { name, date, type, category, regulations } = req.body;
+      const { name, date, type, category, regulations, conducted_online } =
+        req.body;
 
       if (!name || typeof name !== "string" || !name.trim()) {
         res.status(400).json({
@@ -1059,6 +1089,14 @@ export class AdminController {
           ? String(regulations).trim() || null
           : null;
 
+      const conductedOnline =
+        conducted_online === undefined || conducted_online === null
+          ? false
+          : conducted_online === true ||
+            conducted_online === "true" ||
+            conducted_online === 1 ||
+            conducted_online === "1";
+
       const tournamentId = await TournamentModel.createTournament(
         name.trim(),
         type as TournamentType,
@@ -1069,6 +1107,7 @@ export class AdminController {
         regulationsText,
         TournamentStatus.DRAFT,
         authReq.userId ?? null,
+        conductedOnline,
       );
 
       res.status(201).json({
@@ -4730,6 +4769,15 @@ export class AdminController {
         return;
       }
 
+      if (tournament.conducted_online === false) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Для этого турнира включена загрузка результатов из файла — онлайн-ведение недоступно",
+        });
+        return;
+      }
+
       const confirmedTeams =
         await TournamentRegistrationModel.listRegisteredTeamsWithPlayers(
           tournamentId,
@@ -4913,6 +4961,7 @@ export class AdminController {
         status,
         regulations,
         rating_fixed_date,
+        conducted_online,
       } = req.body;
 
       // Проверяем, что передан хотя бы один параметр для обновления
@@ -4924,7 +4973,8 @@ export class AdminController {
         manual === undefined &&
         status === undefined &&
         regulations === undefined &&
-        rating_fixed_date === undefined
+        rating_fixed_date === undefined &&
+        conducted_online === undefined
       ) {
         res.status(400).json({
           success: false,
@@ -4972,6 +5022,47 @@ export class AdminController {
         }
       }
 
+      let conductedOnlineValue: boolean | undefined = undefined;
+      if (conducted_online !== undefined) {
+        if (conducted_online === null) {
+          res.status(400).json({
+            success: false,
+            message: "Поле conducted_online должно быть boolean",
+          });
+          return;
+        }
+        conductedOnlineValue =
+          conducted_online === true ||
+          conducted_online === "true" ||
+          conducted_online === 1 ||
+          conducted_online === "1";
+        const editableStatuses = [
+          TournamentStatus.DRAFT,
+          TournamentStatus.REGISTRATION,
+          TournamentStatus.FINAL_REGISTRATION,
+        ] as string[];
+        if (!editableStatuses.includes(existingTournament.status)) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Способ проведения можно изменить только до начала онлайн-ведения",
+          });
+          return;
+        }
+        if (
+          existingTournament.status === TournamentStatus.FINAL_REGISTRATION &&
+          conductedOnlineValue === false &&
+          existingTournament.play_format
+        ) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Сначала сбросьте настройки онлайн-формата или оставьте проведение в системе",
+          });
+          return;
+        }
+      }
+
       let ratingFixedDateValue: string | null | undefined = undefined;
       if (rating_fixed_date !== undefined) {
         if (rating_fixed_date === null || rating_fixed_date === "") {
@@ -5005,6 +5096,7 @@ export class AdminController {
         status as TournamentStatus | undefined,
         regulationsValue,
         ratingFixedDateValue,
+        conductedOnlineValue,
       );
 
       if (success) {

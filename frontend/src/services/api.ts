@@ -560,6 +560,7 @@ export const adminApi = {
       date?: string;
       status?: TournamentStatus;
       manual?: boolean;
+      conducted_online?: boolean;
       regulations?: string | null;
       rating_fixed_date?: string | null;
     }

@@ -105,6 +105,8 @@ export interface Tournament {
   /** Если задана — рейтинг команд считается на эту дату, а не на сегодня */
   rating_fixed_date?: string | null;
   manual: boolean; // true - при обработке результатов турнира с листа "Ручной ввод"
+  /** true — ведение в системе; false — итоги загружаются из файла */
+  conducted_online?: boolean;
   status: TournamentStatus;
   regulations?: string | null;
   play_format?: TournamentPlayFormat | null;

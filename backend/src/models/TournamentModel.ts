@@ -46,6 +46,10 @@ export class TournamentModel {
     const tournament: Tournament = {
       ...row,
       organizer_user_id: organizerUserId,
+      conducted_online:
+        row.conducted_online === undefined || row.conducted_online === null
+          ? true
+          : Boolean(Number(row.conducted_online)),
       french_system: Boolean(row.french_system),
       tiebreaker_order: parseTiebreakerOrder(row.tiebreaker_order),
       group_draw: parseGroupDraw(row.group_draw),
@@ -184,16 +188,18 @@ export class TournamentModel {
     regulations: string | null = null,
     tournamentStatus: TournamentStatus = TournamentStatus.FINISHED,
     organizerUserId: number | null = null,
+    conductedOnline: boolean = true,
   ): Promise<number> {
     const executor = connection || pool;
     const [result] = await executor.execute<ResultSetHeader>(
-      "INSERT INTO tournaments (name, type, category, date, manual, status, regulations, organizer_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO tournaments (name, type, category, date, manual, conducted_online, status, regulations, organizer_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         name,
         type,
         TournamentCategoryEnum[category],
         date,
         manual,
+        conductedOnline ? 1 : 0,
         tournamentStatus,
         regulations,
         organizerUserId,
@@ -224,6 +230,7 @@ export class TournamentModel {
     status?: TournamentStatus,
     regulations?: string | null,
     ratingFixedDate?: string | null,
+    conductedOnline?: boolean,
   ): Promise<boolean> {
     const updates: string[] = [];
     const values: any[] = [];
@@ -263,6 +270,10 @@ export class TournamentModel {
     if (ratingFixedDate !== undefined) {
       updates.push("rating_fixed_date = ?");
       values.push(ratingFixedDate);
+    }
+    if (conductedOnline !== undefined) {
+      updates.push("conducted_online = ?");
+      values.push(conductedOnline ? 1 : 0);
     }
 
     if (updates.length === 0) {

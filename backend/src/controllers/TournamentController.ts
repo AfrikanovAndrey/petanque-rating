@@ -1294,7 +1294,7 @@ export class TournamentController {
         const replaceFinished = options?.replaceFinishedResults === true;
         if (existingId !== undefined) {
           const [lockRows] = await connection.query<RowDataPacket[]>(
-            "SELECT id, status, type, category, date FROM tournaments WHERE id = ? FOR UPDATE",
+            "SELECT id, status, type, category, date, conducted_online FROM tournaments WHERE id = ? FOR UPDATE",
             [existingId]
           );
           const row = lockRows[0] as
@@ -1304,6 +1304,7 @@ export class TournamentController {
                 type: string;
                 category: string;
                 date: string | Date;
+                conducted_online?: number | boolean | null;
               }
             | undefined;
           if (!row) {
@@ -1315,10 +1316,23 @@ export class TournamentController {
                 "Перезапись результатов доступна только для завершённых турниров"
               );
             }
-          } else if (row.status !== TournamentStatus.IN_PROGRESS) {
-            throw new Error(
-              "Загрузка результатов в существующий турнир доступна только в статусе «В процессе»"
-            );
+          } else {
+            const conductedOnline =
+              row.conducted_online === undefined ||
+              row.conducted_online === null
+                ? true
+                : Boolean(Number(row.conducted_online));
+            const canUpload =
+              row.status === TournamentStatus.IN_PROGRESS ||
+              (row.status === TournamentStatus.FINAL_REGISTRATION &&
+                !conductedOnline);
+            if (!canUpload) {
+              throw new Error(
+                row.status === TournamentStatus.FINAL_REGISTRATION
+                  ? "Загрузка на финальной регистрации доступна только если турнир не проводится онлайн в системе"
+                  : "Загрузка результатов в существующий турнир доступна только в статусе «В процессе» или на финальной регистрации без онлайн-ведения"
+              );
+            }
           }
           if (row.type !== tournamentType) {
             throw new Error(
