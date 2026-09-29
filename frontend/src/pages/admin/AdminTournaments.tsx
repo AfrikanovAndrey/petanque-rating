@@ -771,18 +771,6 @@ const AdminTournaments: React.FC = () => {
                             >
                               <PencilIcon className="h-4 w-4" />
                             </button>
-                          </>
-                        )}
-                        {hasAnyUserRole(currentUser, [UserRole.ADMIN]) && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => openOrganizerModal(tournament)}
-                              className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
-                              title="Сменить организатора"
-                            >
-                              <UserCircleIcon className="h-4 w-4" />
-                            </button>
                             <button
                               type="button"
                               onClick={() =>
@@ -795,6 +783,16 @@ const AdminTournaments: React.FC = () => {
                               <TrashIcon className="h-4 w-4" />
                             </button>
                           </>
+                        )}
+                        {hasAnyUserRole(currentUser, [UserRole.ADMIN]) && (
+                          <button
+                            type="button"
+                            onClick={() => openOrganizerModal(tournament)}
+                            className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
+                            title="Сменить организатора"
+                          >
+                            <UserCircleIcon className="h-4 w-4" />
+                          </button>
                         )}
                       </div>
                     </td>

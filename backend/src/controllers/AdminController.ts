@@ -5217,7 +5217,7 @@ export class AdminController {
     }
   }
 
-  // Удалить турнир (админ)
+  // Удалить турнир (ADMIN или организатор — см. requireTournamentOrganizerOrAdmin)
   static async deleteTournament(req: Request, res: Response): Promise<void> {
     try {
       const tournamentId = parseInt(req.params.tournamentId);

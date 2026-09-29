@@ -595,12 +595,11 @@ router.put(
   AdminController.setTournamentOrganizer,
 );
 
-// DELETE /api/admin/tournaments/:tournamentId - удалить турнир (только ADMIN)
+// DELETE /api/admin/tournaments/:tournamentId - удалить турнир (ADMIN или организатор)
 router.delete(
   "/tournaments/:tournamentId",
   requireTournamentStaff,
   requireTournamentOrganizerOrAdmin,
-  requireAdmin,
   auditLogDelete({
     action: "DELETE_TOURNAMENT",
     entityType: "tournament",
