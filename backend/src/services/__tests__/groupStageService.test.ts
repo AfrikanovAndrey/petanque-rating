@@ -5,6 +5,8 @@ import {
   computeFrenchGroupStandings,
   computeGroupStandings,
   getCrossTableCell,
+  isFrenchGroupMatches,
+  validateGroupRoundPairings,
 } from "../groupStageService";
 
 describe("generateRoundRobinFixtures", () => {
@@ -22,6 +24,74 @@ describe("generateRoundRobinFixtures", () => {
     const fixtures = generateRoundRobinFixtures(1, [1, 2, 3, 4, 5]);
     expect(fixtures).toHaveLength(10);
     expect(new Set(fixtures.map((f) => f.round_number)).size).toBe(5);
+  });
+
+  it("для 6 команд: в каждом туре команда не более чем в одном матче", () => {
+    const teamIds = [1406, 1839, 1911, 1900, 1834, 1958];
+    const fixtures = generateRoundRobinFixtures(1, teamIds);
+    expect(validateGroupRoundPairings(fixtures)).toBeNull();
+    for (let round = 1; round <= 5; round++) {
+      const teamsInRound = fixtures
+        .filter((f) => f.round_number === round)
+        .flatMap((f) => [f.team_a_id, f.team_b_id]);
+      expect(teamsInRound.length).toBe(new Set(teamsInRound).size);
+    }
+  });
+});
+
+describe("isFrenchGroupMatches", () => {
+  it("круговая группа не считается французской сеткой", () => {
+    const fixtures = generateRoundRobinFixtures(3, [1955, 1900, 1904, 57, 1958]);
+    expect(isFrenchGroupMatches(fixtures)).toBe(false);
+  });
+
+  it("французская сетка определяется по ссылкам на следующие матчи", () => {
+    const fixtures = generateFrenchSystemFixtures(1, [1, 2, 3, 4]);
+    expect(isFrenchGroupMatches(fixtures)).toBe(true);
+  });
+});
+
+describe("validateGroupRoundPairings", () => {
+  it("отклоняет две записи одной команды в туре", () => {
+    const err = validateGroupRoundPairings([
+      {
+        group_number: 1,
+        round_number: 3,
+        team_a_id: 1834,
+        team_b_id: 1900,
+      },
+      {
+        group_number: 1,
+        round_number: 3,
+        team_a_id: 1834,
+        team_b_id: 1911,
+      },
+      {
+        group_number: 1,
+        round_number: 3,
+        team_a_id: 1958,
+        team_b_id: 1839,
+      },
+    ]);
+    expect(err).toMatch(/группе 1, туре 3.*1834/);
+  });
+
+  it("допускает пустые слоты французской сетки", () => {
+    const err = validateGroupRoundPairings([
+      {
+        group_number: 1,
+        round_number: 2,
+        team_a_id: null,
+        team_b_id: null,
+      },
+      {
+        group_number: 1,
+        round_number: 2,
+        team_a_id: 10,
+        team_b_id: 20,
+      },
+    ]);
+    expect(err).toBeNull();
   });
 });
 

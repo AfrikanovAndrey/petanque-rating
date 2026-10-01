@@ -30,6 +30,7 @@ import {
   getTournamentTypeIcons,
   hasAnyUserRole,
   canManageTournamentData,
+  canDeleteTournament,
   handleApiError,
   hasActiveTournamentFilters,
   loadAdminTournamentFiltersFromCookie,
@@ -540,6 +541,8 @@ const AdminTournaments: React.FC = () => {
                     currentUser,
                     tournament
                   );
+                  const canDeleteThis =
+                    canManageThis && canDeleteTournament(currentUser, tournament);
                   const opensSnapshotView =
                     isFinished ||
                     ((isRegistration ||
@@ -771,17 +774,19 @@ const AdminTournaments: React.FC = () => {
                             >
                               <PencilIcon className="h-4 w-4" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleDelete(tournament.id, tournament.name)
-                              }
-                              disabled={deleteMutation.isLoading}
-                              className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                              title="Удалить турнир"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
+                            {canDeleteThis && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDelete(tournament.id, tournament.name)
+                                }
+                                disabled={deleteMutation.isLoading}
+                                className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
+                                title="Удалить турнир"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
                           </>
                         )}
                         {hasAnyUserRole(currentUser, [UserRole.ADMIN]) && (

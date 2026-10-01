@@ -17,6 +17,8 @@ import { UserModel } from "../models/UserModel";
 import {
   buildGroupStageViews,
   frenchFixturesOutdated,
+  isFrenchGroupMatches,
+  validateGroupRoundPairings,
   validateMatchScores,
 } from "../services/groupStageService";
 import {
@@ -1706,6 +1708,32 @@ export class AdminController {
         }
       }
 
+      const groupMatchesBefore =
+        await TournamentGroupMatchModel.listByTournament(tournamentId).then(
+          (rows) => rows.filter((m) => m.group_number === match.group_number),
+        );
+      const frenchBracket = isFrenchGroupMatches(groupMatchesBefore);
+      const prevWinner =
+        hadScore &&
+        match.team_a_id != null &&
+        match.team_b_id != null &&
+        match.score_a != null &&
+        match.score_b != null
+          ? match.score_a > match.score_b
+            ? match.team_a_id
+            : match.team_b_id
+          : null;
+      const prevLoser =
+        hadScore &&
+        match.team_a_id != null &&
+        match.team_b_id != null &&
+        match.score_a != null &&
+        match.score_b != null
+          ? match.score_a > match.score_b
+            ? match.team_b_id
+            : match.team_a_id
+          : null;
+
       const saved = await TournamentGroupMatchModel.updateScores(
         matchId,
         scoreA,
@@ -1720,29 +1748,60 @@ export class AdminController {
         return;
       }
 
-      if (body.clear === true && hadScore) {
-        await AdminController.advanceFrenchGroupWinner(match, null, null);
-        await AdminController.syncFrenchGroupThirdPlace(
-          tournamentId,
-          match.group_number,
-        );
-      } else if (
-        scoreA != null &&
-        scoreB != null &&
-        match.team_a_id != null &&
-        match.team_b_id != null
-      ) {
-        const winnerId = scoreA > scoreB ? match.team_a_id : match.team_b_id;
-        const loserId = scoreA > scoreB ? match.team_b_id : match.team_a_id;
-        await AdminController.advanceFrenchGroupWinner(
-          match,
-          winnerId,
-          loserId,
-        );
-        await AdminController.syncFrenchGroupThirdPlace(
-          tournamentId,
-          match.group_number,
-        );
+      if (frenchBracket) {
+        if (body.clear === true && hadScore) {
+          await AdminController.advanceFrenchGroupWinner(match, null, null);
+          await AdminController.syncFrenchGroupThirdPlace(
+            tournamentId,
+            match.group_number,
+          );
+        } else if (
+          scoreA != null &&
+          scoreB != null &&
+          match.team_a_id != null &&
+          match.team_b_id != null
+        ) {
+          const winnerId = scoreA > scoreB ? match.team_a_id : match.team_b_id;
+          const loserId = scoreA > scoreB ? match.team_b_id : match.team_a_id;
+          await AdminController.advanceFrenchGroupWinner(
+            match,
+            winnerId,
+            loserId,
+          );
+          await AdminController.syncFrenchGroupThirdPlace(
+            tournamentId,
+            match.group_number,
+          );
+        }
+      }
+
+      if (frenchBracket) {
+        const groupMatches = (
+          await TournamentGroupMatchModel.listByTournament(tournamentId)
+        ).filter((m) => m.group_number === match.group_number);
+        const pairingError = validateGroupRoundPairings(groupMatches);
+        if (pairingError) {
+          await TournamentGroupMatchModel.updateScores(
+            matchId,
+            match.score_a,
+            match.score_b,
+            match.court,
+          );
+          await AdminController.advanceFrenchGroupWinner(
+            match,
+            prevWinner,
+            prevLoser,
+          );
+          await AdminController.syncFrenchGroupThirdPlace(
+            tournamentId,
+            match.group_number,
+          );
+          res.status(400).json({
+            success: false,
+            message: pairingError,
+          });
+          return;
+        }
       }
 
       const teams =
@@ -2826,6 +2885,10 @@ export class AdminController {
   ): Promise<void> {
     const all = await TournamentGroupMatchModel.listByTournament(tournamentId);
     const groupMatches = all.filter((m) => m.group_number === groupNumber);
+
+    if (!isFrenchGroupMatches(groupMatches)) {
+      return;
+    }
 
     // Новая схема: round 3. Старая: is_third_place.
     const placement =
@@ -4934,7 +4997,10 @@ export class AdminController {
       console.error("Ошибка перехода к проведению турнира:", error);
       res.status(500).json({
         success: false,
-        message: "Внутренняя ошибка сервера",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Внутренняя ошибка сервера",
       });
     }
   }
@@ -5220,6 +5286,7 @@ export class AdminController {
   // Удалить турнир (ADMIN или организатор — см. requireTournamentOrganizerOrAdmin)
   static async deleteTournament(req: Request, res: Response): Promise<void> {
     try {
+      const authReq = req as AuthRequest;
       const tournamentId = parseInt(req.params.tournamentId);
 
       if (isNaN(tournamentId)) {
@@ -5232,7 +5299,7 @@ export class AdminController {
 
       // Получаем информацию о турнире перед удалением
       const [tournaments] = await pool.execute<RowDataPacket[]>(
-        "SELECT date, type FROM tournaments WHERE id = ?",
+        "SELECT date, type, status, results_validated_at FROM tournaments WHERE id = ?",
         [tournamentId]
       );
 
@@ -5244,8 +5311,29 @@ export class AdminController {
         return;
       }
 
-      const tournamentDate = tournaments[0].date;
-      const tournamentType = tournaments[0].type as TournamentType;
+      const row = tournaments[0];
+      const tournamentDate = row.date;
+      const tournamentType = row.type as TournamentType;
+      const userRoles =
+        authReq.userRoles && authReq.userRoles.length > 0
+          ? authReq.userRoles
+          : authReq.userRole
+            ? [authReq.userRole]
+            : [];
+      const isAdmin = userRoles.includes(UserRole.ADMIN);
+
+      if (
+        !isAdmin &&
+        row.status === TournamentStatus.FINISHED &&
+        row.results_validated_at != null
+      ) {
+        res.status(403).json({
+          success: false,
+          message:
+            "Нельзя удалить завершённый турнир с признанными для рейтинга результатами. Обратитесь к администратору.",
+        });
+        return;
+      }
 
       const success = await TournamentModel.deleteTournament(tournamentId);
 

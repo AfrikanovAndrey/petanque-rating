@@ -344,6 +344,63 @@ export function generateFrenchSystemFixtures(
   ];
 }
 
+export type GroupRoundPairingCheck = {
+  group_number: number;
+  round_number: number;
+  team_a_id: number | null;
+  team_b_id: number | null;
+};
+
+/**
+ * В одном туре группы команда не может участвовать более чем в одном матче.
+ * Пустые слоты (французская система) не учитываются.
+ */
+export function validateGroupRoundPairings(
+  fixtures: GroupRoundPairingCheck[],
+): string | null {
+  const byGroupRound = new Map<string, GroupRoundPairingCheck[]>();
+  for (const f of fixtures) {
+    const key = `${f.group_number}:${f.round_number}`;
+    const list = byGroupRound.get(key);
+    if (list) {
+      list.push(f);
+    } else {
+      byGroupRound.set(key, [f]);
+    }
+  }
+
+  for (const [key, roundMatches] of byGroupRound) {
+    const [groupStr, roundStr] = key.split(":");
+    const groupNumber = Number(groupStr);
+    const roundNumber = Number(roundStr);
+    const teamCounts = new Map<number, number>();
+
+    for (const m of roundMatches) {
+      if (
+        m.team_a_id != null &&
+        m.team_b_id != null &&
+        m.team_a_id === m.team_b_id
+      ) {
+        return `В группе ${groupNumber}, туре ${roundNumber} команда #${m.team_a_id} указана против самой себя`;
+      }
+      for (const teamId of [m.team_a_id, m.team_b_id]) {
+        if (teamId == null) {
+          continue;
+        }
+        teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1);
+      }
+    }
+
+    for (const [teamId, count] of teamCounts) {
+      if (count > 1) {
+        return `В группе ${groupNumber}, туре ${roundNumber} команда #${teamId} указана в ${count} матчах (допустим не более одного)`;
+      }
+    }
+  }
+
+  return null;
+}
+
 /** Фикстуры для всех групп жеребьёвки; дорожки сквозные по турниру. */
 export function generateAllGroupFixtures(
   groupDraw: TournamentGroupDrawGroup[],
@@ -369,6 +426,12 @@ export function generateAllGroupFixtures(
       nextCourt = Math.max(...fixtures.map((f) => f.court)) + 1;
     }
   }
+
+  const pairingError = validateGroupRoundPairings(all);
+  if (pairingError) {
+    throw new Error(pairingError);
+  }
+
   return all;
 }
 

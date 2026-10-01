@@ -224,6 +224,31 @@ export function canManageTournamentData(
   return user.id != null && tournament.organizer_user_id === user.id;
 }
 
+/**
+ * Удаление турнира: ADMIN — всегда; организатор — не FINISHED с признанными результатами.
+ */
+export function canDeleteTournament(
+  user: { id?: number; role?: UserRole; roles?: UserRole[] } | null | undefined,
+  tournament: {
+    status?: TournamentStatus;
+    results_validated_at?: string | null;
+  } | null | undefined
+): boolean {
+  if (!user || !tournament) {
+    return false;
+  }
+  if (hasAnyUserRole(user, [UserRole.ADMIN])) {
+    return true;
+  }
+  if (
+    tournament.status === TournamentStatus.FINISHED &&
+    tournament.results_validated_at
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /** Стартовая страница админки после входа в зависимости от роли(ей) */
 export function getAdminHomePath(roleOrRoles: UserRole | UserRole[]): string {
   const roles = Array.isArray(roleOrRoles) ? roleOrRoles : [roleOrRoles];

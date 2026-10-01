@@ -131,8 +131,8 @@ export class TournamentGroupMatchModel {
     frenchSystem: boolean = false,
     connection?: PoolConnection,
   ): Promise<number> {
-    await this.deleteByTournament(tournamentId, connection);
     const fixtures = generateAllGroupFixtures(groupDraw, { frenchSystem });
+    await this.deleteByTournament(tournamentId, connection);
     await this.insertFixtures(tournamentId, fixtures, connection);
     return fixtures.length;
   }
