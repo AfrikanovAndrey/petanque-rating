@@ -907,7 +907,7 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card min-w-0 overflow-hidden">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left hover:bg-gray-50"
@@ -930,7 +930,7 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
       </button>
 
       {sectionOpen && (
-        <div className="space-y-4 border-t border-gray-200 px-6 py-4">
+        <div className="min-w-0 space-y-4 border-t border-gray-200 px-6 py-4">
           <div
             className="flex flex-wrap gap-1 border-b border-gray-200"
             role="tablist"
@@ -991,14 +991,14 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                   )}
                 </div>
               ) : null}
-              <div className="flex justify-center overflow-x-auto">
-                <table className="w-auto border-collapse text-sm">
+              <div className="min-w-0 w-full overflow-x-auto">
+                <table className="min-w-max w-auto border-collapse text-sm">
                   <thead>
                     <tr className="bg-gray-50">
                       <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
                         Место
                       </th>
-                      <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600">
+                      <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-left font-medium text-gray-600 min-w-[8rem]">
                         Команда
                       </th>
                       <th className="whitespace-nowrap border border-gray-200 px-2 py-1.5 text-center font-medium text-gray-600">
@@ -1038,8 +1038,8 @@ export const TournamentSwissStageResults: React.FC<Props> = ({
                           <td className="whitespace-nowrap border border-gray-200 px-2 py-1 text-center font-semibold text-gray-900">
                             {swiss.completed_rounds > 0 ? row.place : "—"}
                           </td>
-                          <td className="border border-gray-200 px-2 py-1 font-medium text-gray-900">
-                            <div className="whitespace-nowrap">{name}</div>
+                          <td className="whitespace-nowrap border border-gray-200 px-2 py-1 font-medium text-gray-900">
+                            <div>{name}</div>
                             {withdrawnFrom != null && (
                               <div className="mt-0.5 text-xs font-normal text-amber-800">
                                 Команда снялась с {withdrawnFrom} тура
