@@ -822,6 +822,7 @@ export const clubsApi = {
           player_id: number;
           player_name: string;
           city: string | null;
+          license_number: string | null;
           joined_at: string;
           created_at: string;
         }[];
