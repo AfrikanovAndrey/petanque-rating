@@ -5,7 +5,11 @@ import {
 
 export const ALL_TIEBREAKER_CRITERIA: TiebreakerCriterion[] = [
   TiebreakerCriterion.BUCHHOLZ,
-  TiebreakerCriterion.DOUBLE_BUCHHOLZ,
+  TiebreakerCriterion.TOTAL_BUCHHOLZ,
+  TiebreakerCriterion.AVERAGED_BUCHHOLZ_1,
+  TiebreakerCriterion.AVERAGED_BUCHHOLZ_2,
+  TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1,
+  TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2,
   TiebreakerCriterion.BERGER,
   TiebreakerCriterion.PROGRESS,
   TiebreakerCriterion.POINT_DIFF,
@@ -19,8 +23,16 @@ export function getTiebreakerLabel(criterion: TiebreakerCriterion): string {
   switch (criterion) {
     case TiebreakerCriterion.BUCHHOLZ:
       return "Коэффициент Бухгольца";
-    case TiebreakerCriterion.DOUBLE_BUCHHOLZ:
-      return "Коэффициент двойной Бухгольца";
+    case TiebreakerCriterion.TOTAL_BUCHHOLZ:
+      return "Суммарный Бухгольц";
+    case TiebreakerCriterion.AVERAGED_BUCHHOLZ_1:
+      return "Усреднённый Бухгольц-1";
+    case TiebreakerCriterion.AVERAGED_BUCHHOLZ_2:
+      return "Усреднённый Бухгольц-2";
+    case TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1:
+      return "Усечённый Бухгольц-1";
+    case TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2:
+      return "Усечённый Бухгольц-2";
     case TiebreakerCriterion.BERGER:
       return "Коэффициент Бергера";
     case TiebreakerCriterion.PROGRESS:
@@ -37,8 +49,16 @@ export function getTiebreakerShortLabel(criterion: TiebreakerCriterion): string 
   switch (criterion) {
     case TiebreakerCriterion.BUCHHOLZ:
       return "Бухгольц";
-    case TiebreakerCriterion.DOUBLE_BUCHHOLZ:
-      return "Дв. Бухгольц";
+    case TiebreakerCriterion.TOTAL_BUCHHOLZ:
+      return "Сумм. Бух.";
+    case TiebreakerCriterion.AVERAGED_BUCHHOLZ_1:
+      return "Уср. Бух.-1";
+    case TiebreakerCriterion.AVERAGED_BUCHHOLZ_2:
+      return "Уср. Бух.-2";
+    case TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1:
+      return "Усеч. Бух.-1";
+    case TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2:
+      return "Усеч. Бух.-2";
     case TiebreakerCriterion.BERGER:
       return "Бергер";
     case TiebreakerCriterion.PROGRESS:

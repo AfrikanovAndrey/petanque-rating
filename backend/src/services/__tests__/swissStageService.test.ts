@@ -717,6 +717,67 @@ describe("computeSwissStandings", () => {
     expect(byId.get(4)!.tiebreakers.BUCHHOLZ).toBe(2);
   });
 
+  it("считает варианты Бухгольца по результатам соперников", () => {
+    const seeds = seedsFromIds([1, 2, 3, 4]);
+    // Тур 1: 1–3 (1 победил), 2–4 (2 победил)
+    // Тур 2: 1–2 (1 победил), 3–4 (3 победил)
+    // wins: 1=2, 2=1, 3=1, 4=0
+    const matches: SwissMatchScores[] = [
+      {
+        round_number: 1,
+        team_a_id: 1,
+        team_b_id: 3,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 1,
+        team_a_id: 2,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+      {
+        round_number: 2,
+        team_a_id: 1,
+        team_b_id: 2,
+        score_a: 13,
+        score_b: 5,
+        is_bye: false,
+      },
+      {
+        round_number: 2,
+        team_a_id: 3,
+        team_b_id: 4,
+        score_a: 13,
+        score_b: 0,
+        is_bye: false,
+      },
+    ];
+    const criteria = [
+      TiebreakerCriterion.BUCHHOLZ,
+      TiebreakerCriterion.TOTAL_BUCHHOLZ,
+      TiebreakerCriterion.AVERAGED_BUCHHOLZ_1,
+      TiebreakerCriterion.AVERAGED_BUCHHOLZ_2,
+      TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1,
+      TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2,
+    ];
+    const standings = computeSwissStandings(seeds, matches, criteria);
+    const byId = new Map(standings.map((s) => [s.team_id, s]));
+    // Команда 1: соперники 3 (1) и 2 (1) → Бух=2, уср.-1=0, усеч.-1=2
+    expect(byId.get(1)!.tiebreakers.BUCHHOLZ).toBe(2);
+    expect(byId.get(1)!.tiebreakers.AVERAGED_BUCHHOLZ_1).toBe(0);
+    expect(byId.get(1)!.tiebreakers.TRUNCATED_BUCHHOLZ_1).toBe(1);
+    expect(byId.get(1)!.tiebreakers.TRUNCATED_BUCHHOLZ_2).toBe(0);
+    // Суммарный: buchholz(3)+buchholz(2) = (2+0)+(0+2)=4
+    expect(byId.get(1)!.tiebreakers.TOTAL_BUCHHOLZ).toBe(4);
+    // Команда 2: соперники 4 (0) и 1 (2) → Бух=2, уср.-1=0
+    expect(byId.get(2)!.tiebreakers.BUCHHOLZ).toBe(2);
+    expect(byId.get(2)!.tiebreakers.AVERAGED_BUCHHOLZ_1).toBe(0);
+  });
+
   it("матч со «Свободен»: 1 победа, разница +6, Бухгольц 0", () => {
     const seeds = seedsFromIds([1, 2, 3]);
     // Тур 1: 1–2, 3–Свободен → wins: 1=1, 2=0, 3=1, FREE=0

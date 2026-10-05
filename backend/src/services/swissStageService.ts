@@ -1193,10 +1193,60 @@ function collectEncounters(
   return byTeam;
 }
 
+/** Победы соперников (по одному значению на каждую встречу). */
+function opponentWinScores(
+  enc: PlayedEncounter[],
+  winsByTeam: Map<number, number>,
+): number[] {
+  return enc.map((e) => winsByTeam.get(e.opponentId) ?? 0);
+}
+
+/**
+ * Бухгольц минус k наименьших и h наибольших результатов соперников
+ * (без повторного вычитания одной и той же встречи).
+ */
+function buchholzCut(
+  opponentWins: number[],
+  dropLow: number,
+  dropHigh: number,
+): number {
+  const total = opponentWins.reduce((sum, v) => sum + v, 0);
+  if (opponentWins.length === 0) {
+    return 0;
+  }
+  const sorted = [...opponentWins].sort((a, b) => a - b);
+  const n = sorted.length;
+  const removeLow = Math.min(dropLow, n);
+  const removeHigh = Math.min(dropHigh, n - removeLow);
+  let subtract = 0;
+  for (let i = 0; i < removeLow; i++) {
+    subtract += sorted[i];
+  }
+  for (let i = 0; i < removeHigh; i++) {
+    subtract += sorted[n - 1 - i];
+  }
+  return total - subtract;
+}
+
+function needsOpponentWinBuchholz(needed: Set<TiebreakerCriterion>): boolean {
+  return (
+    needed.has(TiebreakerCriterion.BUCHHOLZ) ||
+    needed.has(TiebreakerCriterion.TOTAL_BUCHHOLZ) ||
+    needed.has(TiebreakerCriterion.DOUBLE_BUCHHOLZ) ||
+    needed.has(TiebreakerCriterion.AVERAGED_BUCHHOLZ_1) ||
+    needed.has(TiebreakerCriterion.AVERAGED_BUCHHOLZ_2) ||
+    needed.has(TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1) ||
+    needed.has(TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2) ||
+    needed.has(TiebreakerCriterion.BERGER)
+  );
+}
+
 /**
  * Доп. показатели швейцарки.
  * Бухгольц = сумма побед всех оппонентов за турнир (у «Свободен» обычно 0).
- * Двойной Бухгольц = сумма Бухгольцев оппонентов.
+ * Суммарный Бухгольц = сумма Бухгольцев оппонентов.
+ * Усреднённый Бухгольц-1/2 — без 1/2 наименьших и 1/2 наибольших результатов соперников.
+ * Усечённый Бухгольц-1/2 — без 1/2 наименьших результатов соперников.
  * Бергер = Σ (победы_соперника × множитель), где множитель = 1 при победе
  * над соперником и 0 при поражении ему (поражения не учитываются).
  * Прогресс = сумма «текущих побед» после каждого сыгранного тура.
@@ -1220,18 +1270,14 @@ export function computeSwissTiebreakers(
   }
 
   const buchholz = new Map<number, number>();
-  if (
-    needed.has(TiebreakerCriterion.BUCHHOLZ) ||
-    needed.has(TiebreakerCriterion.DOUBLE_BUCHHOLZ) ||
-    needed.has(TiebreakerCriterion.BERGER)
-  ) {
+  if (needsOpponentWinBuchholz(needed)) {
     for (const id of teamIds) {
       const enc = encounters.get(id) ?? [];
-      let sum = 0;
-      for (const e of enc) {
-        sum += winsByTeam.get(e.opponentId) ?? 0;
-      }
-      buchholz.set(id, sum);
+      const scores = opponentWinScores(enc, winsByTeam);
+      buchholz.set(
+        id,
+        scores.reduce((sum, v) => sum + v, 0),
+      );
     }
   }
 
@@ -1241,14 +1287,61 @@ export function computeSwissTiebreakers(
     }
   }
 
-  if (needed.has(TiebreakerCriterion.DOUBLE_BUCHHOLZ)) {
+  const needsTotalBuchholz =
+    needed.has(TiebreakerCriterion.TOTAL_BUCHHOLZ) ||
+    needed.has(TiebreakerCriterion.DOUBLE_BUCHHOLZ);
+  if (needsTotalBuchholz) {
     for (const id of teamIds) {
       const enc = encounters.get(id) ?? [];
       let sum = 0;
       for (const e of enc) {
         sum += buchholz.get(e.opponentId) ?? 0;
       }
-      result.get(id)![TiebreakerCriterion.DOUBLE_BUCHHOLZ] = sum;
+      result.get(id)![TiebreakerCriterion.TOTAL_BUCHHOLZ] = sum;
+    }
+  }
+
+  if (needed.has(TiebreakerCriterion.AVERAGED_BUCHHOLZ_1)) {
+    for (const id of teamIds) {
+      const enc = encounters.get(id) ?? [];
+      result.get(id)![TiebreakerCriterion.AVERAGED_BUCHHOLZ_1] = buchholzCut(
+        opponentWinScores(enc, winsByTeam),
+        1,
+        1,
+      );
+    }
+  }
+
+  if (needed.has(TiebreakerCriterion.AVERAGED_BUCHHOLZ_2)) {
+    for (const id of teamIds) {
+      const enc = encounters.get(id) ?? [];
+      result.get(id)![TiebreakerCriterion.AVERAGED_BUCHHOLZ_2] = buchholzCut(
+        opponentWinScores(enc, winsByTeam),
+        2,
+        2,
+      );
+    }
+  }
+
+  if (needed.has(TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1)) {
+    for (const id of teamIds) {
+      const enc = encounters.get(id) ?? [];
+      result.get(id)![TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1] = buchholzCut(
+        opponentWinScores(enc, winsByTeam),
+        1,
+        0,
+      );
+    }
+  }
+
+  if (needed.has(TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2)) {
+    for (const id of teamIds) {
+      const enc = encounters.get(id) ?? [];
+      result.get(id)![TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2] = buchholzCut(
+        opponentWinScores(enc, winsByTeam),
+        2,
+        0,
+      );
     }
   }
 

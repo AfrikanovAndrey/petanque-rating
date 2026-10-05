@@ -1,4 +1,5 @@
 import {
+  parseTiebreakerOrder,
   performGroupDraw,
   validateManualGroupDraw,
   validatePlaySettings,
@@ -42,7 +43,7 @@ describe("validatePlaySettings", () => {
         swiss_rounds: 5,
         tiebreaker_order: [
           TiebreakerCriterion.BUCHHOLZ,
-          TiebreakerCriterion.DOUBLE_BUCHHOLZ,
+          TiebreakerCriterion.TOTAL_BUCHHOLZ,
           TiebreakerCriterion.BERGER,
           TiebreakerCriterion.PROGRESS,
           TiebreakerCriterion.POINT_DIFF,
@@ -72,6 +73,15 @@ describe("validatePlaySettings", () => {
         ],
       }),
     ).toBeNull();
+  });
+});
+
+describe("parseTiebreakerOrder", () => {
+  it("нормализует устаревший DOUBLE_BUCHHOLZ в TOTAL_BUCHHOLZ", () => {
+    expect(parseTiebreakerOrder(["DOUBLE_BUCHHOLZ", "BUCHHOLZ"])).toEqual([
+      TiebreakerCriterion.TOTAL_BUCHHOLZ,
+      TiebreakerCriterion.BUCHHOLZ,
+    ]);
   });
 });
 

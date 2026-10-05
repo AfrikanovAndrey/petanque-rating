@@ -6,13 +6,27 @@ import {
 
 export const DEFAULT_TIEBREAKER_ORDER: TiebreakerCriterion[] = [
   TiebreakerCriterion.BUCHHOLZ,
-  TiebreakerCriterion.DOUBLE_BUCHHOLZ,
+  TiebreakerCriterion.TOTAL_BUCHHOLZ,
   TiebreakerCriterion.BERGER,
   TiebreakerCriterion.PROGRESS,
   TiebreakerCriterion.POINT_DIFF,
 ];
 
-export const ALL_TIEBREAKER_CRITERIA = [...DEFAULT_TIEBREAKER_ORDER];
+export const ALL_TIEBREAKER_CRITERIA: TiebreakerCriterion[] = [
+  TiebreakerCriterion.BUCHHOLZ,
+  TiebreakerCriterion.TOTAL_BUCHHOLZ,
+  TiebreakerCriterion.AVERAGED_BUCHHOLZ_1,
+  TiebreakerCriterion.AVERAGED_BUCHHOLZ_2,
+  TiebreakerCriterion.TRUNCATED_BUCHHOLZ_1,
+  TiebreakerCriterion.TRUNCATED_BUCHHOLZ_2,
+  TiebreakerCriterion.BERGER,
+  TiebreakerCriterion.PROGRESS,
+  TiebreakerCriterion.POINT_DIFF,
+];
+
+const LEGACY_TIEBREAKER_ALIASES: Record<string, TiebreakerCriterion> = {
+  DOUBLE_BUCHHOLZ: TiebreakerCriterion.TOTAL_BUCHHOLZ,
+};
 
 export interface TournamentPlaySettingsInput {
   play_format: TournamentPlayFormat;
@@ -33,10 +47,24 @@ export function parseTiebreakerOrder(
     return null;
   }
   const allowed = new Set(Object.values(TiebreakerCriterion));
-  const parsed = raw.filter(
-    (item): item is TiebreakerCriterion =>
-      typeof item === "string" && allowed.has(item as TiebreakerCriterion),
-  );
+  const parsed: TiebreakerCriterion[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const normalized =
+      LEGACY_TIEBREAKER_ALIASES[item] ??
+      (allowed.has(item as TiebreakerCriterion)
+        ? (item as TiebreakerCriterion)
+        : null);
+    if (
+      normalized != null &&
+      normalized !== TiebreakerCriterion.DOUBLE_BUCHHOLZ &&
+      !parsed.includes(normalized)
+    ) {
+      parsed.push(normalized);
+    }
+  }
   return parsed.length > 0 ? parsed : null;
 }
 

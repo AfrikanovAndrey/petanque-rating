@@ -160,6 +160,7 @@ export class ClubController {
             player_id: m.player_id,
             player_name: m.player_name,
             city: m.city ?? null,
+            license_number: m.license_number ?? null,
             joined_at: m.joined_at,
             created_at: m.created_at,
           })),

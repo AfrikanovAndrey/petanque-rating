@@ -35,7 +35,13 @@ export enum TournamentPlayFormat {
 
 export enum TiebreakerCriterion {
   BUCHHOLZ = "BUCHHOLZ",
+  /** @deprecated в БД — миграция на TOTAL_BUCHHOLZ; при чтении нормализуется в parseTiebreakerOrder */
   DOUBLE_BUCHHOLZ = "DOUBLE_BUCHHOLZ",
+  TOTAL_BUCHHOLZ = "TOTAL_BUCHHOLZ",
+  AVERAGED_BUCHHOLZ_1 = "AVERAGED_BUCHHOLZ_1",
+  AVERAGED_BUCHHOLZ_2 = "AVERAGED_BUCHHOLZ_2",
+  TRUNCATED_BUCHHOLZ_1 = "TRUNCATED_BUCHHOLZ_1",
+  TRUNCATED_BUCHHOLZ_2 = "TRUNCATED_BUCHHOLZ_2",
   BERGER = "BERGER",
   PROGRESS = "PROGRESS",
   POINT_DIFF = "POINT_DIFF",

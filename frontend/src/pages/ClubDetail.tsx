@@ -97,6 +97,9 @@ const ClubDetail: React.FC = () => {
                   Город
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Лицензия
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Дата вступления
                 </th>
               </tr>
@@ -105,7 +108,7 @@ const ClubDetail: React.FC = () => {
               {club.members.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={4}
                     className="px-4 py-8 text-center text-gray-500"
                   >
                     Состав пока не указан
@@ -119,6 +122,9 @@ const ClubDetail: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {m.city || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {m.license_number || "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {m.joined_at
