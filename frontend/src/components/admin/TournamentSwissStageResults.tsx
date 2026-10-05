@@ -118,7 +118,7 @@ function openPrintWindow(documentTitle: string, bodyHtml: string): void {
     .match .a { text-align: right; }
     .match .b { text-align: left; }
     .match .score { font-weight: 600; min-width: 1.5rem; text-align: center; }
-    .match .court { color: #555; font-size: 12px; white-space: nowrap; }
+    .match .match-court { color: #555; font-size: 12px; white-space: nowrap; }
     @media print {
       body { margin: 12px; }
     }
@@ -143,7 +143,7 @@ ${bodyHtml}
   window.setTimeout(triggerPrint, 100);
 }
 
-function buildStandingsPrintHtml(options: {
+export function buildStandingsPrintHtml(options: {
   tournamentName?: string;
   title: string;
   sortLegend: string;
@@ -216,7 +216,7 @@ function buildStandingsPrintHtml(options: {
   `;
 }
 
-function buildRoundPrintHtml(options: {
+export function buildRoundPrintHtml(options: {
   tournamentName?: string;
   roundNumber: number;
   matches: TournamentSwissMatchView[];
@@ -254,7 +254,7 @@ function buildRoundPrintHtml(options: {
         <span>:</span>
         <span class="score">${scoreB}</span>
         <span class="b">${bName}</span>
-        <span class="court">дорожка ${escapeHtml(court)}</span>
+        <span class="match-court">дорожка ${escapeHtml(court)}</span>
       </div>`;
     })
     .join("");

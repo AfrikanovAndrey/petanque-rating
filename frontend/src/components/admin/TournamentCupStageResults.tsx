@@ -133,49 +133,17 @@ function openPrintWindow(documentTitle: string, bodyHtml: string): void {
   <title>${escapeHtml(documentTitle)}</title>
   <style>
     @page { size: landscape; margin: 10mm; }
-    * { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; color: #111; margin: 16px; }
     h1 { font-size: 16px; margin: 0 0 2px; }
     .meta { color: #555; margin: 0 0 12px; font-size: 11px; }
-    .bracket { display: flex; align-items: flex-start; width: max-content; }
-    .col { display: flex; flex-direction: column; padding-left: 40px; }
-    .col-title { height: 14px; margin-bottom: 8px; text-align: center; font-size: 9px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
-    .col-body { position: relative; }
-    .mc { position: absolute; left: 0; width: ${MATCH_W}px; height: ${MATCH_H}px; }
-    .mc-stack { position: relative; width: ${MATCH_W}px; height: ${MATCH_H}px; margin-bottom: 12px; }
-    .court { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 36px;
-      text-align: center; font-size: 8px; color: #4b5563; line-height: 1.15; }
-    .court strong { display: inline-block; margin-top: 2px; min-width: 28px; padding: 2px 0;
-      border: 1.5px solid #f59e0b; background: #fffbeb; font-size: 11px; font-weight: 700; color: #78350f; }
-    .box { display: flex; width: 100%; height: 100%; overflow: hidden; border: 1px solid #000; background: #fff; border-radius: 2px; }
-    .names { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-    .row { flex: 1; display: flex; align-items: center; padding: 0 6px; min-height: 0; }
-    .row + .row { border-top: 1px solid rgba(0,0,0,0.15); }
-    .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-size: 10px; font-weight: 500; line-height: 1.2; }
-    .name.tbd { font-style: italic; color: #9ca3af; font-weight: 400; }
-    .scores { width: 28px; display: flex; flex-direction: column; border-left: 1px solid #000; }
-    .sc { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
-    .sc + .sc { border-top: 1px solid rgba(0,0,0,0.15); }
-    .conn { position: relative; flex-shrink: 0; width: ${CONNECTOR_W}px; }
-    .conn .h { position: absolute; left: 0; height: 2px; background: #000; }
-    .conn .v { position: absolute; left: 50%; width: 2px; background: #000; }
-    .place-label { position: absolute; left: 0; width: 100%; top: -14px; text-align: center;
-      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
-    .place-card { position: absolute; left: 0; width: ${MATCH_W}px; height: ${MATCH_H}px;
-      display: flex; align-items: center; }
-    .place-box { width: 100%; height: 28px; display: flex; align-items: center; padding: 0 6px;
-      border: 1px solid #000; background: #fff; border-radius: 2px; overflow: hidden; }
-    .stack-col { display: flex; flex-direction: column; gap: 12px; width: ${MATCH_W}px; }
+    ${CUP_BRACKET_PRINT_STYLES}
     @media print {
       body { margin: 8px; }
-      .bracket { page-break-inside: avoid; }
     }
   </style>
 </head>
 <body>
-${bodyHtml}
+<div class="cup-bracket-page cup-bracket-embed">${bodyHtml}</div>
 </body>
 </html>`);
   frameDocument.close();
@@ -268,7 +236,49 @@ function printConnectorsHtml(
   return `<div class="conn" style="height:${columnHeight}px;margin-top:22px">${lines.join("")}</div>`;
 }
 
-function buildCupBracketPrintHtml(options: {
+/** Стили печати турнирной сетки кубка (экспорт / полный отчёт турнира). */
+export const CUP_BRACKET_PRINT_STYLES = `
+  @page cup-landscape { size: landscape; margin: 10mm; }
+  .cup-bracket-page { page: cup-landscape; page-break-before: always; }
+  .cup-bracket-page.cup-bracket-embed { page: auto; page-break-before: auto; }
+  .cup-bracket-page, .cup-bracket-page * { box-sizing: border-box; }
+  .cup-bracket-page .bracket { display: flex; align-items: flex-start; width: max-content; }
+  .cup-bracket-page .col { display: flex; flex-direction: column; padding-left: 40px; }
+  .cup-bracket-page .col-title { height: 14px; margin-bottom: 8px; text-align: center; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
+  .cup-bracket-page .col-body { position: relative; }
+  .cup-bracket-page .mc { position: absolute; left: 0; width: ${MATCH_W}px; height: ${MATCH_H}px; }
+  .cup-bracket-page .mc-stack { position: relative; width: ${MATCH_W}px; height: ${MATCH_H}px; margin-bottom: 12px; }
+  .cup-bracket-page .court { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 36px;
+    text-align: center; font-size: 8px; color: #4b5563; line-height: 1.15; }
+  .cup-bracket-page .court strong { display: inline-block; margin-top: 2px; min-width: 28px; padding: 2px 0;
+    border: 1.5px solid #f59e0b; background: #fffbeb; font-size: 11px; font-weight: 700; color: #78350f; }
+  .cup-bracket-page .box { display: flex; width: 100%; height: 100%; overflow: hidden; border: 1px solid #000; background: #fff; border-radius: 2px; }
+  .cup-bracket-page .names { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .cup-bracket-page .row { flex: 1; display: flex; align-items: center; padding: 0 6px; min-height: 0; }
+  .cup-bracket-page .row + .row { border-top: 1px solid rgba(0,0,0,0.15); }
+  .cup-bracket-page .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 10px; font-weight: 500; line-height: 1.2; }
+  .cup-bracket-page .name.tbd { font-style: italic; color: #9ca3af; font-weight: 400; }
+  .cup-bracket-page .scores { width: 28px; display: flex; flex-direction: column; border-left: 1px solid #000; }
+  .cup-bracket-page .sc { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .cup-bracket-page .sc + .sc { border-top: 1px solid rgba(0,0,0,0.15); }
+  .cup-bracket-page .conn { position: relative; flex-shrink: 0; width: ${CONNECTOR_W}px; }
+  .cup-bracket-page .conn .h { position: absolute; left: 0; height: 2px; background: #000; }
+  .cup-bracket-page .conn .v { position: absolute; left: 50%; width: 2px; background: #000; }
+  .cup-bracket-page .place-label { position: absolute; left: 0; width: 100%; top: -14px; text-align: center;
+    font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
+  .cup-bracket-page .place-card { position: absolute; left: 0; width: ${MATCH_W}px; height: ${MATCH_H}px;
+    display: flex; align-items: center; }
+  .cup-bracket-page .place-box { width: 100%; height: 28px; display: flex; align-items: center; padding: 0 6px;
+    border: 1px solid #000; background: #fff; border-radius: 2px; overflow: hidden; }
+  .cup-bracket-page .stack-col { display: flex; flex-direction: column; gap: 12px; width: ${MATCH_W}px; }
+  @media print {
+    .cup-bracket-page .bracket { page-break-inside: avoid; }
+  }
+`;
+
+export function buildCupBracketPrintHtml(options: {
   tournamentName?: string;
   cupView: TournamentCupStageView;
 }): string {

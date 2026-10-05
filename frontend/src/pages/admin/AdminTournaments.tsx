@@ -1,4 +1,5 @@
 import {
+  ArrowDownTrayIcon,
   ArrowPathIcon,
   ArrowUpTrayIcon,
   BellAlertIcon,
@@ -39,6 +40,7 @@ import {
   type TournamentListFilters,
 } from "../../utils";
 import TournamentResultsUploadModal from "../../components/admin/TournamentResultsUploadModal";
+import { downloadTournamentFinishedPdf } from "../../utils/tournamentFinishedExport";
 import TournamentListFiltersPanel from "../../components/TournamentListFiltersPanel";
 import {
   Tournament,
@@ -85,6 +87,9 @@ const AdminTournaments: React.FC = () => {
   const [organizerModalUserId, setOrganizerModalUserId] = useState<number | "">(
     ""
   );
+  const [exportingTournamentId, setExportingTournamentId] = useState<
+    number | null
+  >(null);
 
   const queryClient = useQueryClient();
 
@@ -390,6 +395,23 @@ const AdminTournaments: React.FC = () => {
     setReplaceResultsModalOpen(true);
   };
 
+  const handleExportFinishedPdf = async (
+    tournamentId: number,
+    tournamentName: string
+  ) => {
+    setExportingTournamentId(tournamentId);
+    try {
+      await downloadTournamentFinishedPdf(tournamentId, tournamentName);
+      toast.success(
+        "Откроется печать — выберите «Сохранить как PDF» в диалоге"
+      );
+    } catch (error) {
+      toast.error(handleApiError(error));
+    } finally {
+      setExportingTournamentId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -685,6 +707,28 @@ const AdminTournaments: React.FC = () => {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex justify-end space-x-2">
+                        {isFinished && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleExportFinishedPdf(
+                                tournament.id,
+                                tournament.name
+                              )
+                            }
+                            disabled={exportingTournamentId === tournament.id}
+                            className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-100 disabled:opacity-50"
+                            title="Экспорт в PDF (диалог печати, полная информация о турнире)"
+                          >
+                            <ArrowDownTrayIcon
+                              className={`h-4 w-4 ${
+                                exportingTournamentId === tournament.id
+                                  ? "animate-pulse"
+                                  : ""
+                              }`}
+                            />
+                          </button>
+                        )}
                         {canValidateResults &&
                           tournament.status === TournamentStatus.FINISHED &&
                           (tournament.teams_count ?? 0) > 0 &&
